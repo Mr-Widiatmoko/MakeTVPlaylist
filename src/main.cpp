@@ -377,39 +377,12 @@ Option:\n\
 										
 					putIntoPlaylist(bufferFiles[indexFile]);
 
-//					auto file = bufferFiles[indexFile];
-//
-//					outputFile << fs::absolute(file).string() << '\n';
-//					#ifndef DEBUG
-//					if (verbose)
-//					#endif
-//						std::cout << fs::absolute(file).string() << '\n';
-//
-//					pleylistCount += 1;
-//
-//					std::vector<fs::path> subtitleFiles = {};
-//					findSubtitleFile(file, &subtitleFiles);
-//					for (auto& sf : subtitleFiles) {
-//						outputFile << fs::absolute(sf).string() << '\n';
-//						#ifndef DEBUG
-//						if (verbose)
-//						#endif
-//							std::cout << fs::absolute(sf).string() << '\n';
-//					}
 				}
 			} //end pass loop
 		}
 		
 		if (indexFile < selectFiles.size()) {
 			putIntoPlaylist(selectFiles[indexFile]);
-//			outputFile << fs::absolute(selectFiles[indexFile]).string() << '\n';
-//			#ifndef DEBUG
-//			if (verbose)
-//			#endif
-//				std::cout << fs::absolute(selectFiles[indexFile]).string() << '\n';
-//
-//			pleylistCount += 1;
-			
 			if (finish and indexFile < selectFiles.size() - 1) {
 				finish = false;
 			}

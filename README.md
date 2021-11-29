@@ -28,9 +28,9 @@ For Apple Silicon, Windows, Linux, and POSIX users, you just need to compile [ma
 At least you need to download (Only for macOS) [Make TV Playlist.workflow](https://raw.githubusercontent.com/Mr-Widiatmoko/MakeTVPlaylist/master/Release/Make%20TV%20Playlist.workflow.zip), then Double-Click on Finder to install (as Finder Quick Action Extension), that's it, your done!.
 
 But, if you need blasting super speed for processing, you may want to download  [tvplaylist](https://raw.githubusercontent.com/Mr-Widiatmoko/MakeTVPlaylist/master/Release/tvplaylist) just by put this file into: 
-	- Inside "/usr/local/bin" folder (PREFERED) or
-	- Home folder (eg: /Users/[YOU]) or 
-	- Download folder (eg: /Users/[YOU]/Downloads).
+- Inside "/usr/local/bin" folder (PREFERED) or
+- Home folder (eg: /Users/[YOU]) or 
+- Download folder (eg: /Users/[YOU]/Downloads).
 Thats it, and "Make TV Playlist" will automatically call "tvplaylist" for processing.
 
 To build "tvplaylist" on macOS Apple Silicon, Windows, or Linux. Inside "MakeTVPlaylist" folder (or folder containing CMakeLists.txt) copy below and paste on the Terminal:

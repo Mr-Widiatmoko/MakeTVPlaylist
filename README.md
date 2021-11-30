@@ -31,6 +31,7 @@ But, if you need blasting super speed for processing, you may want to download  
 - Inside "/usr/local/bin" folder (PREFERED) or
 - Home folder (eg: /Users/[YOU]) or 
 - Download folder (eg: /Users/[YOU]/Downloads).
+
 Thats it, and "Make TV Playlist" will automatically call "tvplaylist" for processing.
 
 To build "tvplaylist" on macOS Apple Silicon, Windows, or Linux. Inside "MakeTVPlaylist" folder (or folder containing CMakeLists.txt) copy below and paste on the Terminal:

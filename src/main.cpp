@@ -322,7 +322,7 @@ Option:\n\
 	
 	std::map<std::string, std::shared_ptr<std::vector<fs::path>>> records;
 	
-	std::string outputName = outDir + (fixFilename != "" ? fixFilename : "playlist_from_" +
+	fs::path outputName = outDir + (fixFilename != "" ? fixFilename : "playlist_from_" +
 								(argc == 1
 									  ? fs::path(argv[0]).parent_path().filename().string()
 									  : (argc == 2
@@ -412,7 +412,7 @@ Option:\n\
 		
 		indexFile += 1;
 		
-		if (finish)
+		if (finish and indexFileSelected >= selectFiles.size())
 			break;
 	}
 	

@@ -152,8 +152,6 @@ std::set<fs::path> seasonDirs	= {};
 std::vector<fs::path> selectFiles  = {};
 
 func checkForSeasonDir(const fs::path& path) -> void {
-	regularDirs.insert(path);
-	
 	auto isNamedAsSeasonDir = [](const fs::path& path) {
 		auto source = path.string();
 		auto suffix = after("season", source, true, true);
@@ -170,9 +168,11 @@ func checkForSeasonDir(const fs::path& path) -> void {
 	
 	std::vector<std::thread> threads;
 	
-	if (not path.empty())
+	if (not path.empty()) {
+		auto hasDir = false;
 		for (auto& child : fs::directory_iterator(path))
 			if (child.is_directory()) {
+				hasDir = true;
 				if (isNamedAsSeasonDir(child))
 					possibleSeasonDirs.insert(child);
 				else {
@@ -180,7 +180,12 @@ func checkForSeasonDir(const fs::path& path) -> void {
 					threads.emplace_back(checkForSeasonDir, child);
 				}
 			}
-	
+		
+		if (not hasDir and isNamedAsSeasonDir(path))
+			seasonDirs.insert(path);
+		else
+			regularDirs.insert(path);
+	}
 	for (auto& t : threads)
 		t.join();
 
@@ -288,18 +293,32 @@ Option:\n\
 	
 	const auto maxDirSize = (regularDirSize >= seasonDirSize ? regularDirSize : seasonDirSize);
 	
+	fs::path firstR, firstS;
+	auto swapDirs = false;
+	
 	/// Convert std::set to classic array, to enable call by index subscript.
 	auto index = 0;
 	fs::path regularDirs[regularDirSize];
-	for (auto& d : ::regularDirs)
+	for (auto& d : ::regularDirs) {
+		if (index == 0)
+			firstR = d;
 		regularDirs[index++] = d;
+	}
 	
 	index = 0;
 	fs::path seasonDirs[seasonDirSize];
-	for (auto& sd : ::seasonDirs)
+	for (auto& sd : ::seasonDirs) {
+		if (index == 0)
+			firstS = sd;
 		seasonDirs[index++] = sd;
+	}
+	
+	std::sort(selectFiles.begin(), selectFiles.end());
 
+	swapDirs = firstS.string() < firstR.string();
+	
 	auto indexFile = 0;
+	auto indexFileSelected =0;
 	
 	std::map<std::string, std::shared_ptr<std::vector<fs::path>>> records;
 	
@@ -309,7 +328,7 @@ Option:\n\
 									  : (argc == 2
 										 ? fs::path(argv[1]).filename().string()
 										 : std::to_string(inputDirCount))) + "_dir" + (inputDirCount > 2 ? "s" : "") + ".m3u8");
-	if (overwrite and fs::exists(outputName))
+	if (fs::exists(outputName) and overwrite)
 		fs::remove(outputName);
 	else
 		std::string outputName = getAvailableFilename(outputName);
@@ -341,10 +360,18 @@ Option:\n\
 	while (true) {
 		auto finish = true;
 		
+		auto putSelectFile = [&]() {
+			putIntoPlaylist(selectFiles[indexFileSelected]);
+			indexFileSelected += 1;
+		};
+		
 		for (auto i = 0; i < maxDirSize; ++i) {
 			for (auto indexPass = 1; indexPass <= 2; ++indexPass) { ///pass 1 for regularDirs, pass 2 for seasonDirs
-				if ((indexPass == 1 and i >= regularDirSize)
-					or (indexPass == 2 and i >= seasonDirSize)) {
+
+				auto passSwapDirs = (indexPass == 1 and swapDirs == false) or (indexPass == 2 and swapDirs);
+
+				if ((indexPass == 1 and i >= (not swapDirs ? regularDirSize : seasonDirSize))
+					or (indexPass == 2 and i >= (not swapDirs ? seasonDirSize : regularDirSize))) {
 					continue;
 				}
 				
@@ -355,13 +382,13 @@ Option:\n\
 						bufferFiles.push_back(f.path());
 				};
 				
-				auto dir = (indexPass == 1 ? regularDirs[i] : seasonDirs[i]);
+				auto dir = (passSwapDirs ? regularDirs[i] : seasonDirs[i]);
 				if (dir.empty())
 					continue;
 				
 				auto found = records[dir.string()];
 				if (found == nullptr) {
-					if (indexPass == 1)
+					if (passSwapDirs)
 						for (auto& f : fs::directory_iterator(dir))
 							filterChildFiles(f);
 					else
@@ -376,17 +403,12 @@ Option:\n\
 					finish = false;
 										
 					putIntoPlaylist(bufferFiles[indexFile]);
-
 				}
 			} //end pass loop
 		}
 		
-		if (indexFile < selectFiles.size()) {
-			putIntoPlaylist(selectFiles[indexFile]);
-			if (finish and indexFile < selectFiles.size() - 1) {
-				finish = false;
-			}
-		}
+		if (indexFileSelected < selectFiles.size())
+			putSelectFile();
 		
 		indexFile += 1;
 		

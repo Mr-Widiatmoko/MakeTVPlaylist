@@ -22,7 +22,7 @@ For Apple Silicon, Windows, Linux, and POSIX users, you just need to compile [ma
 - [CMakeLists.txt](https://github.com/Mr-Widiatmoko/MakeTVPlaylist/CMakeLists.txt) file to build "tvplaylist" using cmake.  
 - [README](https://github.com/Mr-Widiatmoko/MakeTVPlaylist/README) folder contains files needed by this [README.md](https://github.com/Mr-Widiatmoko/MakeTVPlaylist/README.md)
 - [README.md](https://github.com/Mr-Widiatmoko/MakeTVPlaylist/README.md) file displaying What you looking right now.
-- [LICENSE.txt](https://github.com/Mr-Widiatmoko/MakeTVPlaylist/LICENSE.txt) file license for this software.
+- [LICENSE.txt](https://github.com/Mr-Widiatmoko/MakeTVPlaylist/LICENSE.txt) license file for this software.
 
 ## Installation:
 At least you need to download (Only for macOS) [Make TV Playlist.workflow](https://raw.githubusercontent.com/Mr-Widiatmoko/MakeTVPlaylist/master/Release/Make%20TV%20Playlist.workflow.zip), then Double-Click on Finder to install (as Finder Quick Action Extension), that's it, your done!.
@@ -63,4 +63,5 @@ Don't forget to [Press ENTER]. Thats it, you will get "tvplaylist" on "Release" 
 
 ## Donation:
 ![Brave Wallet](https://raw.githubusercontent.com/Mr-Widiatmoko/MakeTVPlaylist/master/README/BW.png "0x7023122b749ac0AD65fc60E64525aC3de36D7677")
-0x7023122b749ac0AD65fc60E64525aC3de36D7677
+	
+	0x7023122b749ac0AD65fc60E64525aC3de36D7677

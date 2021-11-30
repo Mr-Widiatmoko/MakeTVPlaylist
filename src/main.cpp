@@ -1,12 +1,12 @@
 //
 //  main.cpp
-//  Make Serial TV Playlist
+//  Make TV Playlist
 //
 //  Created by Mr-Widiatmoko on 11/26/21.
 //
-//  This file is part of Make Serial TV Playlist. It is subject to the license terms 
+//  This file is part of Make TV Playlist. It is subject to the license terms
 //  in the LICENSE file found in the top-level directory of this
-//  distribution and at http://github.com/Mr-Widiatmoko/MakeSerialTVPlaylist/LICENSE.txt
+//  distribution and at https://github.com/Mr-Widiatmoko/MakeTVPlaylist/LICENSE.txt
 //
 
 #if DEBUG

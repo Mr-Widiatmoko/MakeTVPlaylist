@@ -19,11 +19,9 @@
 #include <set>
 #include <map>
 #include <filesystem>
-//#include <atomic>
 #include <thread>
 #include <cstdarg>
 #include <algorithm>
-//#include <ranges>
 #include <fstream>
 
 #define func auto
@@ -55,9 +53,9 @@ func trim(std::string s) -> std::string
 	return s.substr(start, end);
 }
 
-func isEqual(std::string source, std::vector<std::string> args) -> bool
+func isEqual(std::string source, const std::vector<std::string>* args) -> bool
 {
-	for (auto& check : args)
+	for (auto& check : *args)
 		if (source == check)
 			return true;
 
@@ -102,13 +100,37 @@ func excludeExtension(const fs::path& path) -> std::string
 	return path.string().substr(0, path.string().size() - path.extension().string().size());
 }
 
-func isMediaFile(const fs::path& path) -> bool
+func parseCommaDelimited(const std::string& literal, std::vector<std::string>* result)
 {
-	return fs::is_regular_file(path) and isEqual(tolower(path.extension().string()),
-		{".mp4", ".mkv", ".mov", ".m4v", ".mpeg", ".mpg", ".mts", ".ts", ".webm",
-		".flv", ".opus", ".pcm", ".wmv", ".mp3", ".aac", ".aif", ".aiff", ".3gp",
-		".avi", ".ape", ".asf", ".flac", ".cue", "divx", ".dv", ".mka", ".ra",
-		".rmvb", ".rm", ".vox", ".wma", ".wav", ".acm"});
+	std::string buffer = "";
+	for (auto& c : literal) {
+		if (std::isspace(c))
+			continue;
+		else if (c == ',' and buffer.size() > 2) {
+			if (buffer[0] == '*' and buffer[1] == '.')
+				buffer.erase(buffer.begin());
+			else if (buffer[0] not_eq '.')
+				buffer.insert(buffer.begin(), '.');
+			result->push_back(buffer);
+			buffer = "";
+		} else
+			buffer += c;
+	}
+}
+
+func isMediaFile(const fs::path& path, const std::string extensions) -> bool
+{
+	std::vector<std::string> x;
+	if (extensions.empty()) {
+		constexpr auto s = ".mp4, .mkv, .mov, .m4v, .mpeg, .mpg, .mts, .ts, .webm,\
+		.flv, .opus, .pcm, .wmv, .mp3, .aac, .aif, .aiff, .3gp,\
+		.avi, .ape, .asf, .flac, .cue, divx, .dv, .mka, .ra,\
+		.rmvb, .rm, .vox, .wma, .wav, .acm";
+		parseCommaDelimited(s, &x);
+	} else
+		parseCommaDelimited(tolower(extensions), &x);
+	
+	return fs::is_regular_file(path) and isEqual(tolower(path.extension().string()), &x);
 }
 
 func findSubtitleFile(const fs::path& original,
@@ -116,12 +138,14 @@ func findSubtitleFile(const fs::path& original,
 {
 	auto noext = excludeExtension(original);
 	auto parentPath = original.parent_path();
+	std::vector<std::string> x{".srt", ".ass", ".vtt"};
+	
 	if (not parentPath.empty())
 		for (auto& f : fs::directory_iterator(parentPath)) {
 			if (f.is_regular_file()
 				and f.path().string().size() >= original.string().size()
 				and f.path().string().substr(0, noext.size()) == noext
-				and isEqual(tolower(f.path().extension().string()), {".srt", ".ass", ".vtt"}))
+				and isEqual(tolower(f.path().extension().string()), &x))
 			{
 				result->push_back(f.path());
 			}
@@ -217,6 +241,21 @@ func checkForSeasonDir(const fs::path& path) -> void {
 		t.join();
 }
 
+func processOption(const char *argv) -> const char *
+{
+	auto length = std::strlen(argv);
+	
+	if (length > 2 and ( argv[0] == '-' and argv[1] == '-')) {
+		argv++;
+		argv++;
+	} //else if (length > 1 and argv[0] == '-') argv++;
+	else {
+		return nullptr;
+	}
+	
+	return argv;
+}
+
 #undef func
 constexpr auto VERSION="version 1 (Late 2021)\n™ and © 2021 Widiatmoko. \
 All Rights Reserved. License and Warranty\n";
@@ -224,11 +263,16 @@ All Rights Reserved. License and Warranty\n";
 int main(int argc, char *argv[]) {
 	std::vector<std::thread> threads;
 	
-	auto verbose = false;
-	auto overwrite = false;
-	std::string outDir = "";
-	std::string fixFilename = "";
 	unsigned inputDirCount = 0;
+	
+	std::map<std::string, std::string> state;
+	constexpr auto OPT_HELP 			= "help";
+	constexpr auto OPT_VERBOSE 			= "verbose";
+	constexpr auto OPT_OVERWRITE 		= "overwrite";
+	constexpr auto OPT_SKIPSUBTITLE 	= "skip-subtitle";
+	constexpr auto OPT_ONLYEXT 			= "only-ext";
+	constexpr auto OPT_FIXFILENAME 		= "fix-filename";
+	constexpr auto OPT_OUTDIR 			= "out-dir";
 	
 	#if DEBUG
 	auto start = std::chrono::system_clock::now();
@@ -239,7 +283,8 @@ int main(int argc, char *argv[]) {
 		inputDirCount += 1;
 	} else {
 		for (int i=1; i<argc; ++i) {
-			if (0 == std::strcmp(argv[i], "--help")) {
+			auto opt = processOption(argv[i]);
+			if (opt) {if (0 == std::strcmp(opt, OPT_HELP)) {
 				std::cout <<
 				fs::path(argv[0]).filename().string() << ' '
 				<< VERSION <<
@@ -249,39 +294,61 @@ for all input titles.\n\n\
 Usage:\n    "<< fs::path(argv[0]).filename()<<" [Option or Dir or File] ...\n\n\
 If no argument was specified, the current directory will be use.\n\n\
 Option:\n\
---overwrite                 Overwrite output playlist file.\n\
---verbose                   Display playlist content.\n\
---fix-filename [filename]   Set output playlist filename.\n\
---out-dir [directory path]  Set output directory for playlist file.\n";
+--overwrite                 	Overwrite output playlist file.\n\
+--verbose                   	Display playlist content.\n\
+--skip-subtitle			Dont include subtitle file.\n\
+--only-ext \"extension, ...\"	Search only specific extensions, separated by comma.\n\
+--fix-filename \"filename\"   	Set output playlist filename.\n\
+--out-dir \"directory path\"  	Set output directory for playlist file.\n";
 				return 0;
-			} else if (0 == std::strcmp(argv[i], "--overwrite"))
-				overwrite = true;
-			else if (0 == std::strcmp(argv[i], "--verbose"))
-				verbose = true;
-			else if (0 == std::strcmp(argv[i], "--fix-filename") and i + 1 < argc) {
+			} else if (0 == std::strcmp(opt, OPT_OVERWRITE))
+				state[opt] = "true";
+			else if (0 == std::strcmp(opt, OPT_VERBOSE))
+				state[opt] = "true";
+			else if (0 == std::strcmp(opt, OPT_SKIPSUBTITLE))
+				state[opt] = "true";
+			else if (0 == std::strcmp(opt, OPT_ONLYEXT)) {
+				if (i + 1 < argc) {
+					i++;
+					state[opt] = argv[i];
+				} else
+					std::cout << "Expecting extension after \"only-ext\" option \
+(eg: \".mp4, .mkv\").\n";
+				
+			} else if (0 == std::strcmp(opt, OPT_FIXFILENAME) and i + 1 < argc) {
 				i += 1;
-				fixFilename = argv[i];
-				if (not fs::path(fixFilename).parent_path().string().empty())
+				state[opt] = argv[i];
+				if (not fs::path(state[opt]).parent_path().string().empty())
 				{
-					fixFilename = fs::path(fixFilename).filename().string();
-					outDir = fs::path(fixFilename).parent_path().string() + fs::path::preferred_separator;
+					state[opt] = fs::path(state[opt]).filename().string();
+					state[OPT_OUTDIR] = fs::path(state[opt]).parent_path().string()
+						+ fs::path::preferred_separator;
 				}
 				
-			} else if (0 == std::strcmp(argv[i], "--out-dir") and i + 1 < argc) {
+			} else if (0 == std::strcmp(opt, OPT_OUTDIR) and i + 1 < argc) {
 				i += 1;
-				outDir = fs::absolute(argv[i]);
-				if (fs::exists(outDir)) {
-					if (outDir[outDir.size() - 1] not_eq fs::path::preferred_separator)
-						outDir += fs::path::preferred_separator;
+				state[opt] = fs::absolute(argv[i]);
+				if (fs::exists(state[opt])) {
+					auto tmp = state[opt];
+					if (tmp[tmp.size() - 1] not_eq fs::path::preferred_separator) {
+						tmp += fs::path::preferred_separator;
+						state[opt] = tmp;
+					}
 				} else
-					std::cout << "Cannot set output dir to " << fs::path(outDir) << '\n';
-			} else if (fs::is_directory(argv[i])) {
+					std::cout << "Cannot set output dir to " << fs::path(state[opt]) << '\n';
+			} else
+				goto THERE;
+		} else
+THERE:		if (fs::is_directory(argv[i])) {
 				if (i == 1 and 1 == argc - 1)
-					outDir = fs::absolute(argv[i]).string() + fs::path::preferred_separator;
+					state[opt] = fs::absolute(argv[i]).string() + fs::path::preferred_separator;
 				inputDirCount += 1;
 				threads.emplace_back(checkForSeasonDir, argv[i]);
-			} else if (isMediaFile(argv[i]))
+			} else if (isMediaFile(argv[i], state[OPT_ONLYEXT]))
 				selectFiles.push_back(argv[i]);
+			else
+				std::cout << "What is this: \"" << argv[i] << "\"?, try type \""
+						<< fs::path(argv[0]).filename().string() << " help\"\n";
 		}
 	
 		for (auto& t : threads)
@@ -293,42 +360,33 @@ Option:\n\
 	
 	const auto maxDirSize = (regularDirSize >= seasonDirSize ? regularDirSize : seasonDirSize);
 	
-	fs::path firstR, firstS;
-	auto swapDirs = false;
-	
 	/// Convert std::set to classic array, to enable call by index subscript.
 	auto index = 0;
 	fs::path regularDirs[regularDirSize];
-	for (auto& d : ::regularDirs) {
-		if (index == 0)
-			firstR = d;
+	for (auto& d : ::regularDirs)
 		regularDirs[index++] = d;
-	}
 	
 	index = 0;
 	fs::path seasonDirs[seasonDirSize];
-	for (auto& sd : ::seasonDirs) {
-		if (index == 0)
-			firstS = sd;
+	for (auto& sd : ::seasonDirs)
 		seasonDirs[index++] = sd;
-	}
 	
 	std::sort(selectFiles.begin(), selectFiles.end());
 
-	swapDirs = firstS.string() < firstR.string();
+	auto swapDirs = seasonDirs[0].string() < regularDirs[0].string();
 	
 	auto indexFile = 0;
 	auto indexFileSelected =0;
 	
 	std::map<std::string, std::shared_ptr<std::vector<fs::path>>> records;
 	
-	fs::path outputName = outDir + (fixFilename != "" ? fixFilename : "playlist_from_" +
+	fs::path outputName = state[OPT_OUTDIR] + (state[OPT_FIXFILENAME] != "" ? state[OPT_FIXFILENAME] : "playlist_from_" +
 								(argc == 1
 									  ? fs::path(argv[0]).parent_path().filename().string()
 									  : (argc == 2
 										 ? fs::path(argv[1]).filename().string()
 										 : std::to_string(inputDirCount))) + "_dir" + (inputDirCount > 2 ? "s" : "") + ".m3u8");
-	if (fs::exists(outputName) and overwrite)
+	if (fs::exists(outputName) and state[OPT_OVERWRITE] == "true")
 		fs::remove(outputName);
 	else
 		std::string outputName = getAvailableFilename(outputName);
@@ -340,18 +398,21 @@ Option:\n\
 	auto putIntoPlaylist = [&](const fs::path& file) {
 		outputFile << fs::absolute(file).string() << '\n';
 		#ifndef DEBUG
-		if (verbose)
+		if (state[OPT_VERBOSE] == "true")
 		#endif
 			std::cout << fs::absolute(file).string() << '\n';
 		
 		pleylistCount += 1;
+		
+		if (state[OPT_SKIPSUBTITLE] == "true")
+			return;
 		
 		std::vector<fs::path> subtitleFiles = {};
 		findSubtitleFile(file, &subtitleFiles);
 		for (auto& sf : subtitleFiles) {
 			outputFile << fs::absolute(sf).string() << '\n';
 			#ifndef DEBUG
-			if (verbose)
+			if (state[OPT_VERBOSE] == "true")
 			#endif
 				std::cout << fs::absolute(sf).string() << '\n';
 		}
@@ -377,8 +438,8 @@ Option:\n\
 				
 				std::vector<fs::path> bufferFiles;
 
-				auto filterChildFiles = [&bufferFiles](const fs::directory_entry& f) {
-					if (isMediaFile(f.path()))
+				auto filterChildFiles = [&bufferFiles, &state](const fs::directory_entry& f) {
+					if (isMediaFile(f.path(), state[OPT_ONLYEXT]))
 						bufferFiles.push_back(f.path());
 				};
 				

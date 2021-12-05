@@ -26,11 +26,6 @@
 
 #define func auto
 
-func toBytes() -> std::uintmax_t
-{
-	return 0;
-}
-
 func tolower(std::string s) -> std::string
 {
 	std::transform(s.begin(), s.end(), s.begin(),
@@ -286,7 +281,7 @@ func checkForSeasonDir(const fs::path& path) -> void {
 				}
 			}
 		
-		if ((not hasDir and isNamedAsSeasonDir(path)) or isNum)
+		if ((not hasDir and isNamedAsSeasonDir(path)) or (isNum and hasDir))
 			seasonDirs.insert(path);
 		else
 			regularDirs.insert(path);

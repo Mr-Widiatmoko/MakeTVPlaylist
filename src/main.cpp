@@ -26,6 +26,11 @@
 
 #define func auto
 
+func toBytes() -> std::uintmax_t
+{
+	return 0;
+}
+
 func tolower(std::string s) -> std::string
 {
 	std::transform(s.begin(), s.end(), s.begin(),
@@ -140,7 +145,8 @@ func parseCommaDelimited(const std::string& literal, std::vector<std::string>* r
 	}
 }
 
-func isMediaFile(const fs::path& path, const std::string extensions) -> bool
+func isMediaFile(const fs::path& path, const std::string extensions,
+				 bool greaterThan = false, std::uintmax_t size = 0) -> bool
 {
 	std::vector<std::string> x;
 	if (extensions.empty()) {
@@ -152,7 +158,10 @@ func isMediaFile(const fs::path& path, const std::string extensions) -> bool
 	} else
 		parseCommaDelimited(tolower(extensions), &x);
 	
-	return fs::is_regular_file(path) and isEqual(tolower(path.extension().string()), &x);
+	return fs::is_regular_file(path) and isEqual(tolower(path.extension().string()), &x)
+	and (size == 0 ? true :
+		 (greaterThan ? fs::file_size(path) > size : fs::file_size(path) < size)
+		 );
 }
 
 func findSubtitleFile(const fs::path& original,
@@ -345,6 +354,10 @@ int main(int argc, char *argv[]) {
 	constexpr auto OPT_ONLYEXT 			= "only-ext";
 	constexpr auto OPT_FIXFILENAME 		= "fix-filename";
 	constexpr auto OPT_OUTDIR 			= "out-dir";
+	constexpr auto OPT_SIZE				= "size";
+	constexpr auto OPT_SIZEOPGT			= "size_op";
+	
+	state[OPT_SIZE] = "0";
 	
 	#if DEBUG
 	auto start = std::chrono::system_clock::now();
@@ -368,8 +381,13 @@ If no argument was specified, the current directory will be use.\n\n\
 Option:\n\
 --overwrite                 	Overwrite output playlist file.\n\
 --verbose                   	Display playlist content.\n\
---skip-subtitle			Dont include subtitle file.\n\
---only-ext \"extension, ...\"	Search only specific extensions, separated by comma.\n\
+--skip-subtitle					Dont include subtitle file.\n\
+--only-ext \"extension, ...\"		Filter only specific extensions, separated by comma.\n\
+								Example: --only-ext \"mp4, mkv\"\n\
+--size \"<\" or \">\" \"SIZE\"		Filter by size in \"KB\", \"MB\" (default), or \"GB\".\n\
+								Example: --size < 2.2\n\
+										or\n\
+										 --size > 1.2gb\n\
 --fix-filename \"filename\"   	Set output playlist filename.\n\
 --out-dir \"directory path\"  	Set output directory for playlist file.\n";
 				return 0;
@@ -387,6 +405,27 @@ Option:\n\
 					std::cout << "Expecting extension after \"only-ext\" option \
 (eg: \".mp4, .mkv\").\n";
 				
+			} else if (0 == std::strcmp(opt, OPT_SIZE) and i + 2 < argc) {
+				if (std::strlen(argv[i + 1]) > 0 and ( argv[i + 1][0] == '<' or argv[i + 1][0] == '>') ) {
+					i++;
+					state[OPT_SIZEOPGT] = argv[i][0] == '>' ? "true" : "false";
+					i++;
+					std::string size(argv[i]);
+					std::string unit = "mb";
+					if (std::isalpha(size[size.size() - 2])) {
+						unit = tolower(size.substr(size.size() - 2, size.size()));
+						size = size.substr(0, size.size() - 2);
+					}
+					float sf = std::stof(size);
+					if (unit == "gb")
+						sf *= 1000000000;
+					else if (unit == "kb")
+						sf *= 1000;
+					else
+						sf *= 1000000;
+					
+					state[opt] = std::to_string(sf);
+				}
 			} else if (0 == std::strcmp(opt, OPT_FIXFILENAME) and i + 1 < argc) {
 				i += 1;
 				state[opt] = argv[i];
@@ -416,7 +455,9 @@ THERE:		if (fs::is_directory(argv[i])) {
 					state[OPT_OUTDIR] = fs::absolute(argv[i]).string() + fs::path::preferred_separator;
 				inputDirCount += 1;
 				threads.emplace_back(checkForSeasonDir, argv[i]);
-			} else if (isMediaFile(argv[i], state[OPT_ONLYEXT]))
+			} else if (isMediaFile(argv[i], state[OPT_ONLYEXT],
+								   state[OPT_SIZEOPGT] == "true",
+								   std::stof(state[OPT_SIZE])))
 				selectFiles.push_back(argv[i]);
 			else
 				std::cout << "What is this: \"" << argv[i] << "\"?, try type \""
@@ -511,7 +552,7 @@ THERE:		if (fs::is_directory(argv[i])) {
 				std::vector<fs::path> bufferFiles;
 
 				auto filterChildFiles = [&bufferFiles, &state](const fs::directory_entry& f) {
-					if (isMediaFile(f.path(), state[OPT_ONLYEXT]))
+					if (isMediaFile(f.path(), state[OPT_ONLYEXT], state[OPT_SIZEOPGT] == "true", std::stof(state[OPT_SIZE])))
 						bufferFiles.push_back(f.path());
 				};
 				

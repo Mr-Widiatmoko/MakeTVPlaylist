@@ -93,6 +93,28 @@ func after(const std::string& keyword,
 	return source;
 }
 
+func containInts(const std::string s) -> std::vector<int>
+{
+	std::string buffer = "";
+	std::vector<int> nums;
+	for (auto i = 0; i < s.size(); ++i) {
+		const auto c = s[i];
+		if (std::isdigit(c)) {
+			buffer += c;
+		} else {
+			if (buffer.empty())
+				continue;
+			nums.push_back(std::stoi(buffer));
+			buffer.clear();
+		}
+	}
+	
+	if (not buffer.empty())
+		nums.push_back(std::stoi(buffer));
+	
+	return nums;
+}
+
 namespace fs = std::filesystem;
 
 func excludeExtension(const fs::path& path) -> std::string
@@ -178,9 +200,9 @@ std::vector<fs::path> selectFiles  = {};
 func checkForSeasonDir(const fs::path& path) -> void {
 	auto isNamedAsSeasonDir = [](const fs::path& path) {
 		auto source = path.string();
-		auto suffix = after("season", source, true, true);
+
 		for (auto& keyword : {"season", "s"}) {
-			suffix = after(keyword, source, true, true);
+			auto suffix = after(keyword, source, true, true);
 			if (source not_eq suffix and isInt(suffix))
 				return true;
 		}
@@ -194,18 +216,68 @@ func checkForSeasonDir(const fs::path& path) -> void {
 	
 	if (not path.empty()) {
 		auto hasDir = false;
+		
+		bool isNum = true;
+		std::vector<int> lastNum;
+		std::vector<fs::path> bufferNum;
+		
+		auto pullFromBUfferNum = [&threads, &bufferNum, &isNum]() {
+			isNum = false;
+			for (auto& child : bufferNum) {
+				regularDirs.insert(child);
+				threads.emplace_back(checkForSeasonDir, child);
+			}
+		};
+		
+		std::vector<fs::directory_entry> sortedDir;
 		for (auto& child : fs::directory_iterator(path))
+			sortedDir.push_back(child);
+		
+		std::sort(sortedDir.begin(), sortedDir.end());
+		for (auto& child : sortedDir)
 			if (child.is_directory()) {
 				hasDir = true;
+				auto filename = child.path().filename().string();
 				if (isNamedAsSeasonDir(child))
-					possibleSeasonDirs.insert(child);
-				else {
-					regularDirs.insert(child);
-					threads.emplace_back(checkForSeasonDir, child);
+				{
+					possibleSeasonDirs.insert(child.path());
+					pullFromBUfferNum();
+				}
+				else
+				{
+					if (isNum) {
+						auto iNames = containInts(filename);
+						if (not iNames.empty()) {
+							if (lastNum.empty()) {
+								lastNum = std::move(iNames);
+								bufferNum.push_back(child.path());
+								continue;
+							} else if (lastNum.size() == iNames.size()) {
+								bool hasIncreased = false;
+								for (auto xi = 0; xi < lastNum.size(); ++xi)
+									if (lastNum[xi] < iNames[xi]) {
+										hasIncreased = true;
+										break;
+									}
+								
+								if (hasIncreased) {
+									bufferNum.push_back(child.path());
+									continue;
+								}
+							}
+						}
+						pullFromBUfferNum();
+					}
+					else
+					{
+						regularDirs.insert(child.path());
+						threads.emplace_back(checkForSeasonDir, child.path());
+						pullFromBUfferNum();
+					}
 				}
 			}
 		
-		if (not hasDir and isNamedAsSeasonDir(path))
+		if ((not hasDir and isNamedAsSeasonDir(path)) or isNum)
 			seasonDirs.insert(path);
 		else
 			regularDirs.insert(path);
@@ -341,7 +413,7 @@ Option:\n\
 		} else
 THERE:		if (fs::is_directory(argv[i])) {
 				if (i == 1 and 1 == argc - 1)
-					state[opt] = fs::absolute(argv[i]).string() + fs::path::preferred_separator;
+					state[OPT_OUTDIR] = fs::absolute(argv[i]).string() + fs::path::preferred_separator;
 				inputDirCount += 1;
 				threads.emplace_back(checkForSeasonDir, argv[i]);
 			} else if (isMediaFile(argv[i], state[OPT_ONLYEXT]))

@@ -462,7 +462,7 @@ int main(int argc, char *argv[]) {
 				<< VERSION <<
 "\nCreate playlist file '.m3u8' from vary directories and files, \
 then arranged one episode per title \
-for all input titles.\n\n\
+for all input titles.\nHosted in https://github.com/Mr-Widiatmoko/MakeTVPlaylist\n\n\
 Usage:\n    "<< fs::path(argv[0]).filename()<<" [Option or Dir or File] ...\n\n\
 If no argument was specified, the current directory will be use.\n\n\
 Option:\n\
@@ -477,8 +477,8 @@ Option:\n\
 					   --size > 1.2gb\n\
 					OR using range with '-' OR '..'\n\
 					   --size 750-1.2gb\n\
---fix-filename \"filename\"   	Set output playlist filename.\n\
---out-dir \"directory path\"  	Set output directory for playlist file.\n";
+--fix-filename \"filename\"   	Override output playlist filename.\n\
+--out-dir \"directory path\"  	Override output directory for playlist file.\n";
 				return 0;
 			} else if (0 == std::strcmp(opt, OPT_OVERWRITE))
 				state[opt] = "true";

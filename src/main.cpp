@@ -41,12 +41,12 @@ func trim(std::string s) -> std::string
 {
 	unsigned long start=0, end=s.size();
 	for (auto i=0; i<end; ++i)
-		if (s[i] not_eq ' ') {
+		if (not std::isspace(s[i])) {
 			start=i;
 			break;
 		}
 	for (auto i=end; i>start; --i)
-		if (s[i] not_eq ' ') {
+		if (not std::isspace(s[i])) {
 			end=i;
 			break;
 		}
@@ -141,7 +141,7 @@ func parseCommaDelimited(const std::string& literal, std::vector<std::string>* r
 }
 
 func isMediaFile(const fs::path& path, const std::string extensions,
-				 bool greaterThan = false, std::uintmax_t size = 0) -> bool
+				 char greaterThan = '\0', std::uintmax_t size = 0, std::uintmax_t sizeTo = 0) -> bool
 {
 	std::vector<std::string> x;
 	if (extensions.empty()) {
@@ -153,9 +153,11 @@ func isMediaFile(const fs::path& path, const std::string extensions,
 	} else
 		parseCommaDelimited(tolower(extensions), &x);
 	
+	auto fileSize = fs::file_size(path);
 	return fs::is_regular_file(path) and isEqual(tolower(path.extension().string()), &x)
-	and (size == 0 ? true :
-		 (greaterThan ? fs::file_size(path) > size : fs::file_size(path) < size)
+	and (size == 0 and sizeTo == 0 ? true
+		 : (greaterThan == '\0' ? fileSize > size and fileSize < sizeTo
+			: (greaterThan == '>' ? fileSize > size : fileSize < size))
 		 );
 }
 
@@ -270,20 +272,17 @@ func checkForSeasonDir(const fs::path& path) -> void {
 								}
 							}
 						}
-						pullFromBUfferNum();
 					}
-					else
-					{
-						regularDirs.insert(child.path());
-						threads.emplace_back(checkForSeasonDir, child.path());
-						pullFromBUfferNum();
-					}
+					regularDirs.insert(child.path());
+					threads.emplace_back(checkForSeasonDir, child.path());
+					pullFromBUfferNum();
 				}
 			}
 		
-		if ((not hasDir and isNamedAsSeasonDir(path)) or (isNum and hasDir))
+		if ((not hasDir and isNamedAsSeasonDir(path)) or (isNum and hasDir)) {
+			regularDirs.erase(path);
 			seasonDirs.insert(path);
-		else
+		} else
 			regularDirs.insert(path);
 	}
 	for (auto& t : threads)
@@ -332,6 +331,43 @@ func processOption(const char *argv) -> const char *
 	return argv;
 }
 
+func getBytes(std::string s) -> uintmax_t
+{
+	std::string unit = "mb";
+	std::string value = s;
+	if (s.size() > 2 and std::isalpha(s[s.size() - 2])) {
+		unit = s.substr(s.size() - 2);
+		value = s.substr(0, s.size() - 2);
+	}
+	
+	if (not isInt(value))
+		return 0.0f;
+	
+	uintmax_t result = 0;
+	if (unit == "kb")
+		result = std::stof(value) * 1000;
+	else if (unit == "gb")
+		result = std::stof(value) * 1000000000;
+	else
+		result = std::stof(value) * 1000000;
+	
+	return result;
+}
+
+func getRange(std::string argv, std::string separator) -> std::shared_ptr<std::pair<uintmax_t, uintmax_t>>
+{
+	auto pos = argv.find("-");
+	if (pos == std::string::npos)
+		return nullptr;
+	
+	auto first = tolower(argv.substr(0, pos));
+	auto second = tolower(argv.substr(pos + separator.size()));
+
+	uintmax_t from = getBytes(first);
+	uintmax_t to = getBytes(second);
+	return std::make_shared<std::pair<uintmax_t, uintmax_t>>(from, to);
+}
+
 #undef func
 constexpr auto VERSION="version 1 (Late 2021)\n™ and © 2021 Widiatmoko. \
 All Rights Reserved. License and Warranty\n";
@@ -350,18 +386,18 @@ int main(int argc, char *argv[]) {
 	constexpr auto OPT_FIXFILENAME 		= "fix-filename";
 	constexpr auto OPT_OUTDIR 			= "out-dir";
 	constexpr auto OPT_SIZE				= "size";
+	constexpr auto OPT_SIZETO			= "size_to";
 	constexpr auto OPT_SIZEOPGT			= "size_op";
 	
+	state[OPT_SIZEOPGT] = "\0";
 	state[OPT_SIZE] = "0";
+	state[OPT_SIZETO] = "0";
 	
 	#if DEBUG
 	auto start = std::chrono::system_clock::now();
 	#endif
 	
-	if (argc == 1) {
-		checkForSeasonDir(fs::path(argv[0]).parent_path());
-		inputDirCount += 1;
-	} else {
+	{
 		for (int i=1; i<argc; ++i) {
 			auto opt = processOption(argv[i]);
 			if (opt) {if (0 == std::strcmp(opt, OPT_HELP)) {
@@ -376,13 +412,15 @@ If no argument was specified, the current directory will be use.\n\n\
 Option:\n\
 --overwrite                 	Overwrite output playlist file.\n\
 --verbose                   	Display playlist content.\n\
---skip-subtitle					Dont include subtitle file.\n\
---only-ext \"extension, ...\"		Filter only specific extensions, separated by comma.\n\
-								Example: --only-ext \"mp4, mkv\"\n\
---size \"<\" or \">\" \"SIZE\"		Filter by size in \"KB\", \"MB\" (default), or \"GB\".\n\
-								Example: --size < 2.2\n\
-										or\n\
-										 --size > 1.2gb\n\
+--skip-subtitle			Dont include subtitle file.\n\
+--only-ext \"extension, ...\"	Filter only specific extensions, separated by comma.\n\
+				  Example: --only-ext \"mp4, mkv\"\n\
+--size < OR > SIZE		Filter by size in \"KB\", \"MB\" (default), or \"GB\".\n\
+       FROM-TO			  Example: --size < 750\n\
+       FROM..TO				OR by specify the unit\n\
+					   --size > 1.2gb\n\
+					OR using range with '-' OR '..'\n\
+					   --size 750-1.2gb\n\
 --fix-filename \"filename\"   	Set output playlist filename.\n\
 --out-dir \"directory path\"  	Set output directory for playlist file.\n";
 				return 0;
@@ -397,29 +435,34 @@ Option:\n\
 					i++;
 					state[opt] = argv[i];
 				} else
-					std::cout << "Expecting extension after \"only-ext\" option \
-(eg: \".mp4, .mkv\").\n";
+					std::cout << "Expecting extension after \"--" << opt << "\" option \
+(eg: \"mp4, mkv\").\n";
 				
-			} else if (0 == std::strcmp(opt, OPT_SIZE) and i + 2 < argc) {
-				if (std::strlen(argv[i + 1]) > 0 and ( argv[i + 1][0] == '<' or argv[i + 1][0] == '>') ) {
-					i++;
-					state[OPT_SIZEOPGT] = argv[i][0] == '>' ? "true" : "false";
-					i++;
-					std::string size(argv[i]);
-					std::string unit = "mb";
-					if (std::isalpha(size[size.size() - 2])) {
-						unit = tolower(size.substr(size.size() - 2, size.size()));
-						size = size.substr(0, size.size() - 2);
+			} else if (0 == std::strcmp(opt, OPT_SIZE) and i + 1 < argc) {
+				if (std::strlen(argv[i + 1]) > 0) {
+					auto nextArgv = argv[i + 1];
+					if (i + 2 < argc and (nextArgv[0] == '<' or nextArgv[0] == '>') )
+					{
+						i++;
+						state[OPT_SIZEOPGT] = argv[i][0];
+
+						i++;
+						state[opt] = std::to_string(getBytes(argv[i]));
+					} else {
+						i++;
+						auto range = getRange(argv[i], "-");
+						if (not range)
+							range = getRange(argv[i], "..");
+						if (range)
+						{
+							state[OPT_SIZE] = std::to_string(range->first);
+							state[OPT_SIZETO] = std::to_string(range->second);
+						} else {
+							i--;
+							std::cout << "Expecting operator '<' or '>' followed\
+ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..to'\n";
+						}
 					}
-					float sf = std::stof(size);
-					if (unit == "gb")
-						sf *= 1000000000;
-					else if (unit == "kb")
-						sf *= 1000;
-					else
-						sf *= 1000000;
-					
-					state[opt] = std::to_string(sf);
 				}
 			} else if (0 == std::strcmp(opt, OPT_FIXFILENAME) and i + 1 < argc) {
 				i += 1;
@@ -451,14 +494,23 @@ THERE:		if (fs::is_directory(argv[i])) {
 				inputDirCount += 1;
 				threads.emplace_back(checkForSeasonDir, argv[i]);
 			} else if (isMediaFile(argv[i], state[OPT_ONLYEXT],
-								   state[OPT_SIZEOPGT] == "true",
-								   std::stof(state[OPT_SIZE])))
+								   state[OPT_SIZEOPGT][0],
+								   std::stof(state[OPT_SIZE]),
+								   std::stof(state[OPT_SIZETO])))
 				selectFiles.push_back(argv[i]);
 			else
 				std::cout << "What is this: \"" << argv[i] << "\"?, try type \""
-						<< fs::path(argv[0]).filename().string() << " help\"\n";
+						<< fs::path(argv[0]).filename().string() << " --help\"\n";
 		}
 	
+		if (inputDirCount == 0) {
+			threads.emplace_back(checkForSeasonDir, fs::current_path());
+			inputDirCount += 1;
+		}
+		
+		if (state[OPT_OUTDIR].empty())
+			state[OPT_OUTDIR] = fs::current_path().string() + fs::path::preferred_separator;
+		
 		for (auto& t : threads)
 			t.join();
 	}
@@ -466,7 +518,7 @@ THERE:		if (fs::is_directory(argv[i])) {
 	const auto regularDirSize = ::regularDirs.size();
 	const auto seasonDirSize = ::seasonDirs.size();
 	
-	const auto maxDirSize = (regularDirSize >= seasonDirSize ? regularDirSize : seasonDirSize);
+	const auto maxDirSize = std::max(regularDirSize, seasonDirSize);
 	
 	/// Convert std::set to classic array, to enable call by index subscript.
 	auto index = 0;
@@ -497,7 +549,7 @@ THERE:		if (fs::is_directory(argv[i])) {
 	if (fs::exists(outputName) and state[OPT_OVERWRITE] == "true")
 		fs::remove(outputName);
 	else
-		std::string outputName = getAvailableFilename(outputName);
+		outputName = getAvailableFilename(outputName);
 	
 	std::ofstream outputFile(outputName, std::ios::out);
 	
@@ -547,7 +599,10 @@ THERE:		if (fs::is_directory(argv[i])) {
 				std::vector<fs::path> bufferFiles;
 
 				auto filterChildFiles = [&bufferFiles, &state](const fs::directory_entry& f) {
-					if (isMediaFile(f.path(), state[OPT_ONLYEXT], state[OPT_SIZEOPGT] == "true", std::stof(state[OPT_SIZE])))
+					if (f.is_regular_file() and isMediaFile(f.path(), state[OPT_ONLYEXT],
+									state[OPT_SIZEOPGT][0],
+									std::stof(state[OPT_SIZE]),
+									std::stof(state[OPT_SIZETO])))
 						bufferFiles.push_back(f.path());
 				};
 				

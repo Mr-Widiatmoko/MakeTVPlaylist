@@ -198,6 +198,52 @@ func getAvailableFilename(const fs::path original, std::string prefix = " #", st
 		return original.string();
 }
 
+func isContainsSeasonDirs(const fs::path path) -> bool {
+	std::vector<fs::directory_entry> sortedDir;
+	for (auto& child : fs::directory_iterator(path))
+		sortedDir.push_back(child);
+	
+	std::sort(sortedDir.begin(), sortedDir.end());
+	
+	auto hasDirs = false;
+	
+	auto isNum = true;
+	std::vector<int> lastNum;
+	std::vector<fs::path> bufferNum;
+	
+	for (auto& child : sortedDir)
+		if (child.is_directory()) {
+			hasDirs = true;
+			if (isNum) {
+				auto iNames = containInts(child.path().filename().string());
+				if (not iNames.empty()) {
+					if (lastNum.empty()) {
+						lastNum = std::move(iNames);
+						bufferNum.push_back(child.path());
+						continue;
+					} else if (lastNum.size() == iNames.size()) {
+						bool hasIncreased = false;
+						for (auto xi = 0; xi < lastNum.size(); ++xi)
+							if (lastNum[xi] < iNames[xi]) {
+								hasIncreased = true;
+								break;
+							}
+						
+						if (hasIncreased) {
+							bufferNum.push_back(child.path());
+							continue;
+						}
+					}
+				}
+			}
+			
+			isNum = false;
+			break;
+		}
+
+	return isNum and hasDirs;
+}
+
 /// Use std::set, just because it guarantee unique items and find-able.
 std::set<fs::path> regularDirs 	= {};
 std::set<fs::path> seasonDirs	= {};
@@ -254,6 +300,9 @@ func checkForSeasonDir(const fs::path& path) -> void {
 					if (isNum) {
 						auto iNames = containInts(filename);
 						if (not iNames.empty()) {
+							if (isContainsSeasonDirs(child.path())) {
+								isNum = false;
+							} else {
 							if (lastNum.empty()) {
 								lastNum = std::move(iNames);
 								bufferNum.push_back(child.path());
@@ -270,6 +319,7 @@ func checkForSeasonDir(const fs::path& path) -> void {
 									bufferNum.push_back(child.path());
 									continue;
 								}
+							}
 							}
 						}
 					}
@@ -523,13 +573,21 @@ THERE:		if (fs::is_directory(argv[i])) {
 	/// Convert std::set to classic array, to enable call by index subscript.
 	auto index = 0;
 	fs::path regularDirs[regularDirSize];
-	for (auto& d : ::regularDirs)
+	for (auto& d : ::regularDirs) {
 		regularDirs[index++] = d;
+		#ifdef DEBUG
+		std::cout << "+R:" << d << '\n';
+		#endif
+	}
 	
 	index = 0;
 	fs::path seasonDirs[seasonDirSize];
-	for (auto& sd : ::seasonDirs)
+	for (auto& sd : ::seasonDirs) {
 		seasonDirs[index++] = sd;
+		#ifdef DEBUG
+		std::cout << "+S:" << sd << '\n';
+		#endif
+	}
 	
 	std::sort(selectFiles.begin(), selectFiles.end());
 

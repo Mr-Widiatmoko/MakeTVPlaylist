@@ -213,6 +213,9 @@ func isContainsSeasonDirs(const fs::path path) -> bool {
 	
 	for (auto& child : sortedDir)
 		if (child.is_directory()) {
+			if (child.path().filename() == ".DS_Store")
+				continue;
+			
 			hasDirs = true;
 			if (isNum) {
 				auto iNames = containInts(child.path().filename().string());
@@ -282,8 +285,11 @@ func checkForSeasonDir(const fs::path& path) -> void {
 		};
 		
 		std::vector<fs::directory_entry> sortedDir;
-		for (auto& child : fs::directory_iterator(path))
+		for (auto& child : fs::directory_iterator(path)) {
+			if (child.path().filename() == ".DS_Store")
+				continue;
 			sortedDir.push_back(child);
+		}
 		
 		std::sort(sortedDir.begin(), sortedDir.end());
 		for (auto& child : sortedDir)
@@ -599,11 +605,9 @@ THERE:		if (fs::is_directory(argv[i])) {
 	std::map<std::string, std::shared_ptr<std::vector<fs::path>>> records;
 	
 	fs::path outputName = state[OPT_OUTDIR] + (state[OPT_FIXFILENAME] != "" ? state[OPT_FIXFILENAME] : "playlist_from_" +
-								(argc == 1
-									  ? fs::path(argv[0]).parent_path().filename().string()
-									  : (argc == 2
-										 ? fs::path(argv[1]).filename().string()
-										 : std::to_string(inputDirCount))) + "_dir" + (inputDirCount > 2 ? "s" : "") + ".m3u8");
+								(inputDirCount == 1
+									  ? fs::path(state[OPT_OUTDIR]).filename().string()
+									  : std::to_string(inputDirCount)) + "_dir" + (inputDirCount > 2 ? "s" : "") + ".m3u8");
 	if (fs::exists(outputName) and state[OPT_OVERWRITE] == "true")
 		fs::remove(outputName);
 	else

@@ -93,7 +93,7 @@ func after(const std::string& keyword,
 	return source;
 }
 
-func containInts(const std::string s) -> std::vector<int>
+func containInts(const std::string&& s) -> std::vector<int>
 {
 	std::string buffer = "";
 	std::vector<int> nums;
@@ -122,7 +122,7 @@ func excludeExtension(const fs::path& path) -> std::string
 	return path.string().substr(0, path.string().size() - path.extension().string().size());
 }
 
-func parseCommaDelimited(const std::string& literal, std::vector<std::string>* result)
+func parseCommaDelimited(const std::string&& literal, std::vector<std::string>* result)
 {
 	std::string buffer = "";
 	for (auto& c : literal) {
@@ -295,7 +295,6 @@ func checkForSeasonDir(const fs::path& path) -> void {
 		for (auto& child : sortedDir)
 			if (child.is_directory()) {
 				hasDir = true;
-				auto filename = child.path().filename().string();
 				if (isNamedAsSeasonDir(child))
 				{
 					possibleSeasonDirs.insert(child.path());
@@ -304,7 +303,7 @@ func checkForSeasonDir(const fs::path& path) -> void {
 				else
 				{
 					if (isNum) {
-						auto iNames = containInts(filename);
+						auto iNames = containInts(child.path().filename().string());
 						if (not iNames.empty()) {
 							if (isContainsSeasonDirs(child.path())) {
 								isNum = false;
@@ -412,15 +411,15 @@ func getBytes(std::string s) -> uintmax_t
 
 func getRange(std::string argv, std::string separator) -> std::shared_ptr<std::pair<uintmax_t, uintmax_t>>
 {
-	auto pos = argv.find("-");
+	auto pos = argv.find(separator);
 	if (pos == std::string::npos)
 		return nullptr;
 	
 	auto first = tolower(argv.substr(0, pos));
 	auto second = tolower(argv.substr(pos + separator.size()));
 
-	uintmax_t from = getBytes(first);
-	uintmax_t to = getBytes(second);
+	uintmax_t from = getBytes(std::move(first));
+	uintmax_t to = getBytes(std::move(second));
 	return std::make_shared<std::pair<uintmax_t, uintmax_t>>(from, to);
 }
 
@@ -503,12 +502,12 @@ Option:\n\
 						state[OPT_SIZEOPGT] = argv[i][0];
 
 						i++;
-						state[opt] = std::to_string(getBytes(argv[i]));
+						state[opt] = std::to_string(std::move(getBytes(argv[i])));
 					} else {
 						i++;
-						auto range = getRange(argv[i], "-");
+						auto range = getRange(argv[i], std::move("-"));
 						if (not range)
-							range = getRange(argv[i], "..");
+							range = getRange(argv[i], std::move(".."));
 						if (range)
 						{
 							state[OPT_SIZE] = std::to_string(range->first);
@@ -577,23 +576,11 @@ THERE:		if (fs::is_directory(argv[i])) {
 	const auto maxDirSize = std::max(regularDirSize, seasonDirSize);
 	
 	/// Convert std::set to classic array, to enable call by index subscript.
-	auto index = 0;
 	fs::path regularDirs[regularDirSize];
-	for (auto& d : ::regularDirs) {
-		regularDirs[index++] = d;
-		#ifdef DEBUG
-		std::cout << "+R:" << d << '\n';
-		#endif
-	}
-	
-	index = 0;
+	std::move(::regularDirs.begin(), ::regularDirs.end(), regularDirs);
+
 	fs::path seasonDirs[seasonDirSize];
-	for (auto& sd : ::seasonDirs) {
-		seasonDirs[index++] = sd;
-		#ifdef DEBUG
-		std::cout << "+S:" << sd << '\n';
-		#endif
-	}
+	std::move(::seasonDirs.begin(), ::seasonDirs.end(), seasonDirs);
 	
 	std::sort(selectFiles.begin(), selectFiles.end());
 
@@ -644,7 +631,7 @@ THERE:		if (fs::is_directory(argv[i])) {
 		auto finish = true;
 		
 		auto putSelectFile = [&]() {
-			putIntoPlaylist(selectFiles[indexFileSelected]);
+			putIntoPlaylist(std::move(selectFiles[indexFileSelected]));
 			indexFileSelected += 1;
 		};
 		
@@ -688,7 +675,7 @@ THERE:		if (fs::is_directory(argv[i])) {
 				if (bufferFiles.size() > indexFile) {
 					finish = false;
 										
-					putIntoPlaylist(bufferFiles[indexFile]);
+					putIntoPlaylist(std::move(bufferFiles[indexFile]));
 				}
 			} //end pass loop
 		}

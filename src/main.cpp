@@ -39,8 +39,8 @@ func tolower(std::string s) -> std::string
 
 func trim(std::string s) -> std::string
 {
-	unsigned long start=0, end=s.size();
-	for (auto i=0; i<end; ++i)
+	unsigned long start{0}, end{s.size()};
+	for (auto i{0}; i<end; ++i)
 		if (not std::isspace(s[i])) {
 			start=i;
 			break;
@@ -77,7 +77,7 @@ func after(const std::string& keyword,
 		   bool ignoreCase = false,
 		   bool trimResult = false) -> std::string
 {
-	unsigned long pos=0;
+	unsigned long pos{0};
 	if (ignoreCase)
 		pos=tolower(source).find(keyword);
 	else
@@ -95,10 +95,10 @@ func after(const std::string& keyword,
 
 func containInts(const std::string&& s) -> std::vector<int>
 {
-	std::string buffer = "";
+	std::string buffer;
 	std::vector<int> nums;
-	for (auto i = 0; i < s.size(); ++i) {
-		const auto c = s[i];
+	for (auto i{0}; i < s.size(); ++i) {
+		const auto c{s[i]};
 		if (std::isdigit(c)) {
 			buffer += c;
 		} else {
@@ -124,7 +124,7 @@ func excludeExtension(const fs::path& path) -> std::string
 
 func parseCommaDelimited(const std::string&& literal, std::vector<std::string>* result)
 {
-	std::string buffer = "";
+	std::string buffer;
 	for (auto& c : literal) {
 		if (std::isspace(c))
 			continue;
@@ -164,8 +164,8 @@ func isMediaFile(const fs::path& path, const std::string extensions,
 func findSubtitleFile(const fs::path& original,
 					  std::vector<fs::path>* result)
 {
-	auto noext = excludeExtension(original);
-	auto parentPath = original.parent_path();
+	auto noext{excludeExtension(original)};
+	auto parentPath{original.parent_path()};
 	std::vector<std::string> x{".srt", ".ass", ".vtt"};
 	
 	if (not parentPath.empty())
@@ -183,10 +183,10 @@ func findSubtitleFile(const fs::path& original,
 func getAvailableFilename(const fs::path original, std::string prefix = " #", std::string suffix = "") -> std::string
 {
 	if (fs::exists(original)) {
-		auto s = original.string();
-		auto ext = original.extension().string();
-		auto noext = s.substr(0, s.size() - ext.size());
-		unsigned i = 0;
+		auto s{original.string()};
+		auto ext{original.extension().string()};
+		auto noext{s.substr(0, s.size() - ext.size())};
+		unsigned i{0};
 		while (true) {
 			fs::path test(noext + prefix + std::to_string(++i) + suffix + ext);
 			
@@ -205,9 +205,9 @@ func isContainsSeasonDirs(const fs::path path) -> bool {
 	
 	std::sort(sortedDir.begin(), sortedDir.end());
 	
-	auto hasDirs = false;
+	auto hasDirs{false};
 	
-	auto isNum = true;
+	auto isNum{true};
 	std::vector<int> lastNum;
 	std::vector<fs::path> bufferNum;
 	
@@ -218,15 +218,15 @@ func isContainsSeasonDirs(const fs::path path) -> bool {
 			
 			hasDirs = true;
 			if (isNum) {
-				auto iNames = containInts(child.path().filename().string());
+				auto iNames{containInts(child.path().filename().string())};
 				if (not iNames.empty()) {
 					if (lastNum.empty()) {
 						lastNum = std::move(iNames);
 						bufferNum.push_back(child.path());
 						continue;
 					} else if (lastNum.size() == iNames.size()) {
-						bool hasIncreased = false;
-						for (auto xi = 0; xi < lastNum.size(); ++xi)
+						bool hasIncreased{false};
+						for (auto xi{0}; xi < lastNum.size(); ++xi)
 							if (lastNum[xi] < iNames[xi]) {
 								hasIncreased = true;
 								break;
@@ -254,10 +254,10 @@ std::vector<fs::path> selectFiles  = {};
 
 func checkForSeasonDir(const fs::path& path) -> void {
 	auto isNamedAsSeasonDir = [](const fs::path& path) {
-		auto source = path.string();
+		auto source{path.string()};
 
 		for (auto& keyword : {"season", "s"}) {
-			auto suffix = after(keyword, source, true, true);
+			auto suffix{after(keyword, source, true, true)};
 			if (source not_eq suffix and isInt(suffix))
 				return true;
 		}
@@ -270,9 +270,9 @@ func checkForSeasonDir(const fs::path& path) -> void {
 	std::vector<std::thread> threads;
 	
 	if (not path.empty()) {
-		auto hasDir = false;
+		auto hasDir{false};
 		
-		bool isNum = true;
+		bool isNum{true};
 		std::vector<int> lastNum;
 		std::vector<fs::path> bufferNum;
 		
@@ -303,7 +303,7 @@ func checkForSeasonDir(const fs::path& path) -> void {
 				else
 				{
 					if (isNum) {
-						auto iNames = containInts(child.path().filename().string());
+						auto iNames{containInts(child.path().filename().string())};
 						if (not iNames.empty()) {
 							if (isContainsSeasonDirs(child.path())) {
 								isNum = false;
@@ -313,7 +313,7 @@ func checkForSeasonDir(const fs::path& path) -> void {
 								bufferNum.push_back(child.path());
 								continue;
 							} else if (lastNum.size() == iNames.size()) {
-								bool hasIncreased = false;
+								bool hasIncreased{false};
 								for (auto xi = 0; xi < lastNum.size(); ++xi)
 									if (lastNum[xi] < iNames[xi]) {
 										hasIncreased = true;
@@ -346,8 +346,8 @@ func checkForSeasonDir(const fs::path& path) -> void {
 	threads.clear();
 	
 	for (auto& dir : possibleSeasonDirs) {
-		bool isValidSeasonDir = true;
-		auto parentPath = dir.parent_path();
+		bool isValidSeasonDir{true};
+		auto parentPath{dir.parent_path()};
 		if (not parentPath.empty())
 			for (auto& pdc : fs::directory_iterator(parentPath))
 				if (pdc.is_directory()
@@ -358,9 +358,9 @@ func checkForSeasonDir(const fs::path& path) -> void {
 				}
 
 		if (isValidSeasonDir) {
-			auto newSeasonDir = dir.parent_path();
+			auto newSeasonDir{dir.parent_path()};
 			seasonDirs.insert(newSeasonDir);
-			auto findInRegular = regularDirs.find(newSeasonDir);
+			auto findInRegular{regularDirs.find(newSeasonDir)};
 			if (findInRegular not_eq regularDirs.end())
 				regularDirs.erase(findInRegular);
 		} else
@@ -373,7 +373,7 @@ func checkForSeasonDir(const fs::path& path) -> void {
 
 func processOption(const char *argv) -> const char *
 {
-	auto length = std::strlen(argv);
+	auto length{std::strlen(argv)};
 	
 	if (length > 2 and ( argv[0] == '-' and argv[1] == '-')) {
 		argv++;
@@ -388,8 +388,8 @@ func processOption(const char *argv) -> const char *
 
 func getBytes(std::string s) -> uintmax_t
 {
-	std::string unit = "mb";
-	std::string value = s;
+	std::string unit{"mb"};
+	std::string value{s};
 	if (s.size() > 2 and std::isalpha(s[s.size() - 2])) {
 		unit = s.substr(s.size() - 2);
 		value = s.substr(0, s.size() - 2);
@@ -398,7 +398,7 @@ func getBytes(std::string s) -> uintmax_t
 	if (not isInt(value))
 		return 0.0f;
 	
-	uintmax_t result = 0;
+	uintmax_t result{0};
 	if (unit == "kb")
 		result = std::stof(value) * 1000;
 	else if (unit == "gb")
@@ -411,15 +411,15 @@ func getBytes(std::string s) -> uintmax_t
 
 func getRange(std::string argv, std::string separator) -> std::shared_ptr<std::pair<uintmax_t, uintmax_t>>
 {
-	auto pos = argv.find(separator);
+	auto pos{argv.find(separator)};
 	if (pos == std::string::npos)
 		return nullptr;
 	
-	auto first = tolower(argv.substr(0, pos));
-	auto second = tolower(argv.substr(pos + separator.size()));
+	auto first{tolower(argv.substr(0, pos))};
+	auto second{tolower(argv.substr(pos + separator.size()))};
 
-	uintmax_t from = getBytes(std::move(first));
-	uintmax_t to = getBytes(std::move(second));
+	uintmax_t from{getBytes(std::move(first))};
+	uintmax_t to{getBytes(std::move(second))};
 	return std::make_shared<std::pair<uintmax_t, uintmax_t>>(from, to);
 }
 
@@ -430,31 +430,31 @@ All Rights Reserved. License and Warranty\n";
 int main(int argc, char *argv[]) {
 	std::vector<std::thread> threads;
 	
-	unsigned inputDirCount = 0;
+	unsigned inputDirCount{0};
 	
 	std::map<std::string, std::string> state;
-	constexpr auto OPT_HELP 			= "help";
-	constexpr auto OPT_VERBOSE 			= "verbose";
-	constexpr auto OPT_OVERWRITE 		= "overwrite";
-	constexpr auto OPT_SKIPSUBTITLE 	= "skip-subtitle";
-	constexpr auto OPT_ONLYEXT 			= "only-ext";
-	constexpr auto OPT_FIXFILENAME 		= "fix-filename";
-	constexpr auto OPT_OUTDIR 			= "out-dir";
-	constexpr auto OPT_SIZE				= "size";
-	constexpr auto OPT_SIZETO			= "size_to";
-	constexpr auto OPT_SIZEOPGT			= "size_op";
+	constexpr auto OPT_HELP 			{"help"};
+	constexpr auto OPT_VERBOSE 			{"verbose"};
+	constexpr auto OPT_OVERWRITE 		{"overwrite"};
+	constexpr auto OPT_SKIPSUBTITLE 	{"skip-subtitle"};
+	constexpr auto OPT_ONLYEXT 			{"only-ext"};
+	constexpr auto OPT_FIXFILENAME 		{"fix-filename"};
+	constexpr auto OPT_OUTDIR 			{"out-dir"};
+	constexpr auto OPT_SIZE				{"size"};
+	constexpr auto OPT_SIZETO			{"size_to"};
+	constexpr auto OPT_SIZEOPGT			{"size_op"};
 	
 	state[OPT_SIZEOPGT] = "\0";
 	state[OPT_SIZE] = "0";
 	state[OPT_SIZETO] = "0";
 	
 	#if DEBUG
-	auto start = std::chrono::system_clock::now();
+	auto start{std::chrono::system_clock::now()};
 	#endif
 	
 	{
-		for (int i=1; i<argc; ++i) {
-			auto opt = processOption(argv[i]);
+		for (int i{1}; i<argc; ++i) {
+			auto opt{processOption(argv[i])};
 			if (opt) {if (0 == std::strcmp(opt, OPT_HELP)) {
 				std::cout <<
 				fs::path(argv[0]).filename().string() << ' '
@@ -495,7 +495,7 @@ Option:\n\
 				
 			} else if (0 == std::strcmp(opt, OPT_SIZE) and i + 1 < argc) {
 				if (std::strlen(argv[i + 1]) > 0) {
-					auto nextArgv = argv[i + 1];
+					auto nextArgv{argv[i + 1]};
 					if (i + 2 < argc and (nextArgv[0] == '<' or nextArgv[0] == '>') )
 					{
 						i++;
@@ -505,7 +505,7 @@ Option:\n\
 						state[opt] = std::to_string(std::move(getBytes(argv[i])));
 					} else {
 						i++;
-						auto range = getRange(argv[i], std::move("-"));
+						auto range{getRange(argv[i], std::move("-"))};
 						if (not range)
 							range = getRange(argv[i], std::move(".."));
 						if (range)
@@ -533,7 +533,7 @@ Option:\n\
 				i += 1;
 				state[opt] = fs::absolute(argv[i]);
 				if (fs::exists(state[opt])) {
-					auto tmp = state[opt];
+					auto tmp{state[opt]};
 					if (tmp[tmp.size() - 1] not_eq fs::path::preferred_separator) {
 						tmp += fs::path::preferred_separator;
 						state[opt] = tmp;
@@ -570,10 +570,10 @@ THERE:		if (fs::is_directory(argv[i])) {
 			t.join();
 	}
 	
-	const auto regularDirSize = ::regularDirs.size();
-	const auto seasonDirSize = ::seasonDirs.size();
+	const auto regularDirSize{::regularDirs.size()};
+	const auto seasonDirSize{::seasonDirs.size()};
 	
-	const auto maxDirSize = std::max(regularDirSize, seasonDirSize);
+	const auto maxDirSize{std::max(regularDirSize, seasonDirSize)};
 	
 	/// Convert std::set to classic array, to enable call by index subscript.
 	fs::path regularDirs[regularDirSize];
@@ -584,10 +584,10 @@ THERE:		if (fs::is_directory(argv[i])) {
 	
 	std::sort(selectFiles.begin(), selectFiles.end());
 
-	auto swapDirs = seasonDirs[0].string() < regularDirs[0].string();
+	auto swapDirs{seasonDirs[0].string() < regularDirs[0].string()};
 	
-	auto indexFile = 0;
-	auto indexFileSelected =0;
+	auto indexFile{0};
+	auto indexFileSelected{0};
 	
 	std::map<std::string, std::shared_ptr<std::vector<fs::path>>> records;
 	
@@ -602,7 +602,7 @@ THERE:		if (fs::is_directory(argv[i])) {
 	
 	std::ofstream outputFile(outputName, std::ios::out);
 	
-	unsigned long pleylistCount = 0;
+	unsigned long pleylistCount{0};
 	
 	auto putIntoPlaylist = [&](const fs::path& file) {
 		outputFile << fs::absolute(file).string() << '\n';
@@ -628,17 +628,17 @@ THERE:		if (fs::is_directory(argv[i])) {
 	};
 	
 	while (true) {
-		auto finish = true;
+		auto finish{true};
 		
 		auto putSelectFile = [&]() {
 			putIntoPlaylist(std::move(selectFiles[indexFileSelected]));
 			indexFileSelected += 1;
 		};
 		
-		for (auto i = 0; i < maxDirSize; ++i) {
-			for (auto indexPass = 1; indexPass <= 2; ++indexPass) { ///pass 1 for regularDirs, pass 2 for seasonDirs
+		for (auto i{0}; i < maxDirSize; ++i) {
+			for (auto indexPass{1}; indexPass <= 2; ++indexPass) { ///pass 1 for regularDirs, pass 2 for seasonDirs
 
-				auto passSwapDirs = (indexPass == 1 and swapDirs == false) or (indexPass == 2 and swapDirs);
+				auto passSwapDirs{(indexPass == 1 and swapDirs == false) or (indexPass == 2 and swapDirs)};
 
 				if ((indexPass == 1 and i >= (not swapDirs ? regularDirSize : seasonDirSize))
 					or (indexPass == 2 and i >= (not swapDirs ? seasonDirSize : regularDirSize))) {
@@ -655,11 +655,11 @@ THERE:		if (fs::is_directory(argv[i])) {
 						bufferFiles.push_back(f.path());
 				};
 				
-				auto dir = (passSwapDirs ? regularDirs[i] : seasonDirs[i]);
+				auto dir{passSwapDirs ? regularDirs[i] : seasonDirs[i]};
 				if (dir.empty())
 					continue;
 				
-				auto found = records[dir.string()];
+				auto found{records[dir.string()]};
 				if (found == nullptr) {
 					if (passSwapDirs)
 						for (auto& f : fs::directory_iterator(dir))
@@ -698,8 +698,8 @@ THERE:		if (fs::is_directory(argv[i])) {
 		std::cout << fs::absolute(outputName).string() << '\n';
 	
 	#if DEBUG
-	auto stop = std::chrono::system_clock::now();
-	std::chrono::duration<double, std::milli> time = stop - start;
+	auto stop{std::chrono::system_clock::now()};
+	std::chrono::duration<double, std::milli> time{stop - start};
 	std::cout << std::fixed << std::setprecision(2) << time.count() << "  ms\n";
 	#endif
 

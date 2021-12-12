@@ -98,8 +98,8 @@ func containInts(const std::string&& s) -> std::vector<int>
 	std::string buffer;
 	std::vector<int> nums;
 	for (auto i{0}; i < s.size(); ++i) {
-		const auto c{s[i]};
-		if (std::isdigit(c)) {
+		
+		if (const auto c{s[i]}; std::isdigit(c)) {
 			buffer += c;
 		} else {
 			if (buffer.empty())
@@ -164,11 +164,9 @@ func isMediaFile(const fs::path& path, const std::string extensions,
 func findSubtitleFile(const fs::path& original,
 					  std::vector<fs::path>* result)
 {
-	auto noext{excludeExtension(original)};
-	auto parentPath{original.parent_path()};
-	std::vector<std::string> x{".srt", ".ass", ".vtt"};
-	
-	if (not parentPath.empty())
+	if (auto parentPath{original.parent_path()}; not parentPath.empty()) {
+		auto noext{excludeExtension(original)};
+		std::vector<std::string> x{".srt", ".ass", ".vtt"};
 		for (auto& f : fs::directory_iterator(parentPath)) {
 			if (f.is_regular_file()
 				and f.path().string().size() >= original.string().size()
@@ -178,6 +176,7 @@ func findSubtitleFile(const fs::path& original,
 				result->push_back(f.path());
 			}
 		}
+	}
 }
 
 func getAvailableFilename(const fs::path original, std::string prefix = " #", std::string suffix = "") -> std::string
@@ -218,8 +217,8 @@ func isContainsSeasonDirs(const fs::path path) -> bool {
 			
 			hasDirs = true;
 			if (isNum) {
-				auto iNames{containInts(child.path().filename().string())};
-				if (not iNames.empty()) {
+				if (auto iNames{containInts(child.path().filename().string())};
+					not iNames.empty()) {
 					if (lastNum.empty()) {
 						lastNum = std::move(iNames);
 						bufferNum.push_back(child.path());
@@ -303,8 +302,8 @@ func checkForSeasonDir(const fs::path& path) -> void {
 				else
 				{
 					if (isNum) {
-						auto iNames{containInts(child.path().filename().string())};
-						if (not iNames.empty()) {
+						if (auto iNames{containInts(child.path().filename().string())};
+							not iNames.empty()) {
 							if (isContainsSeasonDirs(child.path())) {
 								isNum = false;
 							} else {
@@ -347,8 +346,7 @@ func checkForSeasonDir(const fs::path& path) -> void {
 	
 	for (auto& dir : possibleSeasonDirs) {
 		bool isValidSeasonDir{true};
-		auto parentPath{dir.parent_path()};
-		if (not parentPath.empty())
+		if (auto parentPath{dir.parent_path()}; not parentPath.empty())
 			for (auto& pdc : fs::directory_iterator(parentPath))
 				if (pdc.is_directory()
 					and pdc.path().filename() not_eq ".DS_Store"
@@ -360,8 +358,9 @@ func checkForSeasonDir(const fs::path& path) -> void {
 		if (isValidSeasonDir) {
 			auto newSeasonDir{dir.parent_path()};
 			seasonDirs.insert(newSeasonDir);
-			auto findInRegular{regularDirs.find(newSeasonDir)};
-			if (findInRegular not_eq regularDirs.end())
+			
+			if (auto findInRegular{regularDirs.find(newSeasonDir)};
+				findInRegular not_eq regularDirs.end())
 				regularDirs.erase(findInRegular);
 		} else
 			threads.emplace_back(checkForSeasonDir, dir);
@@ -373,9 +372,8 @@ func checkForSeasonDir(const fs::path& path) -> void {
 
 func processOption(const char *argv) -> const char *
 {
-	auto length{std::strlen(argv)};
-	
-	if (length > 2 and ( argv[0] == '-' and argv[1] == '-')) {
+	if (auto length{std::strlen(argv)};
+		length > 2 and ( argv[0] == '-' and argv[1] == '-')) {
 		argv++;
 		argv++;
 	} //else if (length > 1 and argv[0] == '-') argv++;
@@ -454,8 +452,7 @@ int main(int argc, char *argv[]) {
 	
 	{
 		for (int i{1}; i<argc; ++i) {
-			auto opt{processOption(argv[i])};
-			if (opt) {if (0 == std::strcmp(opt, OPT_HELP)) {
+			if (auto opt{processOption(argv[i])}; opt) {if (0 == std::strcmp(opt, OPT_HELP)) {
 				std::cout <<
 				fs::path(argv[0]).filename().string() << ' '
 				<< VERSION <<
@@ -495,8 +492,8 @@ Option:\n\
 				
 			} else if (0 == std::strcmp(opt, OPT_SIZE) and i + 1 < argc) {
 				if (std::strlen(argv[i + 1]) > 0) {
-					auto nextArgv{argv[i + 1]};
-					if (i + 2 < argc and (nextArgv[0] == '<' or nextArgv[0] == '>') )
+					if (auto nextArgv{argv[i + 1]};
+						i + 2 < argc and (nextArgv[0] == '<' or nextArgv[0] == '>') )
 					{
 						i++;
 						state[OPT_SIZEOPGT] = argv[i][0];
@@ -533,8 +530,8 @@ Option:\n\
 				i += 1;
 				state[opt] = fs::absolute(argv[i]);
 				if (fs::exists(state[opt])) {
-					auto tmp{state[opt]};
-					if (tmp[tmp.size() - 1] not_eq fs::path::preferred_separator) {
+					if (auto tmp{state[opt]};
+						tmp[tmp.size() - 1] not_eq fs::path::preferred_separator) {
 						tmp += fs::path::preferred_separator;
 						state[opt] = tmp;
 					}
@@ -655,12 +652,12 @@ THERE:		if (fs::is_directory(argv[i])) {
 						bufferFiles.push_back(f.path());
 				}};
 				
-				auto dir{passSwapDirs ? regularDirs[i] : seasonDirs[i]};
-				if (dir.empty())
-					continue;
 				
-				auto found{records[dir.string()]};
-				if (found == nullptr) {
+				if (auto dir{passSwapDirs ? regularDirs[i] : seasonDirs[i]};
+					dir.empty())
+					continue;
+								
+				else if (auto found{records[dir.string()]}; found == nullptr) {
 					if (passSwapDirs)
 						for (auto& f : fs::directory_iterator(dir))
 							filterChildFiles(f);

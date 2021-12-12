@@ -145,10 +145,10 @@ func isMediaFile(const fs::path& path, const std::string extensions,
 {
 	std::vector<std::string> x;
 	if (extensions.empty()) {
-		constexpr auto s = ".mp4, .mkv, .mov, .m4v, .mpeg, .mpg, .mts, .ts, .webm,\
+		constexpr auto s{ ".mp4, .mkv, .mov, .m4v, .mpeg, .mpg, .mts, .ts, .webm,\
 		.flv, .opus, .pcm, .wmv, .mp3, .aac, .aif, .aiff, .3gp,\
 		.avi, .ape, .asf, .flac, .cue, divx, .dv, .mka, .ra,\
-		.rmvb, .rm, .vox, .wma, .wav, .acm";
+  .rmvb, .rm, .vox, .wma, .wav, .acm" };
 		parseCommaDelimited(s, &x);
 	} else
 		parseCommaDelimited(tolower(extensions), &x);

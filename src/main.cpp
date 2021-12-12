@@ -45,7 +45,7 @@ func trim(std::string s) -> std::string
 			start=i;
 			break;
 		}
-	for (auto i=end; i>start; --i)
+	for (auto i{end}; i>start; --i)
 		if (not std::isspace(s[i])) {
 			end=i;
 			break;
@@ -253,7 +253,7 @@ std::set<fs::path> seasonDirs	= {};
 std::vector<fs::path> selectFiles  = {};
 
 func checkForSeasonDir(const fs::path& path) -> void {
-	auto isNamedAsSeasonDir = [](const fs::path& path) {
+	auto isNamedAsSeasonDir{ [](const fs::path& path) {
 		auto source{path.string()};
 
 		for (auto& keyword : {"season", "s"}) {
@@ -263,7 +263,7 @@ func checkForSeasonDir(const fs::path& path) -> void {
 		}
 		
 		return false;
-	};
+	}};
 	
 	std::set<fs::path> possibleSeasonDirs;
 	
@@ -276,13 +276,13 @@ func checkForSeasonDir(const fs::path& path) -> void {
 		std::vector<int> lastNum;
 		std::vector<fs::path> bufferNum;
 		
-		auto pullFromBUfferNum = [&threads, &bufferNum, &isNum]() {
+		auto pullFromBUfferNum{ [&threads, &bufferNum, &isNum]() {
 			isNum = false;
 			for (auto& child : bufferNum) {
 				regularDirs.insert(child);
 				threads.emplace_back(checkForSeasonDir, child);
 			}
-		};
+		}};
 		
 		std::vector<fs::directory_entry> sortedDir;
 		for (auto& child : fs::directory_iterator(path)) {
@@ -591,10 +591,10 @@ THERE:		if (fs::is_directory(argv[i])) {
 	
 	std::map<std::string, std::shared_ptr<std::vector<fs::path>>> records;
 	
-	fs::path outputName = state[OPT_OUTDIR] + (state[OPT_FIXFILENAME] != "" ? state[OPT_FIXFILENAME] : "playlist_from_" +
+	fs::path outputName{ state[OPT_OUTDIR] + (state[OPT_FIXFILENAME] != "" ? state[OPT_FIXFILENAME] : "playlist_from_" +
 								(inputDirCount == 1
 									  ? fs::path(state[OPT_OUTDIR]).filename().string()
-									  : std::to_string(inputDirCount)) + "_dir" + (inputDirCount > 2 ? "s" : "") + ".m3u8");
+								 : std::to_string(inputDirCount)) + "_dir" + (inputDirCount > 2 ? "s" : "") + ".m3u8")};
 	if (fs::exists(outputName) and state[OPT_OVERWRITE] == "true")
 		fs::remove(outputName);
 	else
@@ -604,7 +604,7 @@ THERE:		if (fs::is_directory(argv[i])) {
 	
 	unsigned long pleylistCount{0};
 	
-	auto putIntoPlaylist = [&](const fs::path& file) {
+	auto putIntoPlaylist{ [&](const fs::path& file) {
 		outputFile << fs::absolute(file).string() << '\n';
 		#ifndef DEBUG
 		if (state[OPT_VERBOSE] == "true")
@@ -625,15 +625,15 @@ THERE:		if (fs::is_directory(argv[i])) {
 			#endif
 				std::cout << fs::absolute(sf).string() << '\n';
 		}
-	};
+	}};
 	
 	while (true) {
 		auto finish{true};
 		
-		auto putSelectFile = [&]() {
+		auto putSelectFile{ [&]() {
 			putIntoPlaylist(std::move(selectFiles[indexFileSelected]));
 			indexFileSelected += 1;
-		};
+		}};
 		
 		for (auto i{0}; i < maxDirSize; ++i) {
 			for (auto indexPass{1}; indexPass <= 2; ++indexPass) { ///pass 1 for regularDirs, pass 2 for seasonDirs
@@ -647,13 +647,13 @@ THERE:		if (fs::is_directory(argv[i])) {
 				
 				std::vector<fs::path> bufferFiles;
 
-				auto filterChildFiles = [&bufferFiles, &state](const fs::directory_entry& f) {
+				auto filterChildFiles{ [&bufferFiles, &state](const fs::directory_entry& f) {
 					if (f.is_regular_file() and isMediaFile(f.path(), state[OPT_ONLYEXT],
 									state[OPT_SIZEOPGT][0],
 									std::stof(state[OPT_SIZE]),
 									std::stof(state[OPT_SIZETO])))
 						bufferFiles.push_back(f.path());
-				};
+				}};
 				
 				auto dir{passSwapDirs ? regularDirs[i] : seasonDirs[i]};
 				if (dir.empty())

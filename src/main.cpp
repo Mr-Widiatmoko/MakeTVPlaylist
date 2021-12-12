@@ -255,11 +255,10 @@ func checkForSeasonDir(const fs::path& path) -> void {
 	auto isNamedAsSeasonDir{ [](const fs::path& path) {
 		auto source{path.string()};
 
-		for (auto& keyword : {"season", "s"}) {
-			auto suffix{after(keyword, source, true, true)};
-			if (source not_eq suffix and isInt(suffix))
-				return true;
-		}
+		for (auto& keyword : {"season", "s"})
+			if (auto suffix{after(keyword, source, true, true)};
+				source not_eq suffix and isInt(suffix))
+				return true;		
 		
 		return false;
 	}};

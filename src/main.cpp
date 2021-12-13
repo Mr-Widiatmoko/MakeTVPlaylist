@@ -143,6 +143,9 @@ func parseCommaDelimited(const std::string&& literal, std::vector<std::string>* 
 func isMediaFile(const fs::path& path, const std::string extensions,
 				 char greaterThan = '\0', std::uintmax_t size = 0, std::uintmax_t sizeTo = 0) -> bool
 {
+	if (not fs::exists(path))
+		return false;
+	
 	std::vector<std::string> x;
 	if (extensions.empty()) {
 		constexpr auto s{ ".mp4, .mkv, .mov, .m4v, .mpeg, .mpg, .mts, .ts, .webm,\
@@ -153,9 +156,17 @@ func isMediaFile(const fs::path& path, const std::string extensions,
 	} else
 		parseCommaDelimited(tolower(extensions), &x);
 	
-	auto fileSize = fs::file_size(path);
-	return fs::is_regular_file(path) and isEqual(tolower(path.extension().string()), &x)
-	and (size == 0 and sizeTo == 0 ? true
+	auto tmp{ path };
+	if (fs::is_symlink(tmp)) { //TODO: is_symlink() cannot detect macOS alias file!
+		tmp = fs::read_symlink(path);
+		
+		if (not fs::exists(tmp))
+			return false;
+	}
+
+	auto fileSize{ fs::file_size(tmp) };
+	return fs::is_regular_file(tmp) and isEqual(tolower(tmp.extension().string()), &x)
+		and (size == 0 and sizeTo == 0 ? true
 		 : (greaterThan == '\0' ? fileSize > size and fileSize < sizeTo
 			: (greaterThan == '>' ? fileSize > size : fileSize < size))
 		 );
@@ -544,23 +555,27 @@ THERE:		if (fs::is_directory(argv[i])) {
 					state[OPT_OUTDIR] = fs::absolute(argv[i]).string() + fs::path::preferred_separator;
 				inputDirCount += 1;
 				threads.emplace_back(checkForSeasonDir, argv[i]);
-			} else if (isMediaFile(argv[i], state[OPT_ONLYEXT],
+			} else if (isMediaFile(fs::absolute(argv[i]), state[OPT_ONLYEXT],
 								   state[OPT_SIZEOPGT][0],
 								   std::stof(state[OPT_SIZE]),
 								   std::stof(state[OPT_SIZETO])))
-				selectFiles.push_back(argv[i]);
+				selectFiles.push_back(fs::absolute(argv[i]));
 			else
 				std::cout << "What is this: \"" << argv[i] << "\"?, try type \""
 						<< fs::path(argv[0]).filename().string() << " --help\"\n";
 		}
 	
-		if (inputDirCount == 0) {
+		if (inputDirCount == 0 and selectFiles.empty()) {
 			threads.emplace_back(checkForSeasonDir, fs::current_path());
 			inputDirCount += 1;
 		}
 		
-		if (state[OPT_OUTDIR].empty())
-			state[OPT_OUTDIR] = fs::current_path().string() + fs::path::preferred_separator;
+		if (state[OPT_OUTDIR].empty()) {
+			if (not selectFiles.empty())
+				state[OPT_OUTDIR] = fs::path(selectFiles[0]).parent_path().string() + fs::path::preferred_separator;
+			else
+				state[OPT_OUTDIR] = fs::current_path().string() + fs::path::preferred_separator;
+		}
 		
 		for (auto& t : threads)
 			t.join();
@@ -588,9 +603,11 @@ THERE:		if (fs::is_directory(argv[i])) {
 	std::map<std::string, std::shared_ptr<std::vector<fs::path>>> records;
 	
 	fs::path outputName{ state[OPT_OUTDIR] + (state[OPT_FIXFILENAME] != "" ? state[OPT_FIXFILENAME] : "playlist_from_" +
-								(inputDirCount == 1
-									  ? fs::path(state[OPT_OUTDIR]).filename().string()
-								 : std::to_string(inputDirCount)) + "_dir" + (inputDirCount > 2 ? "s" : "") + ".m3u8")};
+								(inputDirCount == 0
+								 ? std::to_string(selectFiles.size()) + "_file"
+								 : (inputDirCount == 1
+									 ? fs::path(state[OPT_OUTDIR]).filename().string()
+									 : std::to_string(inputDirCount)) + "_dir") + (inputDirCount > 2 ? "s" : "") + ".m3u8")};
 	if (fs::exists(outputName) and state[OPT_OVERWRITE] == "true")
 		fs::remove(outputName);
 	else

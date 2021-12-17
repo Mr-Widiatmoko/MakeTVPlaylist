@@ -497,10 +497,10 @@ for all input titles.\nHosted in https://github.com/Mr-Widiatmoko/MakeTVPlaylist
 Usage:\n    "<< fs::path(argv[0]).filename()<<" [Option or Dir or File] ...\n\n\
 If no argument was specified, the current directory will be use.\n\n\
 Option:\n\
--O, --overwrite                 	Overwrite output playlist file.\n\
--v, --version                   	Display version.\n\
--V, --verbose                   	Display playlist content.\n\
--x, --skip-subtitle			Dont include subtitle file.\n\
+-O, --overwrite                 Overwrite output playlist file.\n\
+-v, --version                   Display version.\n\
+-V, --verbose                   Display playlist content.\n\
+-x, --skip-subtitle		Dont include subtitle file.\n\
 -e, --only-ext \"extension, ...\"	Filter only specific extensions, separated by comma.\n\
 				  Example: --only-ext \"mp4, mkv\"\n\
 -s, --size < OR > SIZE		Filter by size in \"KB\", \"MB\" (default), or \"GB\".\n\
@@ -509,8 +509,8 @@ Option:\n\
 					   --size > 1.2gb\n\
 					OR using range with '-' OR '..'\n\
 					   --size 750-1.2gb\n\
--f, --fix-filename \"filename\"   	Override output playlist filename.\n\
--d, --out-dir \"directory path\"  	Override output directory for playlist file.\n";
+-f, --fix-filename \"filename\"   Override output playlist filename.\n\
+-d, --out-dir \"directory path\"  Override output directory for playlist file.\n";
 				return 0;
 			}
 			else if (opt_match(opt, OPT_VERSION, 'v'))

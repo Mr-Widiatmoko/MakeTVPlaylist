@@ -104,13 +104,23 @@ func containInts(const std::string&& s) -> std::vector<int>
 		} else {
 			if (buffer.empty())
 				continue;
-			nums.push_back(std::stoi(buffer));
+			if (buffer.size() < 9)
+			try {
+				nums.push_back(std::stoi(buffer));
+			} catch (std::out_of_range const& e) {
+				std::cout << "stoi(" << s << ") Fail: " << e.what() << '\n';
+			}
 			buffer.clear();
 		}
 	}
 	
 	if (not buffer.empty())
-		nums.push_back(std::stoi(buffer));
+		if (buffer.size() < 9)
+		try {
+			nums.push_back(std::stoi(buffer));
+		} catch (std::out_of_range const& e) {
+			std::cout << "stoi(" << s << ") Fail: " << e.what() << '\n';
+		}
 	
 	return nums;
 }
@@ -222,8 +232,13 @@ func isContainsSeasonDirs(const fs::path path) -> bool {
 	std::vector<fs::path> bufferNum;
 	
 	for (auto& child : sortedDir)
-		if (child.is_directory()) {
-			if (child.path().filename() == ".DS_Store")
+		if (child.is_directory() and not fs::is_symlink(child.path())) {
+			if (child.path().filename() == ".DS_Store"
+				or (child.status().permissions()
+					& (fs::perms::owner_read
+					   | fs::perms::group_read
+					   | fs::perms::others_read)) not_eq fs::perms::none
+				)
 				continue;
 			
 			hasDirs = true;
@@ -295,7 +310,12 @@ func checkForSeasonDir(const fs::path& path) -> void {
 		
 		std::vector<fs::directory_entry> sortedDir;
 		for (auto& child : fs::directory_iterator(path)) {
-			if (child.path().filename() == ".DS_Store")
+			if (child.path().filename() == ".DS_Store"
+				or (child.status().permissions()
+					& (fs::perms::owner_read
+					   | fs::perms::group_read
+					   | fs::perms::others_read)) not_eq fs::perms::none
+				)
 				continue;
 			sortedDir.push_back(child);
 		}
@@ -386,7 +406,8 @@ func processOption(const char *argv) -> const char *
 		length > 2 and ( argv[0] == '-' and argv[1] == '-')) {
 		argv++;
 		argv++;
-	} //else if (length > 1 and argv[0] == '-') argv++;
+	} else if (length == 2 and argv[0] == '-')
+		argv++;
 	else {
 		return nullptr;
 	}
@@ -442,6 +463,7 @@ int main(int argc, char *argv[]) {
 	
 	std::map<std::string, std::string> state;
 	constexpr auto OPT_HELP 			{"help"};
+	constexpr auto OPT_VERSION 			{"version"};
 	constexpr auto OPT_VERBOSE 			{"verbose"};
 	constexpr auto OPT_OVERWRITE 		{"overwrite"};
 	constexpr auto OPT_SKIPSUBTITLE 	{"skip-subtitle"};
@@ -461,8 +483,11 @@ int main(int argc, char *argv[]) {
 	#endif
 	
 	{
+		auto opt_match{ [](const char* opt, const char* with, char mnemonic) {
+			return 0 == std::strcmp(opt, with) or (strlen(opt) == 1 and opt[0] == mnemonic);
+		}};
 		for (int i{1}; i<argc; ++i) {
-			if (auto opt{processOption(argv[i])}; opt) {if (0 == std::strcmp(opt, OPT_HELP)) {
+			if (auto opt{processOption(argv[i])}; opt) {if (opt_match(opt, OPT_HELP, 'h')) {
 				std::cout <<
 				fs::path(argv[0]).filename().string() << ' '
 				<< VERSION <<
@@ -472,27 +497,31 @@ for all input titles.\nHosted in https://github.com/Mr-Widiatmoko/MakeTVPlaylist
 Usage:\n    "<< fs::path(argv[0]).filename()<<" [Option or Dir or File] ...\n\n\
 If no argument was specified, the current directory will be use.\n\n\
 Option:\n\
---overwrite                 	Overwrite output playlist file.\n\
---verbose                   	Display playlist content.\n\
---skip-subtitle			Dont include subtitle file.\n\
---only-ext \"extension, ...\"	Filter only specific extensions, separated by comma.\n\
+-O, --overwrite                 	Overwrite output playlist file.\n\
+-v, --version                   	Display version.\n\
+-V, --verbose                   	Display playlist content.\n\
+-x, --skip-subtitle			Dont include subtitle file.\n\
+-e, --only-ext \"extension, ...\"	Filter only specific extensions, separated by comma.\n\
 				  Example: --only-ext \"mp4, mkv\"\n\
---size < OR > SIZE		Filter by size in \"KB\", \"MB\" (default), or \"GB\".\n\
+-s, --size < OR > SIZE		Filter by size in \"KB\", \"MB\" (default), or \"GB\".\n\
        FROM-TO			  Example: --size < 750\n\
        FROM..TO				OR by specify the unit\n\
 					   --size > 1.2gb\n\
 					OR using range with '-' OR '..'\n\
 					   --size 750-1.2gb\n\
---fix-filename \"filename\"   	Override output playlist filename.\n\
---out-dir \"directory path\"  	Override output directory for playlist file.\n";
+-f, --fix-filename \"filename\"   	Override output playlist filename.\n\
+-d, --out-dir \"directory path\"  	Override output directory for playlist file.\n";
 				return 0;
-			} else if (0 == std::strcmp(opt, OPT_OVERWRITE))
+			}
+			else if (opt_match(opt, OPT_VERSION, 'v'))
+				std::cout << VERSION << '\n';
+			else if (opt_match(opt, OPT_OVERWRITE, 'O'))
 				state[opt] = "true";
-			else if (0 == std::strcmp(opt, OPT_VERBOSE))
+			else if (opt_match(opt, OPT_VERBOSE, 'V'))
 				state[opt] = "true";
-			else if (0 == std::strcmp(opt, OPT_SKIPSUBTITLE))
+			else if (opt_match(opt, OPT_SKIPSUBTITLE, 'x'))
 				state[opt] = "true";
-			else if (0 == std::strcmp(opt, OPT_ONLYEXT)) {
+			else if (opt_match(opt, OPT_ONLYEXT, 'e')) {
 				if (i + 1 < argc) {
 					i++;
 					state[opt] = argv[i];
@@ -500,7 +529,7 @@ Option:\n\
 					std::cout << "Expecting extension after \"--" << opt << "\" option \
 (eg: \"mp4, mkv\").\n";
 				
-			} else if (0 == std::strcmp(opt, OPT_SIZE) and i + 1 < argc) {
+			} else if (opt_match(opt, OPT_SIZE, 's') and i + 1 < argc) {
 				if (std::strlen(argv[i + 1]) > 0) {
 					if (auto nextArgv{argv[i + 1]};
 						i + 2 < argc and (nextArgv[0] == '<' or nextArgv[0] == '>') )
@@ -526,7 +555,7 @@ Option:\n\
 						}
 					}
 				}
-			} else if (0 == std::strcmp(opt, OPT_FIXFILENAME) and i + 1 < argc) {
+			} else if (opt_match(opt, OPT_FIXFILENAME, 'f') and i + 1 < argc) {
 				i += 1;
 				state[opt] = argv[i];
 				if (not fs::path(state[opt]).parent_path().string().empty())
@@ -536,7 +565,7 @@ Option:\n\
 						+ fs::path::preferred_separator;
 				}
 				
-			} else if (0 == std::strcmp(opt, OPT_OUTDIR) and i + 1 < argc) {
+			} else if (opt_match(opt, OPT_OUTDIR, 'd') and i + 1 < argc) {
 				i += 1;
 				state[opt] = fs::absolute(argv[i]);
 				if (fs::exists(state[opt])) {

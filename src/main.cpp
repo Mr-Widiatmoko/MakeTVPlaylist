@@ -828,7 +828,7 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 	}
 
 	#ifndef DEBUG
-	if (state[OPT_VERBOSE] == "true" or state[OPT_BENCHMARK] == "true")
+	if (not invalidArgs.empty() or state[OPT_VERBOSE] == "true" or state[OPT_BENCHMARK] == "true")
 	#endif
 	std::cout
 		<< OPT_EXECUTION << "\t\t: " << state[OPT_EXECUTION] << '\n'

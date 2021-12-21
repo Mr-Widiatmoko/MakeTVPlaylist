@@ -275,11 +275,7 @@ func listDir(const fs::path& path, std::vector<fs::directory_entry>* const out,
 	}
 	
 	if (sorted)
-		std::sort(out->begin(), out->end(), [](fs::directory_entry& a,
-											   fs::directory_entry& b) {
-			return a.path().string().length() > b.path().string().length()
-			and a.path().string() > b.path().string();
-		});
+		std::sort(out->begin(), out->end());
 }
 
 func isContainsSeasonDirs(const fs::path& path) -> bool {
@@ -594,40 +590,41 @@ int main(int argc, char *argv[]) {
 	state[OPT_SIZETO] 	= "0";
 	state[OPT_EXECUTION]= OPT_ASYNC;
 	
-	auto isMatch{ [&](std::optional<std::string_view> opt,
-					 const char* with,
-					 char mnemonic,
-					 bool writeBoolean=false) {
-		auto result { opt.value() == with or opt.value()[0] == mnemonic };
-		if (result and writeBoolean)
-			state[with] = "true";
-		return result;
-	} };
-	
 	std::vector<std::string> args;
 	expandArgs(argc, argv, &args);
 	
 	for (int i{0}; i<args.size(); ++i) {
-		if (auto opt{ getOption(args[i]) }; opt) {
-			if (auto isHelp{isMatch(opt, OPT_HELP, 	'h')};
-				isHelp or isMatch(opt, OPT_VERSION, 'v'))
+		if (auto isMatch{ [&](const char* with,
+							  char mnemonic,
+							  bool writeBoolean=false) {
+			auto result { (args[i].length() > 3
+					and args[i][0] == '-'
+					and args[i][1] == '-'
+					and args[i].substr(2) == with)
+				or (args[i].length() == 2
+					and args[i][0] == '-'
+					and args[i][1] == mnemonic) };
+			if (result and writeBoolean)
+				state[with] = "true";
+			return result;
+		} }; isMatch(OPT_HELP, 'h') or isMatch(OPT_VERSION, 'v'))
 			{
 				std::cout <<
 				fs::path(args[0]).filename().string() << ' '
 				<< VERSION << '\n';
 				
-				if (isHelp)
+				if (isMatch(OPT_HELP, 'h'))
 					std::cout << HELP << '\n';
 				
 				if (i + 1 == args.size())
 					return 0;
 			}
-			else if (isMatch(opt, OPT_OVERWRITE, 	'O', true));
-			else if (isMatch(opt, OPT_VERBOSE, 		'V', true));
-			else if (isMatch(opt, OPT_BENCHMARK, 	'b', true));
-			else if (isMatch(opt, OPT_SKIPSUBTITLE, 'x', true));
-			else if (isMatch(opt, OPT_EXCLHIDDEN, 	'n', true));
-			else if (isMatch(opt, OPT_EXECUTION, 	'c')) {
+			else if (isMatch(OPT_OVERWRITE, 	'O', true));
+			else if (isMatch(OPT_VERBOSE, 		'V', true));
+			else if (isMatch(OPT_BENCHMARK, 	'b', true));
+			else if (isMatch(OPT_SKIPSUBTITLE, 	'x', true));
+			else if (isMatch(OPT_EXCLHIDDEN, 	'n', true));
+			else if (isMatch(OPT_EXECUTION, 	'c')) {
 				if (i + 1 < args.size()) {
 					i++;
 					if (args[i] == OPT_ASYNC or args[i] == OPT_THREAD)
@@ -637,7 +634,7 @@ int main(int argc, char *argv[]) {
 				} else
 					std::cout << "Expecting 'thread', 'async', or 'none' after \""
 					<< args[i] << "\" option.\n";
-			} else if (isMatch(opt, OPT_ONLYEXT, 	'e')) {
+			} else if (isMatch(OPT_ONLYEXT, 	'e')) {
 				if (i + 1 < args.size()) {
 					i++;
 					state[args[i - 1]] = args[i];
@@ -645,7 +642,7 @@ int main(int argc, char *argv[]) {
 					std::cout << "Expecting extension after \""
 					<< args[i] << "\" option (eg: \"mp4, mkv\").\n";
 			}
-			else if (isMatch(opt, OPT_FIXFILENAME, 	'f')) {
+			else if (isMatch(OPT_FIXFILENAME, 	'f')) {
 				if (i + 1 < args.size()) {
 					i++;
 					state[args[i - 1]] = args[i];
@@ -659,7 +656,7 @@ int main(int argc, char *argv[]) {
 					std::cout << "Expecting file name after \""
 					<< args[i] << "\" option (eg: \"my_playlist.m3u8\").\n";
 			}
-			else if (isMatch(opt, OPT_OUTDIR, 		'd')) {
+			else if (isMatch(OPT_OUTDIR, 		'd')) {
 				if (i + 1 < args.size()) {
 					i++;
 					state[args[i - 1]] = fs::absolute(args[i]);
@@ -670,7 +667,7 @@ int main(int argc, char *argv[]) {
 					std::cout << "Expecting directory after \""
 					<< args[i] << "\" option (eg: \"Downloads/\").\n";
 			}
-			else if (isMatch(opt, OPT_SIZE, 		's')) {
+			else if (isMatch(OPT_SIZE, 		's')) {
 				if (i + 1 < args.size()) {
 					if (args[i + 1][0] == '<' or args[i + 1][0] == '>')
 					{
@@ -757,10 +754,7 @@ int main(int argc, char *argv[]) {
 				else
 SIZE_NEEDED:		std::cout << "Expecting operator '<' or '>' followed\
 by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..to'\n";
-			}
-			else goto CHECK_PATH;
-		} else
-CHECK_PATH:	if (fs::is_directory(args[i]))
+		} else if (fs::is_directory(args[i]))
 			insertTo(&bufferDirs, std::move(fs::path(args[i])));
 		
 		else if (fs::is_regular_file(std::move(fs::path(args[i])))) {
@@ -863,8 +857,8 @@ CHECK_PATH:	if (fs::is_directory(args[i]))
 	std::move(::seasonDirs.begin(), ::seasonDirs.end(), seasonDirs);
 	
 	std::sort(selectFiles.begin(), selectFiles.end(), [](fs::path& a, fs::path& b) {
-		return a.string().length() > b.string().length()
-			and a.string() > b.string();
+		return a.string().length() < b.string().length()
+			and a.string() < b.string();
 	});
 	
 	std::map<std::string, std::shared_ptr<std::vector<fs::path>>> records;
@@ -962,8 +956,8 @@ CHECK_PATH:	if (fs::is_directory(args[i]))
 					}
 					std::sort(bufferFiles.begin(), bufferFiles.end(),
 								[](fs::path& a, fs::path& b){
-						return a.string().length() > b.string().length()
-							and a.string() > b.string();
+						return a.string().length() < b.string().length()
+							and a.string() < b.string();
 					});
 					records[dir.string()] = std::make_shared<std::vector<fs::path>>(bufferFiles);
 				} else
@@ -983,8 +977,8 @@ CHECK_PATH:	if (fs::is_directory(args[i]))
 		indexFile += 1;
 		
 		std::sort(bufferSort.begin(), bufferSort.end(), [](fs::path& a, fs::path& b) {
-			return a.string().length() > b.string().length()
-				and a.string() > b.string();
+			return a.string().length() < b.string().length()
+				and a.string() < b.string();
 		});
 		for (auto& ok : bufferSort)
 			putIntoPlaylist(std::move(ok));

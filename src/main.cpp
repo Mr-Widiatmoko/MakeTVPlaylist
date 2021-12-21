@@ -468,49 +468,74 @@ func getRange(std::string argv, std::string separator)
 
 func expandArgs(const int argc, char* const argv[], std::vector<std::string>* const args)
 {
+	bool newFull{ false };
+	auto push{ [&](char* const arg, unsigned index, int last) {
+		if (last < 0 or index - last <= 0) return;
+				
+		unsigned size = index - last + (newFull ? 2 : 0);
+		char dst[size];
+
+		unsigned i { 0 };
+		if (newFull) {
+			dst[i++] = '-';
+			dst[i++] = '-';
+		}
+		
+		for (auto inc{last}; i < size; ++i, ++inc)
+			dst[i] = arg[inc];
+		
+		dst[i] = '\0';
+		
+		args->push_back(dst);
+		
+		if (newFull)
+			newFull = false;
+	}};
 	for (int i{1}; i<argc; ++i) {
 		auto arg { argv[i] };
-		if (auto len{std::strlen(arg)};
-			len >= 2 and arg[0] == '-' and std::isalpha(arg[1])) {
-			for (auto index{1}; index < len; ++index) {
-				if (arg[index] == '=' or arg[index] == ':') {
-					if (index + 1 < len) {
-						char dst[len - index];
-						std::memcpy(&dst, arg + index + 1, sizeof (len - index));
-						args->push_back(dst);
-					}
-					break;
-				} else if (std::isalpha(arg[index]))
-					args->push_back({'-', arg[index]});
-				else {
-					char dst[len - index];
-					std::memcpy(&dst, arg + index, sizeof (len - index));
-					args->push_back(dst);
-					break;
-				}
-			};
-		} else {
-			if (len > 3 and arg[0] == '-') {
-				auto index{3};
-				for (; index < len; ++index)
-					if (arg[index] == '=' or arg[index] == ':')
-						break;
-				
-				if (index > 3 and index < len - 1) {
-					char dst1[index];
-					std::memcpy(&dst1, arg, sizeof index);
-					args->push_back(dst1);
-					
-					index++;
-					char dst2[len - index];
-					std::memcpy(&dst2, arg + index, sizeof (len - index));
-					args->push_back(dst2);
-					continue;
-				}
+		auto len { std::strlen(arg) };
+		auto isMnemonic{ len > 1 and arg[0] == '-' and (std::isalpha(arg[1]) or arg[1] == ';') };
+		auto isFull {false};
+		if (not isMnemonic) {
+			isFull = len > 2 and arg[0] == '-' and arg[1] == '-' and (std::isalpha(arg[2]) or arg[2] == ';');
+			if (not isFull)
+			{
+				args->push_back(arg);
+				continue;
 			}
-			
-			args->push_back(arg);
 		}
+		
+		
+			
+		unsigned index = isFull ? 1 : 0;
+		int last{ -1 };
+		while (++index < len) {
+			if (last < 0 and std::isalpha(arg[index])) {
+				if (isMnemonic)
+					args->push_back({'-', arg[index]});
+				else if (isFull) {
+					last = index;
+					newFull = true;
+				}
+			} else {
+				if (arg[index] == '=' or arg[index] == ':') {
+					if (isFull) {
+						push(arg, index, last);
+						last = -1;
+					} else
+						last = index + 1;
+				} else if (arg[index] == ';') {
+					push(arg, index, last);
+					last = -1;
+				} else if (isFull and last > 0 and (arg[index] == '<' or arg[index] == '>')) {
+					push(arg, index, last);
+					last = -1;
+				} else if (last < 0)
+					last = index;
+			}
+		}
+		if (last > 0)
+			push(arg, index, last);
 	}
 }
 
@@ -571,15 +596,19 @@ Option:\n\
 -d, --out-dir \"directory path\"  Override output directory for playlist file.\n\
 \n\
 Options can be joined, and replace option assignment separator [SPACE] with '=' \
-or ':'. For the example:\n\
-  tvplaylist -hOVvc=async -xs<1.3gb -r=mp4 \"-f:My-playlist.m3u8\"\n\n\
+or ':' and can be separated by ';' after assignment. For the example:\n\
+  tvplaylist -hOVvc=async;xs<1.3gb;r=mp4;f:My-playlist.m3u8\n\n\
 Thats it, -h -O -V -v -c are joined, and -c has assignment operator '=' instead of\
  using separator [SPACE].\n\
-Also -x -s are joined, and -s has remove [SPACE] separator for operator '<' and \
-value '1.3gb'.\n\
+Also -x -s are joined, and -x is continuing with ';' after option assignment \
+'=async' and -s has remove [SPACE] separator for operator '<' and value '1.3gb'.\n\
 Redefinition of option means, it will use the last option. For the example, \
 this example will not use 'thread' execution at all':\n\
-  tvplaylist -c=thread /usr/local/videos -c=none /Users/Shared/Videos\n"
+  tvplaylist -c=thread /usr/local/videos -c=none /Users/Shared/Videos\n\
+Note, you cannot join mnemonic option with full option, for the example:\n\
+  tvplaylist -ch;only-ext=m43;version\t\tWONT WORK\n\
+Instead try to separate mnemonic and full option, like this:\n\
+  tvplaylist -ch --only-ext=mp3;version\n"
 ;
 
 int main(int argc, char *argv[]) {
@@ -765,7 +794,7 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 				insertTo(&selectFiles, std::move(fs::absolute(args[i])));
 		} else
 			std::cout << "What is this: \"" << args[i] << "\"?\nTry to type \""
-					<< fs::path(args[0]).filename().string() << " --help\"\n";
+					<< fs::path(argv[0]).filename().string() << " --help\"\n";
 	}
 
 	if (bufferDirs.empty() and selectFiles.empty())
@@ -870,7 +899,7 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 								 ? std::to_string(selectFiles.size()) + "_file"
 								 : (inputDirsCount == 1
 									 ? fs::path(state[OPT_OUTDIR].substr(0,
-										state[OPT_OUTDIR].size() - 2)).filename().string()
+										state[OPT_OUTDIR].size() - 1)).filename().string()
 									 : std::to_string(inputDirsCount)) + "_dir")
 										+ (inputDirsCount > 1
 										   or selectFiles.size() > 1 ? "s" : "")
@@ -956,8 +985,8 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 					}
 					std::sort(bufferFiles.begin(), bufferFiles.end(),
 								[](fs::path& a, fs::path& b){
-						return a.string().length() < b.string().length()
-							and a.string() < b.string();
+						return 	a.filename().string() < b.filename().string() or
+								a.filename().string().length() < b.filename().string().length();
 					});
 					records[dir.string()] = std::make_shared<std::vector<fs::path>>(bufferFiles);
 				} else
@@ -977,8 +1006,8 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 		indexFile += 1;
 		
 		std::sort(bufferSort.begin(), bufferSort.end(), [](fs::path& a, fs::path& b) {
-			return a.string().length() < b.string().length()
-				and a.string() < b.string();
+			return a.string() < b.string()
+				and a.string().length() < b.string().length();
 		});
 		for (auto& ok : bufferSort)
 			putIntoPlaylist(std::move(ok));

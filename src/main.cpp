@@ -275,7 +275,11 @@ func listDir(const fs::path& path, std::vector<fs::directory_entry>* const out,
 	}
 	
 	if (sorted)
-		std::sort(out->begin(), out->end());
+		std::sort(out->begin(), out->end(), [](fs::directory_entry& a,
+											   fs::directory_entry& b) {
+			return a.path().string().length() > b.path().string().length()
+			and a.path().string() > b.path().string();
+		});
 }
 
 func isContainsSeasonDirs(const fs::path& path) -> bool {
@@ -759,13 +763,13 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 CHECK_PATH:	if (fs::is_directory(args[i]))
 			insertTo(&bufferDirs, std::move(fs::path(args[i])));
 		
-		else if (fs::is_regular_file(std::move(fs::path(args[i]))) and
-					  isMediaFile(fs::absolute(args[i]), state[OPT_ONLYEXT],
+		else if (fs::is_regular_file(std::move(fs::path(args[i])))) {
+			if (isMediaFile(fs::absolute(args[i]), state[OPT_ONLYEXT],
 							   state[OPT_SIZEOPGT][0],
 							   std::stof(state[OPT_SIZE]),
 							   std::stof(state[OPT_SIZETO])))
-			insertTo(&selectFiles, std::move(fs::absolute(args[i])));
-		else
+				insertTo(&selectFiles, std::move(fs::absolute(args[i])));
+		} else
 			std::cout << "What is this: \"" << args[i] << "\"?\nTry to type \""
 					<< fs::path(args[0]).filename().string() << " --help\"\n";
 	}
@@ -845,7 +849,11 @@ CHECK_PATH:	if (fs::is_directory(args[i]))
 	#ifndef DEBUG
 	if (state[OPT_BENCHMARK] == "true")
 	#endif
-		timeLapse(start, std::to_string(regularDirSize + seasonDirSize) + " valid dirs took ", true);
+	{
+		if (inputDirsCount > 0)
+			timeLapse(start, std::to_string(regularDirSize + seasonDirSize)
+					  + " valid dirs took ", true);
+	}
 
 	/// Convert std::set to classic array, to enable call by index subscript.
 	fs::path regularDirs[regularDirSize];
@@ -854,7 +862,10 @@ CHECK_PATH:	if (fs::is_directory(args[i]))
 	fs::path seasonDirs[seasonDirSize];
 	std::move(::seasonDirs.begin(), ::seasonDirs.end(), seasonDirs);
 	
-	std::sort(selectFiles.begin(), selectFiles.end());
+	std::sort(selectFiles.begin(), selectFiles.end(), [](fs::path& a, fs::path& b) {
+		return a.string().length() > b.string().length()
+			and a.string() > b.string();
+	});
 	
 	std::map<std::string, std::shared_ptr<std::vector<fs::path>>> records;
 	
@@ -949,7 +960,11 @@ CHECK_PATH:	if (fs::is_directory(args[i]))
 						#endif
 							std::cout << e.what() << '\n';
 					}
-					std::sort(bufferFiles.begin(), bufferFiles.end());
+					std::sort(bufferFiles.begin(), bufferFiles.end(),
+								[](fs::path& a, fs::path& b){
+						return a.string().length() > b.string().length()
+							and a.string() > b.string();
+					});
 					records[dir.string()] = std::make_shared<std::vector<fs::path>>(bufferFiles);
 				} else
 					bufferFiles = *found;
@@ -967,7 +982,10 @@ CHECK_PATH:	if (fs::is_directory(args[i]))
 		
 		indexFile += 1;
 		
-		std::sort(bufferSort.begin(), bufferSort.end());
+		std::sort(bufferSort.begin(), bufferSort.end(), [](fs::path& a, fs::path& b) {
+			return a.string().length() > b.string().length()
+				and a.string() > b.string();
+		});
 		for (auto& ok : bufferSort)
 			putIntoPlaylist(std::move(ok));
 		

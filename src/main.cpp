@@ -622,6 +622,8 @@ int main(int argc, char *argv[]) {
 	std::vector<std::string> args;
 	expandArgs(argc, argv, &args);
 	
+	std::vector<std::string_view> invalidArgs;
+	
 	for (int i{0}; i<args.size(); ++i) {
 		if (auto isMatch{ [&](const char* with,
 							  char mnemonic,
@@ -639,7 +641,7 @@ int main(int argc, char *argv[]) {
 		} }; isMatch(OPT_HELP, 'h') or isMatch(OPT_VERSION, 'v'))
 			{
 				std::cout <<
-				fs::path(args[0]).filename().string() << ' '
+				fs::path(argv[0]).filename().string() << ' '
 				<< VERSION << '\n';
 				
 				if (isMatch(OPT_HELP, 'h'))
@@ -793,8 +795,17 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 							   std::stof(state[OPT_SIZETO])))
 				insertTo(&selectFiles, std::move(fs::absolute(args[i])));
 		} else
-			std::cout << "What is this: \"" << args[i] << "\"?\nTry to type \""
-					<< fs::path(argv[0]).filename().string() << " --help\"\n";
+			invalidArgs.push_back(args[i]);
+	}
+	
+	if (not invalidArgs.empty()) {
+		std::cout << "\nWhat " << (invalidArgs.size() > 1 ? "are these" : "is this") << "? :\n";
+		for (auto i{ 0 }; i<invalidArgs.size(); ++i) {
+			std::cout << '"' << invalidArgs[i] << '"'
+				<< (i + 1 < invalidArgs.size() ? ", " : "");
+		}
+		std::cout << "\nFor more information, please try to type \""
+			<< fs::path(argv[0]).filename().string() << " --help\"\n\n";
 	}
 
 	if (bufferDirs.empty() and selectFiles.empty())

@@ -274,7 +274,7 @@ func listDir(const fs::path& path, std::vector<fs::directory_entry>* const out,
 		ignoredPaths.push_back(path.string());
 	}
 	
-	if (sorted)
+	if (sorted and out->size() > 1)
 		std::sort(out->begin(), out->end());
 }
 
@@ -868,12 +868,16 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 		else
 			checkForSeasonDir(std::move(child));
 
-	if (state[OPT_EXECUTION] == OPT_THREAD)
+	if (state[OPT_EXECUTION] == OPT_THREAD) {
 		for (auto& t : threads)
 			t.join();
-	else if (state[OPT_EXECUTION] == OPT_ASYNC)
+		threads.clear();
+	} else if (state[OPT_EXECUTION] == OPT_ASYNC) {
 		for (auto& a : asyncs)
 			a.wait();
+		asyncs.clear();
+	}
+
 		
 	const auto regularDirSize{::regularDirs.size()};
 	const auto seasonDirSize{::seasonDirs.size()};
@@ -896,12 +900,13 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 	fs::path seasonDirs[seasonDirSize];
 	std::move(::seasonDirs.begin(), ::seasonDirs.end(), seasonDirs);
 	
-	std::sort(selectFiles.begin(), selectFiles.end(), [](fs::path& a, fs::path& b) {
-		return a.string().length() < b.string().length()
-			and a.string() < b.string();
-	});
+	if (selectFiles.size() > 1)
+		std::sort(selectFiles.begin(), selectFiles.end(), [](fs::path& a, fs::path& b) {
+			return a.string().length() < b.string().length()
+				and a.string() < b.string();
+		});
 	
-	std::map<std::string, std::shared_ptr<std::vector<fs::path>>> records;
+	std::map<std::string_view, std::shared_ptr<std::vector<fs::path>>> records;
 	
 	fs::path outputName{ state[OPT_OUTDIR]
 							+ (state[OPT_FIXFILENAME] != ""
@@ -945,22 +950,12 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 			}
 		}
 	}};
-		
-	while (true) {
-		auto finish{true};
-		std::vector<fs::path> bufferSort;
-		
-		for (auto i{0}; i < maxDirSize; ++i) {
-			for (auto indexPass{1}; indexPass <= 2; ++indexPass)
-				///pass 1 for regularDirs, pass 2 for seasonDirs
-			{
-				if ((indexPass == 1 and i >= regularDirSize)
-					or (indexPass == 2 and i >= seasonDirSize))
-					continue;
-				
-				std::vector<fs::path> bufferFiles;
-
-				auto filterChildFiles{ [&bufferFiles](const fs::directory_entry& f) {
+	
+	auto filterChildFiles{ [&records](const std::string_view dir) {
+		if (not dir.empty()) {
+			std::vector<fs::path> bufferFiles;
+			try {
+				for (auto& f : fs::recursive_directory_iterator(dir)) {
 					if (not fs::is_regular_file(f.path())
 						or (fs::status(f.path()).permissions()
 							& (fs::perms::owner_read
@@ -974,52 +969,78 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 									std::stof(state[OPT_SIZE]),
 									std::stof(state[OPT_SIZETO])))
 						bufferFiles.push_back(std::move(f.path()));
-				}};
+				}
+			} catch (fs::filesystem_error& e) {
+				#ifndef DEBUG
+				if (state[OPT_VERBOSE] == "true")
+				#endif
+					std::cout << e.what() << '\n';
+			}
+			if (bufferFiles.size() > 1)
+				std::sort(bufferFiles.begin(), bufferFiles.end(),
+							[](fs::path& a, fs::path& b){
+					return 	a.filename().string() < b.filename().string() or
+							a.filename().string().length() < b.filename().string().length();
+				});
+			records[dir] = std::make_shared<std::vector<fs::path>>(std::move(bufferFiles));
+		}
+	}};
+
+	for (auto i{0}; i<maxDirSize; ++i)
+		for (auto& x : {1, 2})
+			if (i < (x == 1 ? regularDirSize : seasonDirSize) ) {
+				auto dir { (x == 1 ? regularDirs[i] : seasonDirs[i]).string() };
+				if (state[OPT_EXECUTION] == OPT_THREAD)
+					threads.emplace_back(filterChildFiles, dir);
+				else if (state[OPT_EXECUTION] == OPT_ASYNC)
+					asyncs.emplace_back(std::async(std::launch::async, filterChildFiles, dir));
+				else
+					filterChildFiles(dir);
+			}
+	
+	if (state[OPT_EXECUTION] == OPT_THREAD) {
+		for (auto& t : threads)
+			t.join();
+	} else if (state[OPT_EXECUTION] == OPT_ASYNC) {
+		for (auto& a : asyncs)
+			a.wait();
+	}
+
+	
+	while (true) {
+		auto finish{true};
+		std::vector<fs::path> bufferSort;
+		
+		for (auto i{0}; i < maxDirSize; ++i)
+			for (auto& indexPass : {1, 2})
+				///pass 1 for regularDirs, pass 2 for seasonDirs
+			{
+				if ((indexPass == 1 and i >= regularDirSize)
+					or (indexPass == 2 and i >= seasonDirSize))
+					continue;
 
 				if (auto dir{indexPass == 1 ? regularDirs[i] : seasonDirs[i]};
 					dir.empty())
 					continue;
 								
-				else if (auto found{records[dir.string()]}; found == nullptr) {
-					try {
-						if (indexPass == 1)
-							for (auto& f : fs::directory_iterator(dir))
-								filterChildFiles(std::move(f));
-						else
-							for (auto& f : fs::recursive_directory_iterator(dir))
-								filterChildFiles(std::move(f));
-					} catch (fs::filesystem_error& e) {
-						#ifndef DEBUG
-						if (state[OPT_VERBOSE] == "true")
-						#endif
-							std::cout << e.what() << '\n';
+				else if (auto found{records[dir.string()]}; found)
+					if ((*found).size() > indexFile) {
+						finish = false;
+											
+						bufferSort.push_back(std::move((*found)[indexFile]));
 					}
-					std::sort(bufferFiles.begin(), bufferFiles.end(),
-								[](fs::path& a, fs::path& b){
-						return 	a.filename().string() < b.filename().string() or
-								a.filename().string().length() < b.filename().string().length();
-					});
-					records[dir.string()] = std::make_shared<std::vector<fs::path>>(bufferFiles);
-				} else
-					bufferFiles = *found;
-				
-				if (bufferFiles.size() > indexFile) {
-					finish = false;
-										
-					bufferSort.push_back(std::move(bufferFiles[indexFile]));
-				}
 			} //end pass loop
-		}
 		
 		if (indexFile < selectFiles.size())
 			bufferSort.push_back(std::move(selectFiles[indexFile]));
 		
 		indexFile += 1;
 		
-		std::sort(bufferSort.begin(), bufferSort.end(), [](fs::path& a, fs::path& b) {
-			return a.string() < b.string()
-				and a.string().length() < b.string().length();
-		});
+		if (bufferSort.size() > 1)
+			std::sort(bufferSort.begin(), bufferSort.end(), [](fs::path& a, fs::path& b) {
+				return a.string() < b.string()
+					and a.string().length() < b.string().length();
+			});
 		for (auto& ok : bufferSort)
 			putIntoPlaylist(std::move(ok));
 		

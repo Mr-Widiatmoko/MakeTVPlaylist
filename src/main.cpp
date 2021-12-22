@@ -493,7 +493,9 @@ func expandArgs(const int argc, char* const argv[], std::vector<std::string>* co
 		auto isFull {false};
 		if (not isMnemonic) {
 			isFull = len > 2 and arg[0] == '-' and arg[1] == '-' and (std::isalpha(arg[2]) or arg[2] == ';');
-			if (not isFull)
+			if (isFull)
+				newFull = true;
+			else
 			{
 				args->emplace_back(arg);
 				continue;
@@ -512,7 +514,6 @@ func expandArgs(const int argc, char* const argv[], std::vector<std::string>* co
 					args->emplace_back(new_s);
 				} else if (isFull) {
 					last = index;
-					newFull = true;
 				}
 			} else {
 				if (arg[index] == '=' or arg[index] == ':') {
@@ -524,9 +525,11 @@ func expandArgs(const int argc, char* const argv[], std::vector<std::string>* co
 				} else if (arg[index] == ';') {
 					push(arg, index, last);
 					last = -1;
+					if (isFull)
+						newFull = true;
 				} else if (isFull and last > 0 and (arg[index] == '<' or arg[index] == '>')) {
 					push(arg, index, last);
-					last = -1;
+					last = index;
 				} else if (last < 0)
 					last = index;
 			}
@@ -655,9 +658,8 @@ int main(int argc, char *argv[]) {
 			else if (isMatch(OPT_EXECUTION, 	'c')) {
 				if (i + 1 < args.size()) {
 					i++;
-					if (auto substr{ args[i].substr(2) };
-						substr == OPT_ASYNC or substr == OPT_THREAD)
-						state[OPT_EXECUTION] = substr;
+					if (args[i] == OPT_ASYNC or args[i] == OPT_THREAD)
+						state[OPT_EXECUTION] = args[i];
 					else
 						state[OPT_EXECUTION] = "";
 				} else

@@ -655,8 +655,9 @@ int main(int argc, char *argv[]) {
 			else if (isMatch(OPT_EXECUTION, 	'c')) {
 				if (i + 1 < args.size()) {
 					i++;
-					if (args[i] == OPT_ASYNC or args[i] == OPT_THREAD)
-						state[OPT_EXECUTION] = args[i];
+					if (auto substr{ args[i].substr(2) };
+						substr == OPT_ASYNC or substr == OPT_THREAD)
+						state[OPT_EXECUTION] = substr;
 					else
 						state[OPT_EXECUTION] = "";
 				} else
@@ -809,6 +810,11 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 		insertTo(&bufferDirs, fs::current_path());
 	
 	const auto inputDirsCount = bufferDirs.size();
+	fs::path inputDirs[inputDirsCount];
+	#ifndef DEBUG
+	if (not invalidArgs.empty() or state[OPT_VERBOSE] == "true" or state[OPT_BENCHMARK] == "true")
+	#endif
+		std::copy(bufferDirs.begin(), bufferDirs.end(), inputDirs);
 
 	while (bufferDirs.size() == 1) {
 		state[OPT_OUTDIR] = fs::absolute(bufferDirs[0]).string();
@@ -828,12 +834,14 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 	#ifndef DEBUG
 	if (not invalidArgs.empty() or state[OPT_VERBOSE] == "true" or state[OPT_BENCHMARK] == "true")
 	#endif
+	{
 	std::cout
 		<< OPT_EXECUTION << "\t\t: " << state[OPT_EXECUTION] << '\n'
 		<< OPT_VERBOSE << "\t\t\t: " << state[OPT_VERBOSE] << '\n'
 		<< OPT_BENCHMARK << "\t\t: " << state[OPT_BENCHMARK] << '\n'
 		<< OPT_OVERWRITE << "\t\t: " << state[OPT_OVERWRITE] << '\n'
 		<< OPT_FIXFILENAME << "\t\t: " << state[OPT_FIXFILENAME] << '\n'
+		<< "Current Directory\t: " << fs::current_path().string() << '\n'
 		<< OPT_OUTDIR << "\t\t\t: " << state[OPT_OUTDIR] << '\n'
 		<< OPT_SKIPSUBTITLE << "\t\t: " << state[OPT_SKIPSUBTITLE] << '\n'
 		<< OPT_ONLYEXT << "\t\t: " << state[OPT_ONLYEXT] << '\n'
@@ -841,10 +849,19 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 			<< (state[OPT_SIZEOPGT].empty() ? "" : " ")
 			<< state[OPT_SIZE]
 			<< (state[OPT_SIZETO] != "0" ? ".." : " bytes")
-			<< (state[OPT_SIZETO] == "0" ? "" : state[OPT_SIZETO] + " bytes")
-			<< '\n'
-	<< '\n';
-	
+		<< (state[OPT_SIZETO] == "0" ? "" : state[OPT_SIZETO] + " bytes") << '\n'
+		<< "Inputs\t\t\t: ";
+		for (auto i{0}; i<inputDirsCount + selectFiles.size(); ++i) {
+			if (i < inputDirsCount) {
+				std::cout << inputDirs[i];
+			} else {
+				std::cout << selectFiles[i - inputDirsCount];
+			}
+			
+			std::cout  << (i < (inputDirsCount + selectFiles.size()) - 1 ? ", " : "");
+		}
+	std::cout << "\n\n";
+	}
 	if (state[OPT_OUTDIR].empty()) {
 		if (selectFiles.empty())
 			state[OPT_OUTDIR] = fs::current_path().string()
@@ -1002,11 +1019,11 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 				if (auto dir { (x == 1 ? regularDirs[i] : seasonDirs[i]).string() };
 					not dir.empty()) {
 					if (state[OPT_EXECUTION] == OPT_THREAD)
-						threads.emplace_back([&]() {
+						threads.emplace_back([&, dir]() {
 							filterChildFiles(dir, x == 2);
 						});
 					else if (state[OPT_EXECUTION] == OPT_ASYNC)
-						asyncs.emplace_back(std::async(std::launch::async, [&]() {
+						asyncs.emplace_back(std::async(std::launch::async, [&, dir]() {
 							filterChildFiles(dir, x == 2);
 						}));
 					else

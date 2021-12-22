@@ -118,7 +118,7 @@ func containInts(const std::string&& s, std::vector<MAXNUM>* const out)
 	std::string buffer;
 	auto make{[&]() -> void {
 		if (buffer.size() > 0 and buffer.size() < 19) /// ULLONG_MAX length is 20
-			out->push_back(std::stoull(std::move(buffer)));
+			out->emplace_back(std::stoull(std::move(buffer)));
 	}};
 	
 	for (auto& c : s) {
@@ -151,7 +151,7 @@ func parseCommaDelimited(const std::string&& literal, std::vector<std::string>* 
 				buffer.erase(buffer.begin());
 			else if (buffer[0] not_eq '.')
 				buffer.insert(buffer.begin(), '.');
-			result->push_back(buffer);
+			result->emplace_back(buffer);
 			buffer = "";
 		} else
 			buffer += c;
@@ -205,7 +205,7 @@ func findSubtitleFile(const fs::path& original,
 				and f.path().string().substr(0, noext.size()) == noext
 				and isEqual(tolower(f.path().extension().string()), &x))
 			{
-				result->push_back(f.path());
+				result->emplace_back(f.path());
 			}
 		}
 	}
@@ -243,7 +243,7 @@ func listDir(const fs::path& path, std::vector<fs::directory_entry>* const out,
 		std::error_code ec;
 		auto ori = fs::read_symlink(path, ec);
 		if (ec) {
-			ignoredPaths.push_back(path.string());
+			ignoredPaths.emplace_back(path.string());
 			return;
 		}
 	}
@@ -259,11 +259,11 @@ func listDir(const fs::path& path, std::vector<fs::directory_entry>* const out,
 			else if (child.is_symlink()) {
 				if (const auto ori { fs::read_symlink(child.path()) };
 					fs::exists(ori) and fs::is_directory(ori))
-					out->push_back(child);
+					out->emplace_back(child);
 				else
-					ignoredPaths.push_back(ori.string());
+					ignoredPaths.emplace_back(ori.string());
 			} else if (child.is_directory())
-					out->push_back(child);
+					out->emplace_back(child);
 		}
 	} catch (fs::filesystem_error& e) {
 		#ifndef DEBUG
@@ -271,7 +271,7 @@ func listDir(const fs::path& path, std::vector<fs::directory_entry>* const out,
 		#endif
 			std::cout << e.what() << '\n';
 		
-		ignoredPaths.push_back(path.string());
+		ignoredPaths.emplace_back(path.string());
 	}
 	
 	if (sorted and out->size() > 1)
@@ -341,7 +341,7 @@ func insertTo(std::vector<fs::path>* const vector, const fs::path& path)
 		or (state[OPT_EXCLHIDDEN] == "true" and path.filename().string()[0] == '.'))
 		;
 	else
-		vector->push_back(path);
+		vector->emplace_back(path);
 }
 
 func checkForSeasonDir(const fs::path& path) -> void {	
@@ -375,7 +375,7 @@ func checkForSeasonDir(const fs::path& path) -> void {
 					} else {
 					if (lastNum.empty()) {
 						lastNum = std::move(iNames);
-						bufferNum.push_back(child.path());
+						bufferNum.emplace_back(child.path());
 						continue;
 					} else if (lastNum.size() == iNames.size()) {
 						bool hasIncreased{false};
@@ -386,7 +386,7 @@ func checkForSeasonDir(const fs::path& path) -> void {
 							}
 						
 						if (hasIncreased) {
-							bufferNum.push_back(child.path());
+							bufferNum.emplace_back(child.path());
 							continue;
 						}
 					}
@@ -481,7 +481,7 @@ func expandArgs(const int argc, char* const argv[], std::vector<std::string>* co
 		
 		dst[i] = '\0';
 		
-		args->push_back(dst);
+		args->emplace_back(std::string(dst));
 		
 		if (newFull)
 			newFull = false;
@@ -495,7 +495,7 @@ func expandArgs(const int argc, char* const argv[], std::vector<std::string>* co
 			isFull = len > 2 and arg[0] == '-' and arg[1] == '-' and (std::isalpha(arg[2]) or arg[2] == ';');
 			if (not isFull)
 			{
-				args->push_back(arg);
+				args->emplace_back(arg);
 				continue;
 			}
 		}
@@ -506,9 +506,11 @@ func expandArgs(const int argc, char* const argv[], std::vector<std::string>* co
 		int last{ -1 };
 		while (++index < len) {
 			if (last < 0 and std::isalpha(arg[index])) {
-				if (isMnemonic)
-					args->push_back({'-', arg[index]});
-				else if (isFull) {
+				if (isMnemonic) {
+					std::string new_s {'-'};
+					new_s += arg[index];
+					args->emplace_back(new_s);
+				} else if (isFull) {
 					last = index;
 					newFull = true;
 				}
@@ -790,7 +792,7 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 							   std::stof(state[OPT_SIZETO])))
 				insertTo(&selectFiles, std::move(fs::absolute(args[i])));
 		} else
-			invalidArgs.push_back(args[i]);
+			invalidArgs.emplace_back(args[i]);
 	}
 	
 	if (not invalidArgs.empty()) {
@@ -809,14 +811,15 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 	const auto inputDirsCount = bufferDirs.size();
 
 	while (bufferDirs.size() == 1) {
-		state[OPT_OUTDIR] = fs::absolute(bufferDirs[0]).string()
-								+ fs::path::preferred_separator;
+		state[OPT_OUTDIR] = fs::absolute(bufferDirs[0]).string();
 		
 		insertTo(&regularDirs, std::move(bufferDirs[0]));/// Assume single input dir is regularDir
 		bufferDirs.clear();
 		
 		std::vector<fs::directory_entry> sortedDirs;
-		listDir(bufferDirs[0], &sortedDirs);
+		listDir(fs::path(state[OPT_OUTDIR]), &sortedDirs);
+		
+		state[OPT_OUTDIR] += fs::path::preferred_separator;
 		
 		for (auto& child : sortedDirs)
 			insertTo(&bufferDirs, std::move(child.path()));
@@ -901,7 +904,7 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 				and a.string() < b.string();
 		});
 	
-	std::map<std::string_view, std::shared_ptr<std::vector<fs::path>>> records;
+	std::map<std::string, std::shared_ptr<std::vector<fs::path>>> records;
 	
 	fs::path outputName{ state[OPT_OUTDIR]
 							+ (state[OPT_FIXFILENAME] != ""
@@ -946,37 +949,51 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 		}
 	}};
 	
-	auto filterChildFiles{ [&records](const std::string_view dir) {
+	auto filterChildFiles{ [&records](const std::string& dir, bool recurive=false) {
 		std::vector<fs::path> bufferFiles;
+		auto filter{ [&](const fs::directory_entry& f) {
+			if (not fs::is_regular_file(f.path())
+				or (fs::status(f.path()).permissions()
+					& (fs::perms::owner_read
+					   | fs::perms::group_read
+					   | fs::perms::others_read)) == fs::perms::none
+				or (state[OPT_EXCLHIDDEN] == "true" and f.path().filename().string()[0] == '.'))
+					return;
+			
+			if (isMediaFile(f.path(), state[OPT_ONLYEXT],
+							state[OPT_SIZEOPGT][0],
+							std::stof(state[OPT_SIZE]),
+							std::stof(state[OPT_SIZETO])))
+				bufferFiles.emplace_back(std::move(f.path()));
+		}};
 		try {
-			for (auto& f : fs::recursive_directory_iterator(dir)) {
-				if (not fs::is_regular_file(f.path())
-					or (fs::status(f.path()).permissions()
-						& (fs::perms::owner_read
-						   | fs::perms::group_read
-						   | fs::perms::others_read)) == fs::perms::none
-					or (state[OPT_EXCLHIDDEN] == "true" and f.path().filename().string()[0] == '.'))
-						continue;
-				
-				if (isMediaFile(f.path(), state[OPT_ONLYEXT],
-								state[OPT_SIZEOPGT][0],
-								std::stof(state[OPT_SIZE]),
-								std::stof(state[OPT_SIZETO])))
-					bufferFiles.push_back(std::move(f.path()));
-			}
+			if (recurive)
+				for (auto& f : fs::recursive_directory_iterator(dir))
+					filter(f);
+			else
+				for (auto& f : fs::directory_iterator(dir))
+					filter(f);
+			
 		} catch (fs::filesystem_error& e) {
 			#ifndef DEBUG
 			if (state[OPT_VERBOSE] == "true")
 			#endif
 				std::cout << e.what() << '\n';
 		}
+		if (bufferFiles.empty())
+			return;
 		if (bufferFiles.size() > 1)
 			std::sort(bufferFiles.begin(), bufferFiles.end(),
 						[](fs::path& a, fs::path& b){
 				return 	a.filename().string() < b.filename().string() or
 						a.filename().string().length() < b.filename().string().length();
 			});
-		records[dir] = std::make_shared<std::vector<fs::path>>(std::move(bufferFiles));
+		#ifdef DEBUG
+			std::cout << "+records[:" << dir << "] " << bufferFiles.size() << " files\n";
+		#endif
+		records.emplace(std::make_pair(std::move(dir),
+									   std::make_shared<std::vector<fs::path>>(std::move(bufferFiles))
+									   ));
 	}};
 
 	for (auto i{0}; i<maxDirSize; ++i)
@@ -985,11 +1002,15 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 				if (auto dir { (x == 1 ? regularDirs[i] : seasonDirs[i]).string() };
 					not dir.empty()) {
 					if (state[OPT_EXECUTION] == OPT_THREAD)
-						threads.emplace_back(filterChildFiles, dir);
+						threads.emplace_back([&]() {
+							filterChildFiles(dir, x == 2);
+						});
 					else if (state[OPT_EXECUTION] == OPT_ASYNC)
-						asyncs.emplace_back(std::async(std::launch::async, filterChildFiles, dir));
+						asyncs.emplace_back(std::async(std::launch::async, [&]() {
+							filterChildFiles(dir, x == 2);
+						}));
 					else
-						filterChildFiles(dir);
+						filterChildFiles(dir, x == 2);
 				}
 	
 	if (state[OPT_EXECUTION] == OPT_THREAD) {
@@ -1012,21 +1033,21 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 				if ((indexPass == 1 and i >= regularDirSize)
 					or (indexPass == 2 and i >= seasonDirSize))
 					continue;
-
-				if (auto dir{indexPass == 1 ? regularDirs[i] : seasonDirs[i]};
+				
+				if (const auto dir{indexPass == 1 ? regularDirs[i] : seasonDirs[i]};
 					dir.empty())
 					continue;
-								
-				else if (auto found{records[dir.string()]}; found)
-					if ((*found).size() > indexFile) {
+
+				else if (auto found { records[dir.string()] }; found)
+					if (indexFile < found->size()) {
 						finish = false;
-											
-						bufferSort.push_back(std::move((*found)[indexFile]));
+
+						bufferSort.emplace_back((*found)[indexFile]);
 					}
 			} //end pass loop
 		
 		if (indexFile < selectFiles.size())
-			bufferSort.push_back(std::move(selectFiles[indexFile]));
+			bufferSort.emplace_back(std::move(selectFiles[indexFile]));
 		
 		indexFile += 1;
 		

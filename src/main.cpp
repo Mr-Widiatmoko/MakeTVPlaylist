@@ -286,7 +286,6 @@ func isContainsSeasonDirs(const fs::path& path) -> bool {
 	
 	auto isNum{true};
 	std::vector<MAXNUM> lastNum;
-	std::vector<fs::path> bufferNum;
 	
 	for (auto& child : sortedDir) {
 		hasDirs = true;
@@ -296,20 +295,16 @@ func isContainsSeasonDirs(const fs::path& path) -> bool {
 			if (not iNames.empty()) {
 				if (lastNum.empty()) {
 					lastNum = std::move(iNames);
-					bufferNum.push_back(child.path());
 					continue;
 				} else if (lastNum.size() == iNames.size()) {
 					bool hasIncreased{false};
 					for (auto xi{0}; xi < lastNum.size(); ++xi)
-						if (lastNum[xi] < iNames[xi]) {
-							hasIncreased = true;
+						if (hasIncreased = lastNum[xi] < iNames[xi];
+							hasIncreased)
 							break;
-						}
 					
-					if (hasIncreased) {
-						bufferNum.push_back(child.path());
+					if (hasIncreased)
 						continue;
-					}
 				}
 			}
 		}
@@ -952,51 +947,50 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 	}};
 	
 	auto filterChildFiles{ [&records](const std::string_view dir) {
-		if (not dir.empty()) {
-			std::vector<fs::path> bufferFiles;
-			try {
-				for (auto& f : fs::recursive_directory_iterator(dir)) {
-					if (not fs::is_regular_file(f.path())
-						or (fs::status(f.path()).permissions()
-							& (fs::perms::owner_read
-							   | fs::perms::group_read
-							   | fs::perms::others_read)) == fs::perms::none
-						or (state[OPT_EXCLHIDDEN] == "true" and f.path().filename().string()[0] == '.'))
-							return;
-					
-					if (isMediaFile(f.path(), state[OPT_ONLYEXT],
-									state[OPT_SIZEOPGT][0],
-									std::stof(state[OPT_SIZE]),
-									std::stof(state[OPT_SIZETO])))
-						bufferFiles.push_back(std::move(f.path()));
-				}
-			} catch (fs::filesystem_error& e) {
-				#ifndef DEBUG
-				if (state[OPT_VERBOSE] == "true")
-				#endif
-					std::cout << e.what() << '\n';
+		std::vector<fs::path> bufferFiles;
+		try {
+			for (auto& f : fs::recursive_directory_iterator(dir)) {
+				if (not fs::is_regular_file(f.path())
+					or (fs::status(f.path()).permissions()
+						& (fs::perms::owner_read
+						   | fs::perms::group_read
+						   | fs::perms::others_read)) == fs::perms::none
+					or (state[OPT_EXCLHIDDEN] == "true" and f.path().filename().string()[0] == '.'))
+						continue;
+				
+				if (isMediaFile(f.path(), state[OPT_ONLYEXT],
+								state[OPT_SIZEOPGT][0],
+								std::stof(state[OPT_SIZE]),
+								std::stof(state[OPT_SIZETO])))
+					bufferFiles.push_back(std::move(f.path()));
 			}
-			if (bufferFiles.size() > 1)
-				std::sort(bufferFiles.begin(), bufferFiles.end(),
-							[](fs::path& a, fs::path& b){
-					return 	a.filename().string() < b.filename().string() or
-							a.filename().string().length() < b.filename().string().length();
-				});
-			records[dir] = std::make_shared<std::vector<fs::path>>(std::move(bufferFiles));
+		} catch (fs::filesystem_error& e) {
+			#ifndef DEBUG
+			if (state[OPT_VERBOSE] == "true")
+			#endif
+				std::cout << e.what() << '\n';
 		}
+		if (bufferFiles.size() > 1)
+			std::sort(bufferFiles.begin(), bufferFiles.end(),
+						[](fs::path& a, fs::path& b){
+				return 	a.filename().string() < b.filename().string() or
+						a.filename().string().length() < b.filename().string().length();
+			});
+		records[dir] = std::make_shared<std::vector<fs::path>>(std::move(bufferFiles));
 	}};
 
 	for (auto i{0}; i<maxDirSize; ++i)
 		for (auto& x : {1, 2})
-			if (i < (x == 1 ? regularDirSize : seasonDirSize) ) {
-				auto dir { (x == 1 ? regularDirs[i] : seasonDirs[i]).string() };
-				if (state[OPT_EXECUTION] == OPT_THREAD)
-					threads.emplace_back(filterChildFiles, dir);
-				else if (state[OPT_EXECUTION] == OPT_ASYNC)
-					asyncs.emplace_back(std::async(std::launch::async, filterChildFiles, dir));
-				else
-					filterChildFiles(dir);
-			}
+			if (i < (x == 1 ? regularDirSize : seasonDirSize) )
+				if (auto dir { (x == 1 ? regularDirs[i] : seasonDirs[i]).string() };
+					not dir.empty()) {
+					if (state[OPT_EXECUTION] == OPT_THREAD)
+						threads.emplace_back(filterChildFiles, dir);
+					else if (state[OPT_EXECUTION] == OPT_ASYNC)
+						asyncs.emplace_back(std::async(std::launch::async, filterChildFiles, dir));
+					else
+						filterChildFiles(dir);
+				}
 	
 	if (state[OPT_EXECUTION] == OPT_THREAD) {
 		for (auto& t : threads)

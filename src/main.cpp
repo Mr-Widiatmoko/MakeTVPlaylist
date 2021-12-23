@@ -168,13 +168,12 @@ func isMediaFile(const fs::path& path,
 		return false;
 	
 	std::vector<std::string> x;
-	if (extensions.empty()) {
-		constexpr auto s{ ".mp4, .mkv, .mov, .m4v, .mpeg, .mpg, .mts, .ts, .webm,\
-		.flv, .opus, .pcm, .wmv, .mp3, .aac, .aif, .aiff, .3gp,\
-		.avi, .ape, .asf, .flac, .cue, divx, .dv, .mka, .ra,\
-  .rmvb, .rm, .vox, .wma, .wav, .acm" };
-		parseCommaDelimited(s, &x);
-	} else
+	if (extensions.empty())
+		x = {".mp4",  ".mkv", ".mov", ".m4v",  ".mpeg", ".mpg",  ".mts", ".ts",
+			 ".webm", ".flv", ".wmv", ".avi",  ".divx", ".xvid", ".dv",  ".3gp",
+			 ".tmvb", ".rm",  ".mpg4", ".mqv",  ".ogm",  ".qt",
+			 ".vox",  ".3gpp",".m2ts",".m1v",  ".m2v",  ".mpe"};
+	else
 		parseCommaDelimited(tolower(extensions), &x);
 	
 	auto tmp{ path };
@@ -404,16 +403,6 @@ func checkForSeasonDir(const fs::path& path) -> void {
 		} else
 			insertTo(&regularDirs, path);
 	}
-}
-
-func getOption(std::string_view s) -> std::optional<std::string_view>
-{
-	if (s.size() == 2 and s[0] == '-' and std::isalpha(s[1]))
-		return s.substr(1);
-	else if (s.size() > 2 and s[0] == '-' and s[1] == '-')
-		return s.substr(2);
-	else
-		return std::nullopt;
 }
 
 func getBytes(std::string s) -> uintmax_t

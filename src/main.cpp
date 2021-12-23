@@ -73,10 +73,12 @@ func trim(std::string s) -> std::string
 	return s.substr(start, end);
 }
 
-func isEqual(std::string source, const std::vector<std::string>* args) -> bool
+func isEqual(const std::string& source, const std::vector<std::string>* args) -> bool
 {
 	for (auto& check : *args)
-		if (source == check)
+		if (source.size() == check.size()
+			and source[1] == check[1]
+			and source == check)
 			return true;
 
 	return false;
@@ -135,6 +137,7 @@ func containInts(const std::string&& s, std::vector<MAXNUM>* const out)
 
 namespace fs = std::filesystem;
 
+inline
 func excludeExtension(const fs::path& path) -> std::string
 {
 	return path.string().substr(0, path.string().size() - path.extension().string().size());
@@ -198,19 +201,24 @@ func findSubtitleFile(const fs::path& original,
 	if (auto parentPath{original.parent_path()}; not parentPath.empty()) {
 		auto noext{excludeExtension(original)};
 		std::vector<std::string> x{".srt", ".ass", ".vtt"};
-		for (auto& f : fs::directory_iterator(parentPath)) {
+		try {
+		for (auto& f : fs::directory_iterator(parentPath))
 			if (f.is_regular_file()
 				and f.path().string().size() >= original.string().size()
 				and f.path().string().substr(0, noext.size()) == noext
 				and isEqual(tolower(f.path().extension().string()), &x))
-			{
+
 				result->emplace_back(f.path());
-			}
+		} catch (fs::filesystem_error& e) {
+			#ifndef DEBUG
+			if (state[OPT_VERBOSE] == "true")
+			#endif
+				std::cout << e.what() << '\n';
 		}
 	}
 }
 
-func getAvailableFilename(const fs::path original, std::string prefix = " #",
+func getAvailableFilename(const fs::path& original, std::string prefix = " #",
 						  std::string suffix = "") -> std::string
 {
 	if (fs::exists(original)) {

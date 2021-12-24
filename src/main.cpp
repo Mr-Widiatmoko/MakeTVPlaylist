@@ -115,7 +115,7 @@ func after(const std::string& keyword,
 	return source;
 }
 typedef unsigned long long MAXNUM;
-func containInts(const std::string&& s, std::vector<MAXNUM>* const out)
+func containInts(const std::string& s, std::vector<MAXNUM>* const out)
 {
 	std::string buffer;
 	auto make{[&]() -> void {
@@ -237,7 +237,27 @@ func getAvailableFilename(const fs::path& original, std::string prefix = " #",
 		return original.string();
 }
 
+func ascending(const fs::path& a, const fs::path& b)
+{
+	std::string afn { a.filename().string().substr(0,
+	a.filename().string().size() - a.extension().string().size()) };
 
+	std::string bfn { b.filename().string().substr(0,
+	b.filename().string().size() - b.extension().string().size()) };
+
+	std::vector<MAXNUM> av, bv;
+	containInts(afn, &av);
+	containInts(afn, &bv);
+
+	if (av.size() == bv.size())
+		for (auto i{0}; i<av.size(); ++ i) {
+			if (av[i] == bv[i])
+				continue;
+			return av[i] < bv[i];
+		}
+
+	return afn < bfn;
+}
 
 func listDir(const fs::path& path, std::vector<fs::directory_entry>* const out,
 			bool sorted=true)
@@ -282,7 +302,10 @@ func listDir(const fs::path& path, std::vector<fs::directory_entry>* const out,
 	}
 	
 	if (sorted and out->size() > 1)
-		std::sort(out->begin(), out->end());
+		std::sort(out->begin(), out->end(), [](const fs::directory_entry& a,
+											   const fs::directory_entry& b) {
+			return ascending(a.path(), b.path());
+		});
 }
 
 func isContainsSeasonDirs(const fs::path& path) -> bool {
@@ -915,10 +938,7 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 	std::move(::seasonDirs.begin(), ::seasonDirs.end(), seasonDirs);
 	
 	if (selectFiles.size() > 1)
-		std::sort(selectFiles.begin(), selectFiles.end(), [](fs::path& a, fs::path& b) {
-			return a.string().length() < b.string().length()
-				and a.string() < b.string();
-		});
+		std::sort(selectFiles.begin(), selectFiles.end(), ascending);
 	
 	std::map<std::string, std::shared_ptr<std::vector<fs::path>>> records;
 	
@@ -999,7 +1019,7 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 		if (bufferFiles.empty())
 			return;
 		if (bufferFiles.size() > 1)
-			std::sort(bufferFiles.begin(), bufferFiles.end());
+			std::sort(bufferFiles.begin(), bufferFiles.end(), ascending);
 		#ifdef DEBUG
 			std::cout << "+records[:" << dir << "] " << bufferFiles.size() << " files\n";
 		#endif
@@ -1064,10 +1084,7 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 		indexFile += 1;
 		
 		if (bufferSort.size() > 1)
-			std::sort(bufferSort.begin(), bufferSort.end(), [](fs::path& a, fs::path& b) {
-				return a.string() < b.string()
-					and a.string().length() < b.string().length();
-			});
+			std::sort(bufferSort.begin(), bufferSort.end(), ascending);
 		for (auto& ok : bufferSort)
 			putIntoPlaylist(std::move(ok));
 		

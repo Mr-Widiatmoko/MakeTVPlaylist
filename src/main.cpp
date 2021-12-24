@@ -211,7 +211,7 @@ func findSubtitleFile(const fs::path& original,
 				result->emplace_back(f.path());
 		} catch (fs::filesystem_error& e) {
 			#ifndef DEBUG
-			if (state[OPT_VERBOSE] == "true")
+			if (state[OPT_VERBOSE] == "all")
 			#endif
 				std::cout << e.what() << '\n';
 		}
@@ -294,7 +294,7 @@ func listDir(const fs::path& path, std::vector<fs::directory_entry>* const out,
 		}
 	} catch (fs::filesystem_error& e) {
 		#ifndef DEBUG
-		if (state[OPT_VERBOSE] == "true")
+		if (state[OPT_VERBOSE] == "all")
 		#endif
 			std::cout << e.what() << '\n';
 		
@@ -619,7 +619,7 @@ Option:\n\
 -n, --exclude-hidden            Exclude hidden folders or files.\n\
 -O, --overwrite                 Overwrite output playlist file.\n\
 -v, --version                   Display version.\n\
--V, --verbose                   Display playlist content, and fail messages.\n\
+-V, --verbose [all]             Display playlist content. Define as 'all' will show fail messages.\n\
 -x, --skip-subtitle		Dont include subtitle file.\n\
 -e, --only-ext \"extension, ...\"	Filter only specific extensions, separated by comma.\n\
 				  Example: --only-ext \"mp4, mkv\"\n\
@@ -688,10 +688,16 @@ int main(int argc, char *argv[]) {
 					return 0;
 			}
 			else if (isMatch(OPT_OVERWRITE, 	'O', true));
-			else if (isMatch(OPT_VERBOSE, 		'V', true));
 			else if (isMatch(OPT_BENCHMARK, 	'b', true));
 			else if (isMatch(OPT_SKIPSUBTITLE, 	'x', true));
 			else if (isMatch(OPT_EXCLHIDDEN, 	'n', true));
+			else if (isMatch(OPT_VERBOSE, 		'V', true)) {
+				if (i + 1 < args.size() and args[i + 1] == "all")
+				{
+					i++;
+					state[OPT_VERBOSE] = args[i];
+				}
+			}
 			else if (isMatch(OPT_EXECUTION, 	'c')) {
 				if (i + 1 < args.size()) {
 					i++;
@@ -1029,7 +1035,7 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 			
 		} catch (fs::filesystem_error& e) {
 			#ifndef DEBUG
-			if (state[OPT_VERBOSE] == "true")
+			if (state[OPT_VERBOSE] == "all")
 			#endif
 				std::cout << e.what() << '\n';
 		}

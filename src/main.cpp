@@ -999,11 +999,7 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 		if (bufferFiles.empty())
 			return;
 		if (bufferFiles.size() > 1)
-			std::sort(bufferFiles.begin(), bufferFiles.end(),
-						[](fs::path& a, fs::path& b){
-				return 	a.filename().string() < b.filename().string() or
-						a.filename().string().length() < b.filename().string().length();
-			});
+			std::sort(bufferFiles.begin(), bufferFiles.end());
 		#ifdef DEBUG
 			std::cout << "+records[:" << dir << "] " << bufferFiles.size() << " files\n";
 		#endif

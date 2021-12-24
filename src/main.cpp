@@ -453,13 +453,13 @@ func getBytes(std::string s) -> uintmax_t
 	float v { std::stof(value) };
 	
 	if (unit == "kb") {
-		if (v < (INT_MAX / 1000))
+		if (v <= (INT_MAX / 1000))
 			result = v * 1000;
 	} else if (unit == "gb") {
-		if (v < (INT_MAX / 1000000000))
+		if (v <= (INT_MAX / 1000000000))
 			result = v * 1000000000;
 	} else {
-		if (v < (INT_MAX / 1000000))
+		if (v <= (INT_MAX / 1000000))
 			result = v * 1000000;
 	}
 	
@@ -484,6 +484,7 @@ func getRange(std::string argv, std::string separator)
 func expandArgs(const int argc, char* const argv[], std::vector<std::string>* const args)
 {
 	bool newFull{ false };
+	unsigned isLastOpt{ 0 };
 	auto push{ [&](char* const arg, unsigned index, int last) {
 		if (last < 0 or index - last <= 0) return;
 				
@@ -517,37 +518,53 @@ func expandArgs(const int argc, char* const argv[], std::vector<std::string>* co
 				newFull = true;
 			else
 			{
-				args->emplace_back(arg);
-				continue;
+				if (isLastOpt > 0 and (arg[0] == ':' or arg[0] == '=')) {
+					if (isLastOpt == 1)
+						isMnemonic = true;
+					else
+						isFull = true;
+				} else {
+					args->emplace_back(arg);
+					continue;
+				}
 			}
 		}
 		
 		
 			
-		unsigned index = isFull ? 1 : 0;
+		unsigned index = isFull and isLastOpt != 2 ? 1 : 0;
 		int last{ -1 };
 		while (++index < len) {
 			if (last < 0 and std::isalpha(arg[index])) {
 				if (isMnemonic) {
+					isLastOpt = 1;
 					std::string new_s {'-'};
 					new_s += arg[index];
 					args->emplace_back(new_s);
 				} else if (isFull) {
+					isLastOpt = 2;
 					last = index;
 				}
 			} else {
 				if (arg[index] == '=' or arg[index] == ':') {
 					if (isFull) {
+						isLastOpt = 2;
 						push(arg, index, last);
 						last = -1;
-					} else
+					} else {
+						isLastOpt = 1;
 						last = index + 1;
+					}
 				} else if (arg[index] == ';') {
+					isLastOpt = 1;
 					push(arg, index, last);
 					last = -1;
-					if (isFull)
+					if (isFull) {
+						isLastOpt = 2;
 						newFull = true;
+					}
 				} else if (isFull and last > 0 and (arg[index] == '<' or arg[index] == '>')) {
+					isLastOpt = 0;
 					push(arg, index, last);
 					last = index;
 				} else if (last < 0)

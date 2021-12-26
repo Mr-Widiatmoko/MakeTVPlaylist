@@ -356,6 +356,9 @@ func isContainsSeasonDirs(const fs::path& path) -> bool {
 	std::vector<fs::directory_entry> sortedDir;
 	listDir(path, &sortedDir);
 	
+	if (sortedDir.size() <= 1)
+		return false;
+	
 	auto hasDirs{false};
 	
 	auto isNum{true};
@@ -437,6 +440,7 @@ func checkForSeasonDir(const fs::path& path) -> void {
 		std::vector<fs::directory_entry> sortedDir;
 		listDir(path, &sortedDir);
 		
+		if (sortedDir.size() > 1)
 		for (auto& child : sortedDir) {
 			hasDir = true;
 
@@ -908,11 +912,11 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 
 	while (bufferDirs.size() == 1) {
 		state[OPT_OUTDIR] = fs::absolute(bufferDirs[0]).string();
+		insertTo(&regularDirs, std::move(bufferDirs[0]));/// Assume single input dir is regularDir
 		if (isContainsSeasonDirs(fs::path(state[OPT_OUTDIR]))) {
 			state[OPT_OUTDIR] += fs::path::preferred_separator;
 			break;
-		} else {
-		insertTo(&regularDirs, std::move(bufferDirs[0]));/// Assume single input dir is regularDir
+		}
 		bufferDirs.clear();
 		std::vector<fs::directory_entry> sortedDirs;
 		listDir(fs::path(state[OPT_OUTDIR]), &sortedDirs);
@@ -921,7 +925,6 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 		
 		for (auto& child : sortedDirs)
 			insertTo(&bufferDirs, std::move(child.path()));
-		}
 	}
 
 	#ifndef DEBUG
@@ -1117,7 +1120,8 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 						if (filter(f))
 							tmp.emplace_back(f);
 					
-					std::sort(tmp.begin(), tmp.end(), ascending);
+					if (tmp.size() > 1)
+						std::sort(tmp.begin(), tmp.end(), ascending);
 					
 					for (auto& f : tmp)
 						bufferFiles.emplace_back(f);

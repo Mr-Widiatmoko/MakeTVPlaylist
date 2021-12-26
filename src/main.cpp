@@ -247,7 +247,7 @@ func ascending(const fs::path& a, const fs::path& b)
 
 	std::vector<MAXNUM> av, bv;
 	containInts(afn, &av);
-	containInts(afn, &bv);
+	containInts(bfn, &bv);
 
 	if (av.size() == bv.size())
 		for (auto i{0}; i<av.size(); ++ i) {

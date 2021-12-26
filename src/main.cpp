@@ -43,6 +43,7 @@ constexpr auto OPT_THREAD			{"thread"};
 constexpr auto OPT_ASYNC			{"async"};
 constexpr auto OPT_EXECUTION		{"execution"};
 constexpr auto OPT_EXCLHIDDEN		{"exclude-hidden"};
+constexpr auto OPT_DEBUG			{"debug"};
 
 #define func auto
 
@@ -258,6 +259,49 @@ func ascending(const fs::path& a, const fs::path& b)
 
 	return afn < bfn;
 }
+
+func recursiveDirectory(const char* const dir,
+						std::vector<std::string>* const out) -> void
+{
+	std::vector<fs::path> tmp;
+	try {
+		for (auto& d : fs::directory_iterator(dir))
+			if (d.is_directory())
+				tmp.emplace_back(d.path().string());
+	} catch (fs::filesystem_error& e) {
+		#ifndef DEBUG
+		if (state[OPT_VERBOSE] == "all")
+		#endif
+			std::cout << e.what() << '\n';
+	}
+	
+	if (tmp.size() > 1)
+		std::sort(tmp.begin(), tmp.end(), ascending);
+	
+	for (auto& d : tmp) {
+		out->emplace_back(d.string());
+		
+		try {
+			std::vector<fs::path> inner_tmp;
+			for (auto& inner : fs::recursive_directory_iterator(d))
+				if (inner.is_directory())
+					inner_tmp.emplace_back(inner.path().string());
+			
+			if (inner_tmp.size() > 1)
+				std::sort(inner_tmp.begin(), inner_tmp.end(), ascending);
+			
+			for (auto& inner : inner_tmp)
+				out->emplace_back(inner);
+			
+		} catch (fs::filesystem_error& e) {
+			#ifndef DEBUG
+			if (state[OPT_VERBOSE] == "all")
+			#endif
+				std::cout << e.what() << '\n';
+		}
+	}
+}
+
 
 func listDir(const fs::path& path, std::vector<fs::directory_entry>* const out,
 			bool sorted=true)
@@ -687,6 +731,7 @@ int main(int argc, char *argv[]) {
 				if (i + 1 == args.size())
 					return 0;
 			}
+			else if (isMatch(OPT_DEBUG, 		'D', true));
 			else if (isMatch(OPT_OVERWRITE, 	'O', true));
 			else if (isMatch(OPT_BENCHMARK, 	'b', true));
 			else if (isMatch(OPT_SKIPSUBTITLE, 	'x', true));
@@ -877,9 +922,16 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 	}
 
 	#ifndef DEBUG
-	if (not invalidArgs.empty() or state[OPT_VERBOSE] == "true" or state[OPT_BENCHMARK] == "true")
+	if (not invalidArgs.empty() or state[OPT_VERBOSE] == "all"
+		or state[OPT_BENCHMARK] == "true" or state[OPT_DEBUG] == "true")
 	#endif
 	{
+		if (state[OPT_DEBUG] == "true") {
+			std::cout << "Arguments: ";
+			for (auto i{0}; i<args.size(); ++i)
+				std::cout << args[i] << (i+1>=args.size() ? "" : ", ");
+			std::cout << '\n';
+		}
 	std::cout
 		<< OPT_EXECUTION << "\t\t: " << state[OPT_EXECUTION] << '\n'
 		<< OPT_VERBOSE << "\t\t\t: " << state[OPT_VERBOSE] << '\n'
@@ -945,7 +997,7 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 	const auto maxDirSize{std::max(regularDirSize, seasonDirSize)};
 
 	#ifndef DEBUG
-	if (state[OPT_BENCHMARK] == "true")
+	if (state[OPT_BENCHMARK] == "true" or state[OPT_DEBUG] == "true")
 	#endif
 	{
 		if (inputDirsCount > 0)
@@ -959,6 +1011,18 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 
 	fs::path seasonDirs[seasonDirSize];
 	std::move(::seasonDirs.begin(), ::seasonDirs.end(), seasonDirs);
+	
+	#ifndef DEBUG
+	if (state[OPT_DEBUG] == "true")
+	#endif
+	for (auto i{0}; i<maxDirSize; ++i)
+		for (auto& select : {1, 2}) {
+			if ((select == 1 and i >= regularDirSize)
+				or (select == 2 and i >= seasonDirSize))
+				continue;
+			std::cout << (select == 1 ? 'R' : 'S') << ':'
+				<< (select == 1 ? regularDirs[i] : seasonDirs[i]) << '\n';
+		}
 	
 	if (selectFiles.size() > 1)
 		std::sort(selectFiles.begin(), selectFiles.end(), ascending);
@@ -991,7 +1055,7 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 		playlistCount += 1;
 		outputFile << fs::absolute(file).string() << '\n';
 		#ifndef DEBUG
-		if (state[OPT_VERBOSE] == "true")
+		if (state[OPT_VERBOSE] == "true" or state[OPT_DEBUG] == "true")
 		#endif
 			std::cout << fs::absolute(file).string() << '\n';
 				
@@ -1001,7 +1065,7 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 			for (auto& sf : subtitleFiles) {
 				outputFile << fs::absolute(sf).string() << '\n';
 				#ifndef DEBUG
-				if (state[OPT_VERBOSE] == "true")
+				if (state[OPT_VERBOSE] == "true" or state[OPT_DEBUG] == "true")
 				#endif
 					std::cout << fs::absolute(sf).string() << '\n';
 			}
@@ -1009,29 +1073,61 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 	}};
 	
 	auto filterChildFiles{ [&records](const std::string& dir, bool recurive=false) {
-		std::vector<fs::path> bufferFiles;
-		auto filter{ [&](const fs::directory_entry& f) {
+		auto filter{ [](const fs::directory_entry& f) -> bool {
 			if (not fs::is_regular_file(f.path())
 				or (fs::status(f.path()).permissions()
 					& (fs::perms::owner_read
 					   | fs::perms::group_read
 					   | fs::perms::others_read)) == fs::perms::none
 				or (state[OPT_EXCLHIDDEN] == "true" and f.path().filename().string()[0] == '.'))
-					return;
+					return false;
 			
-			if (isMediaFile(f.path(), state[OPT_ONLYEXT],
-							state[OPT_SIZEOPGT][0],
-							std::stof(state[OPT_SIZE]),
-							std::stof(state[OPT_SIZETO])))
-				bufferFiles.emplace_back(std::move(f.path()));
+			return isMediaFile(f.path(), state[OPT_ONLYEXT],
+							   state[OPT_SIZEOPGT][0],
+							   std::stof(state[OPT_SIZE]),
+							   std::stof(state[OPT_SIZETO]));
 		}};
+		
+		std::vector<fs::path> bufferFiles;
+		
+		auto putToRecord{[&bufferFiles, &dir, &records](bool wantToSort) {
+			if (bufferFiles.empty())
+				return;
+			
+			if (wantToSort and bufferFiles.size() > 1)
+				std::sort(bufferFiles.begin(), bufferFiles.end(), ascending);
+			
+			records.emplace(std::make_pair(std::move(dir),
+										   std::make_shared<std::vector<fs::path>>(std::move(bufferFiles))
+										   ));
+		}};
+		
 		try {
-			if (recurive)
-				for (auto& f : fs::recursive_directory_iterator(dir))
-					filter(f);
-			else
+			if (recurive) {
+				std::vector<std::string> dirs;
+				recursiveDirectory(dir.c_str(), &dirs);
+				
+				for (auto& d : dirs) {
+					std::vector<fs::path> tmp;
+					
+					for (auto& f : fs::recursive_directory_iterator(d))
+						if (filter(f))
+							tmp.emplace_back(f);
+					
+					std::sort(tmp.begin(), tmp.end(), ascending);
+					
+					for (auto& f : tmp)
+						bufferFiles.emplace_back(f);
+				}
+				
+				putToRecord(false);
+			} else {
 				for (auto& f : fs::directory_iterator(dir))
-					filter(f);
+					if (filter(f))
+						bufferFiles.emplace_back(f);
+				
+				putToRecord(true);
+			}
 			
 		} catch (fs::filesystem_error& e) {
 			#ifndef DEBUG
@@ -1039,16 +1135,6 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 			#endif
 				std::cout << e.what() << '\n';
 		}
-		if (bufferFiles.empty())
-			return;
-		if (bufferFiles.size() > 1)
-			std::sort(bufferFiles.begin(), bufferFiles.end(), ascending);
-		#ifdef DEBUG
-			std::cout << "+records[:" << dir << "] " << bufferFiles.size() << " files\n";
-		#endif
-		records.emplace(std::make_pair(std::move(dir),
-									   std::make_shared<std::vector<fs::path>>(std::move(bufferFiles))
-									   ));
 	}};
 
 	for (auto i{0}; i<maxDirSize; ++i)
@@ -1105,9 +1191,7 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 			bufferSort.emplace_back(std::move(selectFiles[indexFile]));
 		
 		indexFile += 1;
-		
-		if (bufferSort.size() > 1)
-			std::sort(bufferSort.begin(), bufferSort.end(), ascending);
+		//if (bufferSort.size() > 1) std::sort(bufferSort.begin(), bufferSort.end());
 		for (auto& ok : bufferSort)
 			putIntoPlaylist(std::move(ok));
 		
@@ -1119,7 +1203,7 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 		outputFile.close();
 	
 	#ifndef DEBUG
-	if (state[OPT_BENCHMARK] == "true")
+	if (state[OPT_BENCHMARK] == "true" or state[OPT_DEBUG] == "true")
 	#endif
 		timeLapse(start, std::to_string(playlistCount) + " valid files took ");
 	

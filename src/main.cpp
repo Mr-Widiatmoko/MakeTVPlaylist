@@ -162,6 +162,12 @@ func parseCommaDelimited(const std::string&& literal, std::vector<std::string>* 
 	}
 }
 
+std::vector<std::string> DEFAULT_EXT {
+	".mp4",  ".mkv", ".mov", ".m4v",  ".mpeg", ".mpg",  ".mts", ".ts",
+	".webm", ".flv", ".wmv", ".avi",  ".divx", ".xvid", ".dv",  ".3gp",
+	".tmvb", ".rm",  ".mpg4", ".mqv",  ".ogm",  ".qt",
+	".vox",  ".3gpp",".m2ts",".m1v",  ".m2v",  ".mpe"};
+
 func isMediaFile(const fs::path& path,
 				 const std::string extensions,
 				 char greaterThan = '\0',
@@ -171,14 +177,8 @@ func isMediaFile(const fs::path& path,
 	if (not fs::exists(path))
 		return false;
 	
-	std::vector<std::string> x;
-	if (extensions.empty())
-		x = {".mp4",  ".mkv", ".mov", ".m4v",  ".mpeg", ".mpg",  ".mts", ".ts",
-			 ".webm", ".flv", ".wmv", ".avi",  ".divx", ".xvid", ".dv",  ".3gp",
-			 ".tmvb", ".rm",  ".mpg4", ".mqv",  ".ogm",  ".qt",
-			 ".vox",  ".3gpp",".m2ts",".m1v",  ".m2v",  ".mpe"};
-	else
-		parseCommaDelimited(tolower(extensions), &x);
+	if (not extensions.empty())
+		parseCommaDelimited(tolower(extensions), &DEFAULT_EXT);
 	
 	auto tmp{ path };
 	if (fs::is_symlink(tmp)) { //TODO: is_symlink() cannot detect macOS alias file!
@@ -189,7 +189,7 @@ func isMediaFile(const fs::path& path,
 	}
 
 	auto fileSize{ fs::file_size(tmp) };
-	return /*fs::is_regular_file(tmp) and*/ isEqual(tolower(tmp.extension().string()), &x)
+	return /*fs::is_regular_file(tmp) and*/ isEqual(tolower(tmp.extension().string()), &DEFAULT_EXT)
 		and (size == 0 and sizeTo == 0 ? true
 		 : (greaterThan == '\0' ? fileSize > size and fileSize < sizeTo
 			: (greaterThan == '>' ? fileSize > size : fileSize < size))
@@ -698,7 +698,7 @@ Usage:\n    tvplaylist [Option or Dir or File] ...\n\n\
 If no argument was specified, the current directory will be use.\n\n\
 Option:\n\
 -h, --help                      Display this screen.\n\
--c, --execution USING           Specify execution, using 'thread', 'async', or 'linear' to process directories.\n\
+-c, --execution USING           Specify execution, using 'thread', 'async' is default, or 'linear' to process.\n\
 -b, --benchmark                 Benchmarking execution.\n\
 -n, --exclude-hidden            Exclude hidden folders or files.\n\
 -O, --overwrite                 Overwrite output playlist file.\n\
@@ -996,9 +996,13 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 		<< "Current Directory\t: " << fs::current_path().string() << '\n'
 		<< OPT_OUTDIR << "\t\t\t: " << state[OPT_OUTDIR] << '\n'
 		<< OPT_SKIPSUBTITLE << "\t\t: " << state[OPT_SKIPSUBTITLE] << '\n'
-		<< OPT_ONLYEXT << "\t\t: " << state[OPT_ONLYEXT] << '\n'
-		<< OPT_SIZE << "\t\t\t: " << (state[OPT_SIZETO] == "0" ? state[OPT_SIZEOPGT] : "")
-			<< (state[OPT_SIZEOPGT].empty() ? "" : " ")
+		<< OPT_ONLYEXT << "\t\t: " << state[OPT_ONLYEXT];
+		if (state[OPT_ONLYEXT].empty())
+			for (auto i{0}; i<DEFAULT_EXT.size(); ++i)
+				std::cout << DEFAULT_EXT[i] << (i < DEFAULT_EXT.size() - 1 ? ", " : "");
+	std::cout << '\n';
+	std::cout << OPT_SIZE << "\t\t\t: " << (state[OPT_SIZETO] == "0"
+			? (state[OPT_SIZEOPGT][0] == '\0' ? ">" : state[OPT_SIZEOPGT]) + " " : "")
 			<< state[OPT_SIZE]
 			<< (state[OPT_SIZETO] != "0" ? ".." : " bytes")
 		<< (state[OPT_SIZETO] == "0" ? "" : state[OPT_SIZETO] + " bytes") << '\n'
@@ -1051,22 +1055,28 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 	
 	const auto maxDirSize{std::max(regularDirSize, seasonDirSize)};
 
-	#ifndef DEBUG
-	if (state[OPT_BENCHMARK] == "true" or state[OPT_DEBUG] == "true")
-	#endif
-	{
-		if (inputDirsCount > 0)
-			timeLapse(start, std::to_string(regularDirSize + seasonDirSize)
-					  + " valid dirs took ", true);
-	}
-
 	/// Convert std::set to classic array, to enable call by index subscript.
 	fs::path regularDirs[regularDirSize];
 	std::move(::regularDirs.begin(), ::regularDirs.end(), regularDirs);
 
 	fs::path seasonDirs[seasonDirSize];
 	std::move(::seasonDirs.begin(), ::seasonDirs.end(), seasonDirs);
-	
+
+	sortFiles(&selectFiles);
+
+	#ifndef DEBUG
+	if (state[OPT_BENCHMARK] == "true" or state[OPT_DEBUG] == "true")
+	#endif
+	{
+		if (inputDirsCount > 0)
+			timeLapse(start, std::to_string(regularDirSize + seasonDirSize)
+					  + " valid input dirs"
+					  + (selectFiles.size() > 0
+						 ? " and " + std::to_string(selectFiles.size())
+						 + " input files " : " " ) + "took ");
+	}
+
+
 	#ifndef DEBUG
 	if (state[OPT_DEBUG] == "true")
 	#endif
@@ -1079,7 +1089,6 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 				<< (select == 1 ? regularDirs[i] : seasonDirs[i]) << '\n';
 		}
 	
-	sortFiles(&selectFiles);
 	
 	std::map<std::string, std::shared_ptr<std::vector<fs::path>>> records;
 	
@@ -1191,6 +1200,7 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 		}
 	}};
 
+	start = std::chrono::system_clock::now();
 	for (auto i{0}; i<maxDirSize; ++i)
 		for (auto& x : {1, 2})
 			if (i < (x == 1 ? regularDirSize : seasonDirSize) )

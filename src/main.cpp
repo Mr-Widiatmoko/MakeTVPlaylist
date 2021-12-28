@@ -260,6 +260,35 @@ func ascending(const fs::path& a, const fs::path& b)
 	return afn < bfn;
 }
 
+func sortFiles(std::vector<fs::path>* const selectFiles)
+{
+	if (selectFiles->size() > 1) {
+		std::map<std::string, std::shared_ptr<std::vector<fs::path>>> selectFilesDirs;
+		std::sort(selectFiles->begin(), selectFiles->end());
+		
+		for (auto& f : *selectFiles) {
+			auto parent { f.parent_path().string() };
+			if (auto ptr { selectFilesDirs[parent] };
+				ptr) {
+				ptr->emplace_back(f);
+			} else {
+				std::vector<fs::path> flist;
+				flist.emplace_back(f);
+				selectFilesDirs[parent] = std::make_shared<std::vector<fs::path>>(std::move(flist));
+			}
+		}
+		
+		selectFiles->clear();
+		for (auto& m : selectFilesDirs) {
+			std::vector<fs::path> files {*(m.second)};
+			std::sort(files.begin(), files.end(), ascending);
+			for (auto& f : files) {
+				selectFiles->emplace_back(f);
+			}
+		}
+	}
+}
+
 func recursiveDirectory(const char* const dir,
 						std::vector<std::string>* const out) -> void
 {
@@ -742,7 +771,13 @@ int main(int argc, char *argv[]) {
 				if (i + 1 == args.size())
 					return 0;
 			}
-			else if (isMatch(OPT_DEBUG, 		'D', true));
+			else if (isMatch(OPT_DEBUG, 		'D', true)) {
+				if (i + 1 < args.size() and args[i + 1] == "args")
+				{
+					i++;
+					state[OPT_DEBUG] = args[i];
+				}
+			}
 			else if (isMatch(OPT_OVERWRITE, 	'O', true));
 			else if (isMatch(OPT_BENCHMARK, 	'b', true));
 			else if (isMatch(OPT_SKIPSUBTITLE, 	'x', true));
@@ -938,10 +973,11 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 
 	#ifndef DEBUG
 	if (not invalidArgs.empty() or state[OPT_VERBOSE] == "all"
-		or state[OPT_BENCHMARK] == "true" or state[OPT_DEBUG] == "true")
+		or state[OPT_BENCHMARK] == "true"
+		or state[OPT_DEBUG] == "true" or state[OPT_DEBUG] == "args")
 	#endif
 	{
-		if (state[OPT_DEBUG] == "true") {
+		if (state[OPT_DEBUG] == "true" or state[OPT_DEBUG] == "args") {
 			std::cout << "Original Arguments: ";
 			for (auto i{1}; i<argc; ++i)
 				std::cout << '"' << argv[i] << '"' << (i+1>=argc ? "" : ", ");
@@ -1043,8 +1079,7 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 				<< (select == 1 ? regularDirs[i] : seasonDirs[i]) << '\n';
 		}
 	
-	if (selectFiles.size() > 1)
-		std::sort(selectFiles.begin(), selectFiles.end(), ascending);
+	sortFiles(&selectFiles);
 	
 	std::map<std::string, std::shared_ptr<std::vector<fs::path>>> records;
 	
@@ -1133,8 +1168,7 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 						if (filter(f))
 							tmp.emplace_back(f);
 					
-					if (tmp.size() > 1)
-						std::sort(tmp.begin(), tmp.end(), ascending);
+					sortFiles(&tmp);
 					
 					for (auto& f : tmp)
 						bufferFiles.emplace_back(f);

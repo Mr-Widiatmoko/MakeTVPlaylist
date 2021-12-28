@@ -532,7 +532,7 @@ func getRange(std::string argv, std::string separator)
 func expandArgs(const int argc, char* const argv[], std::vector<std::string>* const args)
 {
 	bool newFull{ false };
-	unsigned isLastOpt{ 0 };
+	unsigned lastOptCode{ 0 };
 	auto push{ [&](char* const arg, unsigned index, int last) {
 		if (last < 0 or index - last <= 0) return;
 				
@@ -566,11 +566,18 @@ func expandArgs(const int argc, char* const argv[], std::vector<std::string>* co
 				newFull = true;
 			else
 			{
-				if (isLastOpt > 0 and (arg[0] == ':' or arg[0] == '=')) {
-					if (isLastOpt == 1)
+				if (lastOptCode > 0 and (arg[0] == ':' or arg[0] == '=')) {
+					if (lastOptCode == 1)
 						isMnemonic = true;
 					else
 						isFull = true;
+					
+					if (len == 1) {
+						i++;
+						arg = argv[i];
+						len = std::strlen(arg);
+						lastOptCode = 3;
+					}
 				} else {
 					args->emplace_back(arg);
 					continue;
@@ -580,39 +587,39 @@ func expandArgs(const int argc, char* const argv[], std::vector<std::string>* co
 		
 		
 			
-		unsigned index = isFull and isLastOpt != 2 ? 1 : 0;
+		unsigned index = lastOptCode == 3 ? -1 : (isFull and lastOptCode != 2 ? 1 : 0);
 		int last{ -1 };
 		while (++index < len) {
 			if (last < 0 and std::isalpha(arg[index])) {
 				if (isMnemonic) {
-					isLastOpt = 1;
+					lastOptCode = 1;
 					std::string new_s {'-'};
 					new_s += arg[index];
 					args->emplace_back(new_s);
 				} else if (isFull) {
-					isLastOpt = 2;
+					lastOptCode = 2;
 					last = index;
 				}
 			} else {
 				if (arg[index] == '=' or arg[index] == ':') {
 					if (isFull) {
-						isLastOpt = 2;
+						lastOptCode = 2;
 						push(arg, index, last);
 						last = -1;
 					} else {
-						isLastOpt = 1;
+						lastOptCode = 1;
 						last = index + 1;
 					}
 				} else if (arg[index] == ';') {
-					isLastOpt = 1;
+					lastOptCode = 1;
 					push(arg, index, last);
 					last = -1;
 					if (isFull) {
-						isLastOpt = 2;
+						lastOptCode = 2;
 						newFull = true;
 					}
 				} else if (isFull and last > 0 and (arg[index] == '<' or arg[index] == '>')) {
-					isLastOpt = 0;
+					lastOptCode = 0;
 					push(arg, index, last);
 					last = index;
 				} else if (last < 0)
@@ -662,7 +669,7 @@ Usage:\n    tvplaylist [Option or Dir or File] ...\n\n\
 If no argument was specified, the current directory will be use.\n\n\
 Option:\n\
 -h, --help                      Display this screen.\n\
--c, --execution USING           Specify execution, using 'thread' or 'async' to process directories.\n\
+-c, --execution USING           Specify execution, using 'thread', 'async', or 'linear' to process directories.\n\
 -b, --benchmark                 Benchmarking execution.\n\
 -n, --exclude-hidden            Exclude hidden folders or files.\n\
 -O, --overwrite                 Overwrite output playlist file.\n\
@@ -707,7 +714,7 @@ int main(int argc, char *argv[]) {
 	std::vector<std::string> args;
 	expandArgs(argc, argv, &args);
 	
-	std::vector<std::string_view> invalidArgs;
+	std::set<std::string_view> invalidArgs;
 	
 	for (int i{0}; i<args.size(); ++i) {
 		if (auto isMatch{ [&](const char* with,
@@ -753,7 +760,7 @@ int main(int argc, char *argv[]) {
 					if (args[i] == OPT_ASYNC or args[i] == OPT_THREAD)
 						state[OPT_EXECUTION] = args[i];
 					else
-						state[OPT_EXECUTION] = "";
+						state[OPT_EXECUTION] = "Linear";
 				} else
 					std::cout << "Expecting 'thread', 'async', or 'none' after \""
 					<< args[i] << "\" option.\n";
@@ -887,13 +894,15 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 							   std::stof(state[OPT_SIZETO])))
 				insertTo(&selectFiles, std::move(fs::absolute(args[i])));
 		} else
-			invalidArgs.emplace_back(args[i]);
+			invalidArgs.emplace(args[i]);
 	}
 	
 	if (not invalidArgs.empty()) {
+		std::string_view invalid_args[invalidArgs.size()];
+		std::move(invalidArgs.begin(), invalidArgs.end(), invalid_args);
 		std::cout << "\nWhat " << (invalidArgs.size() > 1 ? "are these" : "is this") << "? :\n";
 		for (auto i{ 0 }; i<invalidArgs.size(); ++i) {
-			std::cout << '"' << invalidArgs[i] << '"'
+			std::cout << '"' << invalid_args[i] << '"'
 				<< (i + 1 < invalidArgs.size() ? ", " : "");
 		}
 		std::cout << "\nFor more information, please try to type \""

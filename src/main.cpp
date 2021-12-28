@@ -601,7 +601,7 @@ func expandArgs(const int argc, char* const argv[], std::vector<std::string>* co
 					last = index;
 				}
 			} else {
-				if (arg[index] == '=' or arg[index] == ':') {
+				if (arg[index] == '=' or arg[index] == ':' or std::isspace(arg[index])) {
 					if (isFull) {
 						lastOptCode = 2;
 						push(arg, index, last);
@@ -942,9 +942,13 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 	#endif
 	{
 		if (state[OPT_DEBUG] == "true") {
-			std::cout << "Arguments: ";
+			std::cout << "Original Arguments: ";
+			for (auto i{1}; i<argc; ++i)
+				std::cout << '"' << argv[i] << '"' << (i+1>=argc ? "" : ", ");
+			std::cout << '\n';
+			std::cout << "Parsed Arguments  : ";
 			for (auto i{0}; i<args.size(); ++i)
-				std::cout << args[i] << (i+1>=args.size() ? "" : ", ");
+				std::cout << '"' << args[i] << '"' << (i+1>=args.size() ? "" : ", ");
 			std::cout << '\n';
 		}
 	std::cout

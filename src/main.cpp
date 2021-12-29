@@ -71,8 +71,16 @@ func transformWhiteSpace(std::string s) -> std::string
 
 func groupNumber(std::string number) -> std::string
 {
-	long i = number.size();
-	while ( i - 3 > 0 ) {
+	long long i = number.find_last_of('.');
+	if (i == std::string::npos) {
+		i = number.find_last_of('e');
+		if (i == std::string::npos)
+			i = number.size();
+	}
+	auto a{ number.size() > 1 and not std::isdigit(number[0]) ? 1
+			: ( number.size() > 2 and std::tolower(number[1]) == 'x' ? 2
+			   : 0) };
+	while ( i - 3 > a ) {
 		i-=3;
 		number.insert(i, 1, ',');
 	}
@@ -739,7 +747,7 @@ Option:\n\
 \n\
 Options can be joined, and replace option assignment separator [SPACE] with '=' \
 or ':' and can be separated by ';' after assignment. For the example:\n\
-  tvplaylist -hOVvc=async;xs<1.3gb;r=mp4;f:My-playlist.m3u8\n\n\
+  tvplaylist -hOVvc=async;xs<1.3gb;e=mp4,mkv;f:My-playlist.m3u8\n\n\
 Thats it, -h -O -V -v -c are joined, and -c has assignment operator '=' instead of\
  using separator [SPACE].\n\
 Also -x -s are joined, and -x is continuing with ';' after option assignment \
@@ -904,6 +912,9 @@ int main(int argc, char *argv[]) {
 							if (i + 3 < args.size()) {
 								state[OPT_SIZE] = std::to_string(getBytes(args[i + 1]));
 								state[OPT_SIZETO] = std::to_string(getBytes(args[i + 3]));
+							} else if (i + 2 < args.size()) {
+								state[OPT_SIZE] = std::to_string(getBytes(args[i + 1]));
+								state[OPT_SIZETO] = std::to_string(getBytes(args[i + 2]));
 							}
 							
 							if (state[OPT_SIZE] != "0" and state[OPT_SIZETO] != "0")
@@ -928,9 +939,9 @@ int main(int argc, char *argv[]) {
 						}
 						
 						if (std::stoul(state[OPT_SIZETO]) < std::stoul(state[OPT_SIZE])) {
-							std::cout << "Fail: Range up side down! \""
-								<< state[OPT_SIZE] << "bytes greater than "
-								<< state[OPT_SIZETO] << "bytes\"\n";
+							std::cout << "Fail: Range is up side down! \""
+								<< groupNumber(state[OPT_SIZE]) << " bytes greater than "
+								<< groupNumber(state[OPT_SIZETO]) << " bytes\"\n";
 							state[OPT_SIZE] = "0";
 							state[OPT_SIZETO] = "0";
 						}

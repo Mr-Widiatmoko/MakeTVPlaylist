@@ -25,7 +25,6 @@
 #include <algorithm>
 #include <fstream>
 
-
 std::map<std::string, std::string> state;
 constexpr auto OPT_HELP 			{"help"};
 constexpr auto OPT_VERSION 			{"version"};
@@ -47,6 +46,10 @@ constexpr auto OPT_DEBUG			{"debug"};
 
 #define func auto
 
+#ifdef LIBCPP_FORMAT
+#include <format>
+#endif
+
 func tolower(std::string s) -> std::string
 {
 	std::transform(s.begin(), s.end(), s.begin(),
@@ -58,7 +61,25 @@ func tolower(std::string s) -> std::string
 	return s;
 }
 
-func trim(std::string s) -> std::string
+func transformWhiteSpace(std::string s) -> std::string
+{
+	std::transform(s.begin(), s.end(), s.begin(), [](unsigned char c) {
+		return std::isspace(c) ? ' ' : c;
+	});
+	return s;
+}
+
+func groupNumber(std::string number) -> std::string
+{
+	long i = number.size();
+	while ( i - 3 > 0 ) {
+		i-=3;
+		number.insert(i, 1, ',');
+	}
+	return number;
+}
+
+func trim(const std::string& s) -> std::string
 {
 	unsigned long start{0}, end{s.size()};
 	for (auto i{0}; i<end; ++i)
@@ -85,7 +106,7 @@ func isEqual(const std::string& source, const std::vector<std::string>* args) ->
 	return false;
 }
 
-func isInt(const std::string s) -> bool
+func isInt(const std::string& s) -> bool
 {
 	int result;
 	if (auto [p, ec] = std::from_chars(s.c_str(), s.c_str()+s.size(), result);
@@ -169,7 +190,7 @@ std::vector<std::string> DEFAULT_EXT {
 	".vox",  ".3gpp",".m2ts",".m1v",  ".m2v",  ".mpe"};
 
 func isMediaFile(const fs::path& path,
-				 const std::string extensions,
+				 const std::string& extensions,
 				 char greaterThan = '\0',
 				 std::uintmax_t size = 0,
 				 std::uintmax_t sizeTo = 0) -> bool
@@ -219,8 +240,8 @@ func findSubtitleFile(const fs::path& original,
 	}
 }
 
-func getAvailableFilename(const fs::path& original, std::string prefix = " #",
-						  std::string suffix = "") -> std::string
+func getAvailableFilename(const fs::path& original, const std::string& prefix = " #",
+						  const std::string& suffix = "") -> std::string
 {
 	if (fs::exists(original)) {
 		auto s{original.string()};
@@ -513,7 +534,7 @@ func checkForSeasonDir(const fs::path& path) -> void {
 	}
 }
 
-func getBytes(std::string s) -> uintmax_t
+func getBytes(const std::string& s) -> uintmax_t
 {
 	std::string unit{"mb"};
 	std::string value{s};
@@ -543,7 +564,7 @@ func getBytes(std::string s) -> uintmax_t
 	return result;
 }
 
-func getRange(std::string argv, std::string separator)
+func getRange(const std::string& argv, const std::string& separator)
 		-> std::shared_ptr<std::pair<uintmax_t, uintmax_t>>
 {
 	auto pos{argv.find(separator)};
@@ -661,7 +682,7 @@ func expandArgs(const int argc, char* const argv[], std::vector<std::string>* co
 }
 
 func timeLapse(std::chrono::system_clock::time_point& start,
-			   std::string_view msg,
+			   const std::string& msg,
 			   bool resetStart=false)
 {
 	auto value { (std::chrono::system_clock::now() - start).count() };
@@ -680,7 +701,7 @@ func timeLapse(std::chrono::system_clock::time_point& start,
 	std::string_view tu[]{ "microseconds", "milliseconds", "seconds",
 		"minutes", "hours" };
 	std::cout << msg << std::fixed << std::setprecision(2)
-		<< value << " " << tu[inc] << ".\n\n";
+		<< groupNumber(std::to_string(value)) << " " << tu[inc] << ".\n\n";
 	
 	if (resetStart)
 		start = std::chrono::system_clock::now();
@@ -814,8 +835,7 @@ int main(int argc, char *argv[]) {
 					if (not fs::path(args[i]).parent_path().string().empty())
 					{
 						state[args[i - 1]] = fs::path(args[i]).filename().string();
-						state[OPT_OUTDIR] = fs::path(args[i]).parent_path().string()
-							+ fs::path::preferred_separator;
+						state[OPT_OUTDIR] = fs::path(args[i]).parent_path().string();
 					}
 				} else
 					std::cout << "Expecting file name after \""
@@ -958,19 +978,39 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 		state[OPT_OUTDIR] = fs::absolute(bufferDirs[0]).string();
 		insertTo(&regularDirs, std::move(bufferDirs[0]));/// Assume single input dir is regularDir
 		if (isContainsSeasonDirs(fs::path(state[OPT_OUTDIR]))) {
-			state[OPT_OUTDIR] += fs::path::preferred_separator;
 			break;
 		}
 		bufferDirs.clear();
 		std::vector<fs::directory_entry> sortedDirs;
 		listDir(fs::path(state[OPT_OUTDIR]), &sortedDirs);
-		
-		state[OPT_OUTDIR] += fs::path::preferred_separator;
-		
+				
 		for (auto& child : sortedDirs)
 			insertTo(&bufferDirs, std::move(child.path()));
 	}
 
+	if (auto dirOut{ inputDirsCount == 1
+			? transformWhiteSpace(fs::path(state[OPT_OUTDIR]).filename().string())
+			: std::to_string(inputDirsCount)};
+		state[OPT_FIXFILENAME].empty())
+	{
+		#ifdef LIBCPP_FORMAT
+		std::format_to(std::back_inserter(state[OPT_FIXFILENAME]),
+					   "playlist_from_{0}{1}.m3u8",
+					   inputDirsCount == 0
+						 ? groupNumber(std::to_string(selectFiles.size())) + "_file"
+						 : dirOut + "_dir",
+					   inputDirsCount > 1 or selectFiles.size() > 1 ? "s" : "";
+		#else
+			state[OPT_FIXFILENAME] = "playlist_from_"
+				+ (inputDirsCount == 0
+				   ? groupNumber(std::to_string(selectFiles.size())) + "_file"
+				   : dirOut + "_dir")
+		
+				+ (inputDirsCount > 1 or selectFiles.size() > 1 ? "s" : "")
+				+ ".m3u8";
+		#endif
+	}
+	
 	#ifndef DEBUG
 	if (not invalidArgs.empty() or state[OPT_VERBOSE] == "all"
 		or state[OPT_BENCHMARK] == "true"
@@ -1003,9 +1043,9 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 	std::cout << '\n';
 	std::cout << OPT_SIZE << "\t\t\t: " << (state[OPT_SIZETO] == "0"
 			? (state[OPT_SIZEOPGT][0] == '\0' ? ">" : state[OPT_SIZEOPGT]) + " " : "")
-			<< state[OPT_SIZE]
+			<< groupNumber(state[OPT_SIZE])
 			<< (state[OPT_SIZETO] != "0" ? ".." : " bytes")
-		<< (state[OPT_SIZETO] == "0" ? "" : state[OPT_SIZETO] + " bytes") << '\n'
+		<< (state[OPT_SIZETO] == "0" ? "" : groupNumber(state[OPT_SIZETO]) + " bytes") << '\n'
 		<< "Inputs\t\t\t: ";
 		for (auto i{0}; i<inputDirsCount + selectFiles.size(); ++i) {
 			if (i < inputDirsCount) {
@@ -1020,11 +1060,9 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 	}
 	if (state[OPT_OUTDIR].empty()) {
 		if (selectFiles.empty())
-			state[OPT_OUTDIR] = fs::current_path().string()
-									+ fs::path::preferred_separator;
+			state[OPT_OUTDIR] = fs::current_path().string();
 		else
-			state[OPT_OUTDIR] = fs::path(selectFiles[0]).parent_path().string()
-									+ fs::path::preferred_separator;
+			state[OPT_OUTDIR] = fs::path(selectFiles[0]).parent_path().string();
 	}
 	
 	auto start{std::chrono::system_clock::now()};
@@ -1069,10 +1107,10 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 	#endif
 	{
 		if (inputDirsCount > 0)
-			timeLapse(start, std::to_string(regularDirSize + seasonDirSize)
+			timeLapse(start, groupNumber(std::to_string(regularDirSize + seasonDirSize))
 					  + " valid input dirs"
 					  + (selectFiles.size() > 0
-						 ? " and " + std::to_string(selectFiles.size())
+						 ? " and " + groupNumber(std::to_string(selectFiles.size()))
 						 + " input files " : " " ) + "took ");
 	}
 
@@ -1092,18 +1130,7 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 	
 	std::map<std::string, std::shared_ptr<std::vector<fs::path>>> records;
 	
-	fs::path outputName{ state[OPT_OUTDIR]
-							+ (state[OPT_FIXFILENAME] != ""
-							   ? state[OPT_FIXFILENAME]
-							   : "playlist_from_" + (inputDirsCount == 0
-								 ? std::to_string(selectFiles.size()) + "_file"
-								 : (inputDirsCount == 1
-									 ? fs::path(state[OPT_OUTDIR].substr(0,
-										state[OPT_OUTDIR].size() - 1)).filename().string()
-									 : std::to_string(inputDirsCount)) + "_dir")
-										+ (inputDirsCount > 1
-										   or selectFiles.size() > 1 ? "s" : "")
-										+ ".m3u8")};
+	fs::path outputName{ state[OPT_OUTDIR] + fs::path::preferred_separator + state[OPT_FIXFILENAME]  };
 	if (fs::exists(outputName) and state[OPT_OVERWRITE] == "true")
 		fs::remove(outputName);
 	else
@@ -1269,7 +1296,7 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 	#ifndef DEBUG
 	if (state[OPT_BENCHMARK] == "true" or state[OPT_DEBUG] == "true")
 	#endif
-		timeLapse(start, std::to_string(playlistCount) + " valid files took ");
+		timeLapse(start, groupNumber(std::to_string(playlistCount)) + " valid files took ");
 	
 	if (playlistCount == 0)
 		fs::remove(outputName);

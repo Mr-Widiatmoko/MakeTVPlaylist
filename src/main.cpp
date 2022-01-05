@@ -34,6 +34,7 @@ constexpr auto OPT_OVERWRITE 		{"overwrite"};
 constexpr auto OPT_SKIPSUBTITLE 	{"skip-subtitle"};
 constexpr auto OPT_ONLYEXT 			{"only-ext"};
 constexpr auto OPT_FIXFILENAME 		{"fix-filename"};
+constexpr auto OPT_NOOUTPUTFILE 	{"no-output-file"};
 constexpr auto OPT_OUTDIR 			{"out-dir"};
 constexpr auto OPT_SIZE				{"size"};
 constexpr auto OPT_SIZETO			{"size_to"};
@@ -44,11 +45,13 @@ constexpr auto OPT_EXECUTION		{"execution"};
 constexpr auto OPT_EXCLHIDDEN		{"exclude-hidden"};
 constexpr auto OPT_DEBUG			{"debug"};
 
-#define func auto
+//#include <format>
 
-#ifdef LIBCPP_FORMAT
-#include <format>
+#if MAKE_LIB
+#include "libtvplaylist.h"
 #endif
+
+#define func auto
 
 func tolower(std::string s) -> std::string
 {
@@ -198,7 +201,7 @@ std::vector<std::string> DEFAULT_EXT {
 	".vox",  ".3gpp",".m2ts",".m1v",  ".m2v",  ".mpe"};
 
 func isMediaFile(const fs::path& path,
-				 const std::string& extensions,
+				 const std::string& extensions, // comma delimited extensions
 				 char greaterThan = '\0',
 				 std::uintmax_t size = 0,
 				 std::uintmax_t sizeTo = 0) -> bool
@@ -743,6 +746,7 @@ Option:\n\
 					OR using range with '-' OR '..'\n\
 					   --size 750-1.2gb\n\
 -f, --fix-filename \"filename\"   Override output playlist filename.\n\
+-P, --no-ouput-file [yes | no]  Choose to create playlist file or no. Default 'yes' if option was declared.\n\
 -d, --out-dir \"directory path\"  Override output directory for playlist file.\n\
 \n\
 Options can be joined, and replace option assignment separator [SPACE] with '=' \
@@ -761,7 +765,13 @@ Instead try to separate mnemonic and full option, like this:\n\
   tvplaylist -ch --only-ext=mp3;version\n"
 ;
 
+#if MAKE_LIB
+void process(int argc, char *argv[], int *outc, char **outs) {
+	state[OPT_NOOUTPUTFILE] = "true";
+#else
 int main(int argc, char *argv[]) {
+#endif
+
 	std::vector<fs::path> bufferDirs;
 
 	state[OPT_SIZEOPGT] = '\0';
@@ -798,13 +808,26 @@ int main(int argc, char *argv[]) {
 					std::cout << HELP << '\n';
 				
 				if (i + 1 == args.size())
-					return 0;
+					return
+#ifndef MAKE_LIB
+					0
+#endif
+					;
 			}
 			else if (isMatch(OPT_DEBUG, 		'D', true)) {
 				if (i + 1 < args.size() and args[i + 1] == "args")
 				{
 					i++;
 					state[OPT_DEBUG] = args[i];
+				}
+			}
+			else if (isMatch(OPT_NOOUTPUTFILE, 	'P', true)) {
+				if (i + 1 < args.size()
+					and (tolower(args[i + 1]) != "true"
+						 or tolower(args[i + 1]) != "yes"))
+				{
+					i++;
+					state[OPT_NOOUTPUTFILE] = "";
 				}
 			}
 			else if (isMatch(OPT_OVERWRITE, 	'O', true));
@@ -1012,7 +1035,9 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 						 : dirOut + "_dir",
 					   inputDirsCount > 1 or selectFiles.size() > 1 ? "s" : "";
 		#else
-			state[OPT_FIXFILENAME] = "playlist_from_"
+			state[OPT_FIXFILENAME] =
+				state[OPT_NOOUTPUTFILE] == "true" ? "" :
+				"playlist_from_"
 				+ (inputDirsCount == 0
 				   ? groupNumber(std::to_string(selectFiles.size())) + "_file"
 				   : dirOut + "_dir")
@@ -1038,19 +1063,22 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 				std::cout << '"' << args[i] << '"' << (i+1>=args.size() ? "" : ", ");
 			std::cout << '\n';
 		}
+	#define PRINT_OPT(x)	(x.empty() ? "false" : x)
 	std::cout
 		<< OPT_EXECUTION << "\t\t: " << state[OPT_EXECUTION] << '\n'
-		<< OPT_VERBOSE << "\t\t\t: " << state[OPT_VERBOSE] << '\n'
-		<< OPT_BENCHMARK << "\t\t: " << state[OPT_BENCHMARK] << '\n'
-		<< OPT_OVERWRITE << "\t\t: " << state[OPT_OVERWRITE] << '\n'
+		<< OPT_VERBOSE << "\t\t\t: " << PRINT_OPT(state[OPT_VERBOSE]) << '\n'
+		<< OPT_BENCHMARK << "\t\t: " << PRINT_OPT(state[OPT_BENCHMARK]) << '\n'
+		<< OPT_OVERWRITE << "\t\t: " << PRINT_OPT(state[OPT_OVERWRITE]) << '\n'
+		<< OPT_NOOUTPUTFILE << "\t\t: " << PRINT_OPT(state[OPT_NOOUTPUTFILE]) << '\n'
 		<< OPT_FIXFILENAME << "\t\t: " << state[OPT_FIXFILENAME] << '\n'
 		<< "Current Directory\t: " << fs::current_path().string() << '\n'
 		<< OPT_OUTDIR << "\t\t\t: " << state[OPT_OUTDIR] << '\n'
-		<< OPT_SKIPSUBTITLE << "\t\t: " << state[OPT_SKIPSUBTITLE] << '\n'
+		<< OPT_SKIPSUBTITLE << "\t\t: " << PRINT_OPT(state[OPT_SKIPSUBTITLE]) << '\n'
 		<< OPT_ONLYEXT << "\t\t: " << state[OPT_ONLYEXT];
 		if (state[OPT_ONLYEXT].empty())
 			for (auto i{0}; i<DEFAULT_EXT.size(); ++i)
 				std::cout << DEFAULT_EXT[i] << (i < DEFAULT_EXT.size() - 1 ? ", " : "");
+	#undef PRINT_OPT
 	std::cout << '\n';
 	std::cout << OPT_SIZE << "\t\t\t: " << (state[OPT_SIZETO] == "0"
 			? (state[OPT_SIZEOPGT][0] == '\0' ? ">" : state[OPT_SIZEOPGT]) + " " : "")
@@ -1141,22 +1169,33 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 	
 	std::map<std::string, std::shared_ptr<std::vector<fs::path>>> records;
 	
-	fs::path outputName{ state[OPT_OUTDIR] + fs::path::preferred_separator + state[OPT_FIXFILENAME]  };
-	if (fs::exists(outputName) and state[OPT_OVERWRITE] == "true")
-		fs::remove(outputName);
-	else
-		outputName = getAvailableFilename(outputName);
-	
-	std::ofstream outputFile(outputName, std::ios::out);
+	std::ofstream outputFile;
+	fs::path outputName;
+	std::vector<std::string> outputArray;
+					   
+	if (state[OPT_NOOUTPUTFILE] != "true") {
+		outputName = state[OPT_OUTDIR] + fs::path::preferred_separator
+			+ state[OPT_FIXFILENAME];
+		if (fs::exists(outputName) and state[OPT_OVERWRITE] == "true")
+			fs::remove(outputName);
+		else
+			outputName = getAvailableFilename(outputName);
+			
+		outputFile = std::ofstream(outputName, std::ios::out);
+	}
 	
 	unsigned long indexFile{0};
 	unsigned long playlistCount{0};
 	
 	auto putIntoPlaylist{ [&](const fs::path& file) {
 		playlistCount += 1;
-		outputFile << fs::absolute(file).string() << '\n';
+		if (state[OPT_NOOUTPUTFILE] == "true")
+			outputArray.emplace_back(fs::absolute(file).string());
+		else
+			outputFile << fs::absolute(file).string() << '\n';
 		#ifndef DEBUG
-		if (state[OPT_VERBOSE] == "true" or state[OPT_DEBUG] == "true")
+		if (state[OPT_VERBOSE] == "true" or state[OPT_DEBUG] == "true"
+			or state[OPT_NOOUTPUTFILE] == "true")
 		#endif
 			std::cout << fs::absolute(file).string() << '\n';
 				
@@ -1164,9 +1203,13 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 			std::vector<fs::path> subtitleFiles = {};
 			findSubtitleFile(file, &subtitleFiles);
 			for (auto& sf : subtitleFiles) {
-				outputFile << fs::absolute(sf).string() << '\n';
+				if (state[OPT_NOOUTPUTFILE] == "true")
+					outputArray.emplace_back(fs::absolute(file).string());
+				else
+					outputFile << fs::absolute(sf).string() << '\n';
 				#ifndef DEBUG
-				if (state[OPT_VERBOSE] == "true" or state[OPT_DEBUG] == "true")
+				if (state[OPT_VERBOSE] == "true" or state[OPT_DEBUG] == "true"
+					or state[OPT_NOOUTPUTFILE] == "true")
 				#endif
 					std::cout << fs::absolute(sf).string() << '\n';
 			}
@@ -1301,18 +1344,27 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 			break;
 	}
 	
-	if (outputFile.is_open())
-		outputFile.close();
-	
 	#ifndef DEBUG
 	if (state[OPT_BENCHMARK] == "true" or state[OPT_DEBUG] == "true")
 	#endif
 		timeLapse(start, groupNumber(std::to_string(playlistCount)) + " valid files took ");
-	
-	if (playlistCount == 0)
-		fs::remove(outputName);
-	else
-		std::cout << fs::absolute(outputName).string() << '\n';
-	
-	return 0;
+
+#if MAKE_LIB
+	*outc = static_cast<int>(outputArray.size());
+	if (*outc > 0) {
+		outs = (char**)malloc(outputArray.size() * sizeof(char *));
+		for (auto i = 0;auto& item : outputArray)
+			outs[i++] = const_cast<char *>(item.c_str());
+	}
+#endif
+					   
+	if (state[OPT_NOOUTPUTFILE] != "true") {
+		if (outputFile.is_open())
+			outputFile.close();
+			
+		if (playlistCount == 0)
+			fs::remove(outputName);
+		else
+			std::cout << fs::absolute(outputName).string() << '\n';
+	}
 }

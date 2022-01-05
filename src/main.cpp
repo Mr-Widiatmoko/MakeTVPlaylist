@@ -590,7 +590,8 @@ func getRange(const std::string& argv, const std::string& separator)
 	return std::make_shared<std::pair<uintmax_t, uintmax_t>>(from, to);
 }
 
-func expandArgs(const int argc, char* const argv[], std::vector<std::string>* const args)
+func expandArgs(const int argc, char* const argv[],
+				const int startAt, std::vector<std::string>* const args)
 {
 	bool newFull{ false };
 	unsigned lastOptCode{ 0 };
@@ -616,7 +617,7 @@ func expandArgs(const int argc, char* const argv[], std::vector<std::string>* co
 		if (newFull)
 			newFull = false;
 	}};
-	for (int i{1}; i<argc; ++i) {
+	for (int i{startAt}; i<argc; ++i) {
 		auto arg { argv[i] };
 		auto len { std::strlen(arg) };
 		auto isMnemonic{ len > 1 and arg[0] == '-' and (std::isalpha(arg[1]) or arg[1] == ';') };
@@ -746,7 +747,7 @@ Option:\n\
 					OR using range with '-' OR '..'\n\
 					   --size 750-1.2gb\n\
 -f, --fix-filename \"filename\"   Override output playlist filename.\n\
--P, --no-ouput-file [yes | no]  Choose to create playlist file or no. Default 'yes' if option was declared.\n\
+-P, --no-ouput-file [yes | no]  Choose to create playlist file or no. Default 'yes' if option was declared or if was build as library.\n\
 -d, --out-dir \"directory path\"  Override output directory for playlist file.\n\
 \n\
 Options can be joined, and replace option assignment separator [SPACE] with '=' \
@@ -780,7 +781,13 @@ int main(int argc, char *argv[]) {
 	state[OPT_EXECUTION]= OPT_ASYNC;
 	
 	std::vector<std::string> args;
-	expandArgs(argc, argv, &args);
+	expandArgs(argc, argv,
+			   #if MAKE_LIB
+			   0
+			   #else
+			   1
+			   #endif
+			   , &args);
 	
 	std::set<std::string_view> invalidArgs;
 	
@@ -822,12 +829,16 @@ int main(int argc, char *argv[]) {
 				}
 			}
 			else if (isMatch(OPT_NOOUTPUTFILE, 	'P', true)) {
-				if (i + 1 < args.size()
-					and (tolower(args[i + 1]) != "true"
-						 or tolower(args[i + 1]) != "yes"))
+				if (i + 1 < args.size())
 				{
 					i++;
-					state[OPT_NOOUTPUTFILE] = "";
+					if (auto next { tolower(args[i + 1]) };
+						next == "true" or next == "yes")
+						state[OPT_NOOUTPUTFILE] = "true";
+					else if (next == "false" or next == "no")
+						state[OPT_NOOUTPUTFILE] = "false";
+					else
+						i--;
 				}
 			}
 			else if (isMatch(OPT_OVERWRITE, 	'O', true));
@@ -1194,8 +1205,7 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 		else
 			outputFile << fs::absolute(file).string() << '\n';
 		#ifndef DEBUG
-		if (state[OPT_VERBOSE] == "true" or state[OPT_DEBUG] == "true"
-			or state[OPT_NOOUTPUTFILE] == "true")
+		if (state[OPT_VERBOSE] == "true" or state[OPT_DEBUG] == "true")
 		#endif
 			std::cout << fs::absolute(file).string() << '\n';
 				
@@ -1208,8 +1218,7 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 				else
 					outputFile << fs::absolute(sf).string() << '\n';
 				#ifndef DEBUG
-				if (state[OPT_VERBOSE] == "true" or state[OPT_DEBUG] == "true"
-					or state[OPT_NOOUTPUTFILE] == "true")
+				if (state[OPT_VERBOSE] == "true" or state[OPT_DEBUG] == "true")
 				#endif
 					std::cout << fs::absolute(sf).string() << '\n';
 			}
@@ -1350,11 +1359,11 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 		timeLapse(start, groupNumber(std::to_string(playlistCount)) + " valid files took ");
 
 #if MAKE_LIB
-	*outc = static_cast<int>(outputArray.size());
-	if (*outc > 0) {
-		outs = (char**)malloc(outputArray.size() * sizeof(char *));
-		for (auto i = 0;auto& item : outputArray)
-			outs[i++] = const_cast<char *>(item.c_str());
+	if (outc) {
+		*outc = static_cast<int>(outputArray.size());
+		if (*outc > 0 and outs)
+			for (auto i = 0;auto& item : outputArray)
+				std::strcpy(outs[i++], item.c_str());
 	}
 #endif
 					   

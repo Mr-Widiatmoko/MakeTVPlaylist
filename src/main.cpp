@@ -1191,50 +1191,35 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 	unsigned long playlistCount{0};
 	
 	auto putIntoPlaylist{ [&](const fs::path& file) {
-		playlistCount++;
-		if (state[OPT_NOOUTPUTFILE] == "true") {
-			#if MAKE_LIB
-			if (outc)
-				*outc += 1;
-			if (maxLength) {
-				if (auto sz { fs::absolute(file).string().size() + 1 };
-					*maxLength < sz)
-					*maxLength = sz;
-			}
-			if (outs)
-				std::strcpy(outs[playlistCount - 1], fs::absolute(file).string().c_str());
+		auto putIt{ [&](const fs::path& file) {
+			playlistCount++;
+			if (state[OPT_NOOUTPUTFILE] == "true") {
+				#if MAKE_LIB
+				if (outc)
+					*outc += 1;
+				if (maxLength) {
+					if (auto sz { fs::absolute(file).string().size() + 1 };
+						*maxLength < sz)
+						*maxLength = sz;
+				}
+				if (outs)
+					std::strcpy(outs[playlistCount - 1], fs::absolute(file).string().c_str());
+				#endif
+			} else
+				outputFile << fs::absolute(file).string() << '\n';
+			#ifndef DEBUG
+			if (state[OPT_VERBOSE] == "true" or state[OPT_DEBUG] == "true")
 			#endif
-		} else
-			outputFile << fs::absolute(file).string() << '\n';
-		#ifndef DEBUG
-		if (state[OPT_VERBOSE] == "true" or state[OPT_DEBUG] == "true")
-		#endif
-			std::cout << fs::absolute(file).string() << '\n';
+				std::cout << fs::absolute(file).string() << '\n';
+		}};
+		
+		putIt(file);
 				
 		if (state[OPT_SKIPSUBTITLE] != "true") {
-			std::vector<fs::path> subtitleFiles = {};
+			std::vector<fs::path> subtitleFiles;
 			findSubtitleFile(file, &subtitleFiles);
-			for (auto& sf : subtitleFiles) {
-				playlistCount++;
-				if (state[OPT_NOOUTPUTFILE] == "true") {
-					#if MAKE_LIB
-					if (outc)
-						*outc += 1;
-					if (maxLength) {
-						if (auto sz { fs::absolute(sf).string().size() + 1 };
-							*maxLength < sz)
-							*maxLength = sz;
-					}
-					if (outs)
-						std::strcpy(outs[playlistCount - 1], fs::absolute(sf).string().c_str());
-					#endif
-				} else
-					outputFile << fs::absolute(sf).string() << '\n';
-				#ifndef DEBUG
-				if (state[OPT_VERBOSE] == "true" or state[OPT_DEBUG] == "true")
-				#endif
-					std::cout << fs::absolute(sf).string() << '\n';
-			}
+			for (auto& sf : subtitleFiles)
+				putIt(sf);
 		}
 	}};
 	

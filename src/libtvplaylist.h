@@ -25,16 +25,27 @@ void process(int argc, char *argv[], /// Inputs
  
 		int main(int argc, char *argv[]) {
 			{ /// BEGIN Just create playlist filename.
+ 
+				/// This example will try to create playlist file under '/tmp' folder with file name 'my_playlist.m3u8'.
+ 
 				char *inputs[] = {
 					/// By default, --no-output-file=true for 'libtvplaylist', but false for 'tvplaylist'
-					"--no-output-file=false", // or "-P=false"
-					"/Users/dev/Movies", // Specify one input folder. If no input, then current directory will be automatically used.
+					"--no-output-file=false", 			// or "-P=false"
+					"--out-dir=/tmp", 					// or "-d=/tmp"
+					"--fix-filename=my_playlist.m3u8",	// or "-f=my_playlist.m3u8"
+					"/Users/dev/Movies",				 // Specify one input folder. If no input, then current directory will be used automatically.
 					/// Another inputs, can be: files, folders or options
 				};
+ 
+				/// Output playlist file will be created on '/tmp/my_playlist.m3u8'.
 				process(sizeof(inputs)/sizeof(inputs[0]), inputs, NULL, NULL);
+ 
 			} /// END Get playlist filename.
  
 			{ /// BEGIN Get filenames as array string.
+
+				/// This example will try get all full path file names from playlist.
+
 				int outc = 0;
 				process(argc, argv, &outc, NULL); /// Try to get numbers of filenames in 'outc'
 				
@@ -44,16 +55,16 @@ void process(int argc, char *argv[], /// Inputs
 				for (int i=0; i<outc; ++i) outs[i] = (char *)malloc(1000 * sizeof(char));
 	 
 				process(argc, argv, &outc, outs); /// Copy full path filenames into outs elements.
+				/// Yes this process runs twice and consume double times, if you seek for performance, please see first example above.
 	 
-				if (outs)
-					for (int i=0; i<outc; ++i) {
-						char *element = out[i];
-						
-						/// Do whatever you want with 'element'.
-						
-						/// Remember!: This is your responsibility!.
-						free(element);
-					}
+				for (int i=0; i<outc; ++i) {
+					char *element = out[i];
+					
+					/// Do whatever you want with 'element'.
+					
+					/// Remember!: This is your responsibility!.
+					free(element);
+				}
 			} /// END Get filenames as array string.
 		}
  */

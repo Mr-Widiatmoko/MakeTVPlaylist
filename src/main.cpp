@@ -367,17 +367,13 @@ func recursiveDirectory(const char* const dir,
 func listDir(const fs::path& path, std::vector<fs::directory_entry>* const out,
 			bool sorted=true)
 {
-	static std::vector<std::string_view> ignoredPaths;
-	if (not out or (std::find(ignoredPaths.begin(), ignoredPaths.end(),
-							  path.string()) != ignoredPaths.end()))
+	if (not out)
 		return;
 	if (fs::is_symlink(path)) {
 		std::error_code ec;
 		auto ori = fs::read_symlink(path, ec);
-		if (ec) {
-			ignoredPaths.emplace_back(path.string());
+		if (ec)
 			return;
-		}
 	}
 	try {
 		for (auto& child : fs::directory_iterator(path)) {
@@ -392,8 +388,6 @@ func listDir(const fs::path& path, std::vector<fs::directory_entry>* const out,
 				if (const auto ori { fs::read_symlink(child.path()) };
 					fs::exists(ori) and fs::is_directory(ori))
 					out->emplace_back(child);
-				else
-					ignoredPaths.emplace_back(ori.string());
 			} else if (child.is_directory())
 					out->emplace_back(child);
 		}
@@ -402,8 +396,6 @@ func listDir(const fs::path& path, std::vector<fs::directory_entry>* const out,
 		if (state[OPT_VERBOSE] == "all")
 		#endif
 			std::cout << e.what() << '\n';
-		
-		ignoredPaths.emplace_back(path.string());
 	}
 	
 	if (sorted and out->size() > 1)
@@ -751,19 +743,19 @@ Option:\n\
 -d, --out-dir \"directory path\"  Override output directory for playlist file.\n\
 \n\
 Options can be joined, and replace option assignment separator [SPACE] with '=' \
-or ':' and can be separated by ';' after assignment. For the example:\n\
+or ':' and can be separated by ';' after assignment. For the example:\n\n\
   tvplaylist -hOVvc=async;xs<1.3gb;e=mp4,mkv;f:My-playlist.m3u8\n\n\
 Thats it, -h -O -V -v -c are joined, and -c has assignment operator '=' instead of\
- using separator [SPACE].\n\
+ using separator [SPACE]. \
 Also -x -s are joined, and -x is continuing with ';' after option assignment \
-'=async' and -s has remove [SPACE] separator for operator '<' and value '1.3gb'.\n\
+'=async' and -s has remove [SPACE] separator for operator '<' and value '1.3gb'.\n\n\
 Redefinition of option means, it will use the last option. For the example, \
-this example will not use 'thread' execution at all':\n\
-  tvplaylist -c=thread /usr/local/videos -c=none /Users/Shared/Videos\n\
-Note, you cannot join mnemonic option with full option, for the example:\n\
-  tvplaylist -ch;only-ext=m43;version\t\tWONT WORK\n\
-Instead try to separate mnemonic and full option, like this:\n\
-  tvplaylist -ch --only-ext=mp3;version\n"
+this example will not use 'thread' execution at all':\n\n\
+  tvplaylist -c=thread /usr/local/videos -c=none /Users/Shared/Videos\n\n\
+Note, you cannot join mnemonic option with full option, for the example:\n\n\
+  tvplaylist -bO;only-ext=m43;version\t\tWONT WORK\n\n\
+Instead try to separate mnemonic and full option, like this:\n\n\
+  tvplaylist -bO --only-ext=mp3;version\n"
 ;
 
 #if MAKE_LIB

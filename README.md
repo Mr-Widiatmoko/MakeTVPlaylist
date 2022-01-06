@@ -8,7 +8,7 @@ As the name suggests, this is a small utility to create playlist from various se
 This is a utility to create playlist file with extension .m3u8 that contains sequence per episode per Title of multiple Title TV program or just videos. To do that, you have two option:
 1. By selecting folders or files, then Right-Click choose "Quick Actions" -> "Make TV Playlist". Then "MPV" (by default, if you have one) or your default video player will be automatically used to play the playlist file. After the player quit, the playlist file will be removed. If you need to save the playlist, use your player to save playlist as ..., or you can use [tvplaylist](https://github.com/Mr-Widiatmoko/MakeTVPlaylist/Release/tvplaylist) to do so (see below). This workflow implemented using zsh script, so the performace to create playlist is very, very, very ... slugish. To upgrade performace for more than 1000%, yes thats right MORE THAN 1000%, you need to download [tvplaylist](https://github.com/Mr-Widiatmoko/MakeTVPlaylist/Release/tvplaylist)(for macOS Intel!, other platform need to compile, see Installation) and put it into "HOME" or "Downloads" or "/usr/local/bin/" by copy or by alias. For example, to make alias on "/usr/local/bin/" you can type:
 	
-		ln -f tvplaylist /usr/local/bin/
+		mv tvplaylist /usr/local/bin/
 		
 2. By using Terminal.app and type "tvplaylist" press SPACE then drag folders or files from Finder to Terminal, then press ENTER. the program will display full path of playlist file.
 
@@ -40,7 +40,7 @@ To build "tvplaylist" on macOS Apple Silicon, Windows, or Linux, first you must 
 	cd Release
 	cmake ../
 	cmake --build .
-	ln -f tvplaylist /usr/local/bin/
+	mv tvplaylist /usr/local/bin/
 	
 Don't forget to [Press ENTER]. Thats it, you will get "tvplaylist" on "Release" folder.
 
@@ -50,7 +50,7 @@ If you need to build this as library file, then copy below and paste on the Term
 	cd WHATEVER
 	cmake ../ -DMAKE_LIB=1
 	cmake --build .
-	ln -f libtvplaylist.dylib /usr/local/lib/
+	mv libtvplaylist.dylib /usr/local/lib/
 	cp ../src/libtvplaylist.h /usr/local/include/
  
 Don't forget to [Press ENTER]. Thats it, you will get "libtvplaylist.dylib" on "WHATEVER" folder. 

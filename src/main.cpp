@@ -759,7 +759,7 @@ Instead try to separate mnemonic and full option, like this:\n\n\
 ;
 
 #if MAKE_LIB
-void process(int argc, char *argv[], int *outc, char **outs) {
+void process(int argc, char *argv[], int *outc, char *outs[], unsigned long *maxLength) {
 	state[OPT_NOOUTPUTFILE] = "true";
 #else
 int main(int argc, char *argv[]) {
@@ -1191,10 +1191,20 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 	unsigned long playlistCount{0};
 	
 	auto putIntoPlaylist{ [&](const fs::path& file) {
-		playlistCount += 1;
-		if (state[OPT_NOOUTPUTFILE] == "true")
-			outputArray.emplace_back(fs::absolute(file).string());
-		else
+		playlistCount++;
+		if (state[OPT_NOOUTPUTFILE] == "true") {
+			#if MAKE_LIB
+			if (outc)
+				*outc += 1;
+			if (maxLength) {
+				if (auto sz { fs::absolute(file).string().size() + 1 };
+					*maxLength < sz)
+					*maxLength = sz;
+			}
+			if (outs)
+				std::strcpy(outs[playlistCount - 1], fs::absolute(file).string().c_str());
+			#endif
+		} else
 			outputFile << fs::absolute(file).string() << '\n';
 		#ifndef DEBUG
 		if (state[OPT_VERBOSE] == "true" or state[OPT_DEBUG] == "true")
@@ -1205,9 +1215,20 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 			std::vector<fs::path> subtitleFiles = {};
 			findSubtitleFile(file, &subtitleFiles);
 			for (auto& sf : subtitleFiles) {
-				if (state[OPT_NOOUTPUTFILE] == "true")
-					outputArray.emplace_back(fs::absolute(file).string());
-				else
+				playlistCount++;
+				if (state[OPT_NOOUTPUTFILE] == "true") {
+					#if MAKE_LIB
+					if (outc)
+						*outc += 1;
+					if (maxLength) {
+						if (auto sz { fs::absolute(sf).string().size() + 1 };
+							*maxLength < sz)
+							*maxLength = sz;
+					}
+					if (outs)
+						std::strcpy(outs[playlistCount - 1], fs::absolute(sf).string().c_str());
+					#endif
+				} else
 					outputFile << fs::absolute(sf).string() << '\n';
 				#ifndef DEBUG
 				if (state[OPT_VERBOSE] == "true" or state[OPT_DEBUG] == "true")
@@ -1349,15 +1370,6 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 	if (state[OPT_BENCHMARK] == "true" or state[OPT_DEBUG] == "true")
 	#endif
 		timeLapse(start, groupNumber(std::to_string(playlistCount)) + " valid files took ");
-
-#if MAKE_LIB
-	if (outc) {
-		*outc = static_cast<int>(outputArray.size());
-		if (*outc > 0 and outs)
-			for (auto i = 0;auto& item : outputArray)
-				std::strcpy(outs[i++], item.c_str());
-	}
-#endif
 					   
 	if (state[OPT_NOOUTPUTFILE] != "true") {
 		if (outputFile.is_open())

@@ -17,7 +17,7 @@ extern "C" {
 #endif
 
 void process(int argc, char *argv[], /// Inputs
-			 int *outc, char **outs);/// Outputs, you need to free 'outs' by your self.
+			 int *outc, char *outs[], unsigned long *maxLength);/// Outputs, you need to free 'outs' by your self.
 
 /** Example Usage on C:
 	
@@ -38,7 +38,7 @@ void process(int argc, char *argv[], /// Inputs
 				};
  
 				/// Output playlist file will be created on '/tmp/my_playlist.m3u8'.
-				process(sizeof(inputs)/sizeof(inputs[0]), inputs, NULL, NULL);
+				process(sizeof(inputs)/sizeof(inputs[0]), inputs, NULL, NULL, NULL);
  
 			} /// END Get playlist filename.
  
@@ -47,14 +47,15 @@ void process(int argc, char *argv[], /// Inputs
 				/// This example will try get all full path file names from playlist.
 
 				int outc = 0;
-				process(argc, argv, &outc, NULL); /// Try to get numbers of filenames in 'outc'
+				unsigned long maxLength = 0;
+				process(argc, argv, &outc, NULL, &maxLength); /// Try to get numbers of filenames in 'outc' and maximum filename length.
 				
 				char *outs[outc]; /// Stack allocation for outs.
 	 
-				/// Allocate heap buffer 1000 characters for full path filename.
-				for (int i=0; i<outc; ++i) outs[i] = (char *)malloc(1000 * sizeof(char));
+				/// Allocate heap buffer with maximum 'maxLength' characters for full path filename.
+				for (int i=0; i<outc; ++i) outs[i] = (char *)malloc(maxLength * sizeof(char));
 	 
-				process(argc, argv, &outc, outs); /// Copy full path filenames into outs elements.
+				process(argc, argv, NULL, outs, NULL); /// Copy full path filenames into outs elements.
 				/// Yes this process runs twice and consume double times, if you seek for performance, please see first example above.
 	 
 				for (int i=0; i<outc; ++i) {

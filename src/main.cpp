@@ -24,6 +24,7 @@
 #include <cstdarg>
 #include <algorithm>
 #include <fstream>
+#include <regex>
 
 std::map<std::string, std::string> state;
 constexpr auto OPT_HELP 			{"help"};
@@ -32,17 +33,24 @@ constexpr auto OPT_VERBOSE 			{"verbose"};
 constexpr auto OPT_BENCHMARK 		{"benchmark"};
 constexpr auto OPT_OVERWRITE 		{"overwrite"};
 constexpr auto OPT_SKIPSUBTITLE 	{"skip-subtitle"};
-constexpr auto OPT_ONLYEXT 			{"only-ext"};
-constexpr auto OPT_FIXFILENAME 		{"fix-filename"};
+constexpr auto OPT_ONLYEXT 			{"ext"};
+constexpr auto OPT_EXCLEXT 			{"exclude-ext"};
+constexpr auto OPT_FIXFILENAME 		{"out-filename"};
 constexpr auto OPT_NOOUTPUTFILE 	{"no-output-file"};
 constexpr auto OPT_OUTDIR 			{"out-dir"};
 constexpr auto OPT_SIZE				{"size"};
-constexpr auto OPT_SIZETO			{"size_to"};
 constexpr auto OPT_SIZEOPGT			{"size_op"};
+constexpr auto OPT_EXCLSIZE			{"exclude-size"};
+constexpr auto OPT_EXCLSIZEOPGT		{"exclude-size_op"};
 constexpr auto OPT_THREAD			{"thread"};
 constexpr auto OPT_ASYNC			{"async"};
 constexpr auto OPT_EXECUTION		{"execution"};
 constexpr auto OPT_EXCLHIDDEN		{"exclude-hidden"};
+constexpr auto OPT_REGEXSYNTAX		{"regex-syntax"};
+constexpr auto OPT_FIND				{"find"};
+constexpr auto OPT_REGEX			{"regex"};
+constexpr auto OPT_EXCLFIND			{"exclude-find"};
+constexpr auto OPT_EXCLREGEX		{"exclude-regex"};
 constexpr auto OPT_DEBUG			{"debug"};
 
 //#include <format>
@@ -194,38 +202,128 @@ func parseCommaDelimited(const std::string&& literal, std::vector<std::string>* 
 	}
 }
 
+std::vector<std::string> EXCLUDE_EXT;
 std::vector<std::string> DEFAULT_EXT {
 	".mp4",  ".mkv", ".mov", ".m4v",  ".mpeg", ".mpg",  ".mts", ".ts",
 	".webm", ".flv", ".wmv", ".avi",  ".divx", ".xvid", ".dv",  ".3gp",
-	".tmvb", ".rm",  ".mpg4", ".mqv",  ".ogm",  ".qt",
-	".vox",  ".3gpp",".m2ts",".m1v",  ".m2v",  ".mpe"};
+	".tmvb", ".rm",  ".mpg4",".mqv",  ".ogm",  ".qt",
+	".vox",  ".3gpp",".m2ts",".m1v",  ".m2v",  ".mpe",
+	".mp3",	 ".m4a", ".aac", ".wav",  ".wma",  ".flac", ".ape", ".aiff"
+	".jpg",  ".jpeg",".png", ".gif",  ".bmp"
+};
+bool EXCLUDE_EXT_REPLACED = false;
+bool DEFAULT_EXT_REPLACED = false;
 
-func isMediaFile(const fs::path& path,
-				 const std::string& extensions, // comma delimited extensions
-				 char greaterThan = '\0',
-				 std::uintmax_t size = 0,
-				 std::uintmax_t sizeTo = 0) -> bool
+std::vector<std::regex> listRegex, listExclRegex;
+std::vector<std::string> listFind, listExclFind;
+std::vector<std::pair<std::uintmax_t, std::uintmax_t>> listSize, listExclSize;
+
+func isValidFile(const fs::path& path) -> bool
 {
 	if (not fs::exists(path))
 		return false;
+
+	if (not state[OPT_EXCLEXT].empty())
+		if (not EXCLUDE_EXT_REPLACED) {
+			parseCommaDelimited(tolower(state[OPT_EXCLEXT]), &EXCLUDE_EXT);
+			EXCLUDE_EXT_REPLACED = true;
+		}
+	if (not state[OPT_ONLYEXT].empty())
+		if (not DEFAULT_EXT_REPLACED) {
+			parseCommaDelimited(tolower(state[OPT_ONLYEXT]), &DEFAULT_EXT);
+			DEFAULT_EXT_REPLACED = true;
+		}
 	
-	if (not extensions.empty())
-		parseCommaDelimited(tolower(extensions), &DEFAULT_EXT);
 	
-	auto tmp{ path };
+	
+	fs::path tmp{ path };
 	if (fs::is_symlink(tmp)) { //TODO: is_symlink() cannot detect macOS alias file!
 		tmp = fs::read_symlink(path);
 		
 		if (not fs::exists(tmp) or not fs::is_regular_file(tmp))
 			return false;
 	}
+	
+	if (not isEqual(tolower(tmp.extension().string()), &DEFAULT_EXT))
+		return false;
+	
+	if (not state[OPT_EXCLEXT].empty())
+		if (isEqual(tolower(tmp.extension().string()), &EXCLUDE_EXT))
+			return false;
+	
+	if (bool found{ false }; not state[OPT_REGEX].empty()) {
+		for (auto filename{ excludeExtension(tmp.filename()) };
+			 auto& regex : listRegex)
+			if (std::regex_search(filename, regex)) {
+				found = true;
+				break;
+			}
+		if (not found)
+			return false;
+	}
+	
+	if (not state[OPT_EXCLREGEX].empty())
+		for (auto filename{ excludeExtension(tmp.filename()) };
+			 auto& regex : listExclRegex)
+			if (std::regex_search(filename, regex))
+				return false;
+	
+	if (bool found{ false }; not state[OPT_FIND].empty()) {
+		for (auto filename{ excludeExtension(tmp.filename()) };
+			 auto& keyword : listFind)
+			if (filename.find(keyword) != std::string::npos) {
+				found = true;
+				break;
+			}
+		if (not found)
+			return false;
+	}
 
-	auto fileSize{ fs::file_size(tmp) };
-	return /*fs::is_regular_file(tmp) and*/ isEqual(tolower(tmp.extension().string()), &DEFAULT_EXT)
-		and (size == 0 and sizeTo == 0 ? true
-		 : (greaterThan == '\0' ? fileSize > size and fileSize < sizeTo
-			: (greaterThan == '>' ? fileSize > size : fileSize < size))
-		 );
+	if (not state[OPT_EXCLFIND].empty())
+		for (auto filename{ excludeExtension(tmp.filename()) };
+			 auto& keyword : listExclFind)
+			if (filename.find(keyword) != std::string::npos)
+				return false;
+
+	if (bool found{ false };
+		not listSize.empty()
+		or (state[OPT_SIZEOPGT][0] != '\0' and state[OPT_SIZE] != "0"))
+	{
+		const std::uintmax_t fileSize{ fs::file_size(tmp) };
+		
+		for (auto& range : listSize)
+			if (fileSize > range.first and fileSize < range.second) {
+				found = true;
+				break;
+			}
+		
+		if (not found)
+			found = state[OPT_SIZEOPGT][0] == '>'
+						? fileSize > std::stoul(state[OPT_SIZE])
+						: fileSize < std::stoul(state[OPT_SIZE]);
+		if (not found)
+			return false;
+	}
+	
+	if (bool found{ false };
+		not listExclSize.empty()
+		or (state[OPT_EXCLSIZEOPGT][0] != '\0' and state[OPT_EXCLSIZE] != "0"))
+	{
+		const std::uintmax_t fileSize{ fs::file_size(tmp) };
+		
+		for (auto& range : listExclSize)
+			if (fileSize > range.first and fileSize < range.second)
+				return false;
+		
+		if (not found)
+			found = state[OPT_EXCLSIZEOPGT][0] == '>'
+						? fileSize > std::stoul(state[OPT_EXCLSIZE])
+						: fileSize < std::stoul(state[OPT_EXCLSIZE]);
+		if (found)
+			return false;
+	}
+	
+	return /*fs::is_regular_file(tmp) and*/ true;
 }
 
 func findSubtitleFile(const fs::path& original,
@@ -450,27 +548,27 @@ std::set<fs::path> regularDirs 	= {};
 std::set<fs::path> seasonDirs	= {};
 std::vector<fs::path> selectFiles  = {};
 
-func insertTo(std::set<fs::path>* const set, const fs::path& path)
+inline
+func isValid(const fs::path& path) -> bool
 {
-	if (((fs::status(path).permissions() & (fs::perms::owner_read
+	return not (
+	((fs::status(path).permissions() & (fs::perms::owner_read
 											| fs::perms::group_read
 											| fs::perms::others_read))
 			== fs::perms::none)
-		or (state[OPT_EXCLHIDDEN] == "true" and path.filename().string()[0] == '.'))
-		;
-	else
-		set->insert(path);
+	or (state[OPT_EXCLHIDDEN] == "true" and path.filename().string()[0] == '.')
+	);
+}
+
+func insertTo(std::set<fs::path>* const set, const fs::path& path)
+{
+	if (isValid(path))
+		set->emplace(path);
 }
 
 func insertTo(std::vector<fs::path>* const vector, const fs::path& path)
 {
-	if (((fs::status(path).permissions() & (fs::perms::owner_read
-											| fs::perms::group_read
-											| fs::perms::others_read))
-			== fs::perms::none)
-		or (state[OPT_EXCLHIDDEN] == "true" and path.filename().string()[0] == '.'))
-		;
-	else
+	if (isValid(path))
 		vector->emplace_back(path);
 }
 
@@ -552,6 +650,8 @@ func getBytes(const std::string& s) -> uintmax_t
 		return result;
 	
 	float v { std::stof(value) };
+	if (v <= 0)
+		return result;
 	
 	if (unit == "kb") {
 		if (v <= (INT_MAX / 1000))
@@ -578,7 +678,9 @@ func getRange(const std::string& argv, const std::string& separator)
 	auto second{tolower(argv.substr(pos + separator.size()))};
 
 	uintmax_t from{getBytes(std::move(first))};
+	from = std::max(from, static_cast<uintmax_t>(0));
 	uintmax_t to{getBytes(std::move(second))};
+	to = std::max(to, static_cast<uintmax_t>(0));
 	return std::make_shared<std::pair<uintmax_t, uintmax_t>>(from, to);
 }
 
@@ -723,39 +825,59 @@ Usage:\n    tvplaylist [Option or Dir or File] ...\n\n\
 If no argument was specified, the current directory will be use.\n\n\
 Option:\n\
 -h, --help                      Display this screen.\n\
--c, --execution USING           Specify execution, using 'thread', 'async' is default, or 'linear' to process.\n\
+-c, --execution USING           Specify execution, using 'thread', 'async' is default, or 'linear' to execute.\n\
 -b, --benchmark                 Benchmarking execution.\n\
 -n, --exclude-hidden            Exclude hidden folders or files.\n\
 -O, --overwrite                 Overwrite output playlist file.\n\
 -v, --version                   Display version.\n\
--V, --verbose [all]             Display playlist content. Define as 'all' will show fail messages.\n\
--x, --skip-subtitle		Dont include subtitle file.\n\
--e, --only-ext \"extension, ...\"	Filter only specific extensions, separated by comma.\n\
-				  Example: --only-ext \"mp4, mkv\"\n\
--s, --size < OR > SIZE		Filter by size in \"KB\", \"MB\" (default), or \"GB\".\n\
+-V, --verbose [all | info]      Display playlist content.\n\
+                                Define as 'all' will show fail messages.\n\
+                                Define as 'info' will display options info.\n\
+-x, --skip-subtitle             Dont include subtitle file.\n\
+-X, --regex-syntax [type]       Specify regular expression syntax to use.\n\
+                                Available value are: 'ecma'(Default), 'awk', 'grep', 'egrep', 'basic', 'extended'.\n\
+                                'basic' use the basic POSIX regex grammar and\n\
+								'extended' use the extended POSIX regex grammar.\n\
+-i, --find 'keyword'            Filter only files with filename contains find keyword.\n\
+                                You can specifying this multiple times.\n\
+								  Example: --find war; find invasion\n\
+-I, --exclude-find 'keyword'    Filter to exclude files with filename contains find keyword.\n\
+                                You can specifying this multiple times.\n\
+                                  Example: -I love; I and; I home\n\
+-r, --regex 'syntax'            Filter only files with filename match regular expression.\n\
+                                You can specifying this multiple times.\n\
+-R, --exclude-regex 'syntax'    Filter to exclude files with filename match regular expression.\n\
+                                You can specifying this multiple times.\n\
+-e, --ext \"extension, ...\"    Filter only files that match specific extensions, separated by comma.\n\
+				  Example: --only-ext \"pdf, docx\"\n\
+-E, --exclude-ext \"extension, ...\"Filter to exclude files that match specific extensions, separated by comma.\n\
+-s, --size < | > SIZE           Filter only files that size match, in \"KB\", \"MB\" (default), or \"GB\".\n\
+                                You can specifying this multiple times for 'Range' only based size.\n\
 	   FROM-TO	  	  Example: --size < 750\n\
 	   FROM..TO			OR by specify the unit\n\
 					   --size > 1.2gb\n\
 					OR using range with '-' OR '..'\n\
-					   --size 750-1.2gb\n\
--f, --fix-filename \"filename\"   Override output playlist filename.\n\
+					   --size 750-1.2gb; size=30..200.2; size 2gb..4gb\n\
+-S, --exclude-size < | > SIZE   Filter to exclude files that size match, in \"KB\", \"MB\" (default), or \"GB\".\n\
+                                You can specifying this multiple times for 'Range' only based size.\n\
+-f, --out-filename \"filename\"   Override output playlist filename.\n\
 -P, --no-ouput-file [yes | no]  Choose to create playlist file or no. Default 'yes' if option was declared or if was build as library.\n\
 -d, --out-dir \"directory path\"  Override output directory for playlist file.\n\
 \n\
-Options can be joined, and replace option assignment separator [SPACE] with '=' \
+Options can be joined, and you replace option assignment separator [SPACE] with '=' \
 or ':' and can be separated by ';' after assignment. For the example:\n\n\
-  tvplaylist -hOVvc=async;xs<1.3gb;e=mp4,mkv;f:My-playlist.m3u8\n\n\
+  tvplaylist -hOVvc=async;xs<1.3gb;e=mp4,mkv;f:My-playlist.txt\n\n\
 Thats it, -h -O -V -v -c are joined, and -c has assignment operator '=' instead of\
  using separator [SPACE]. \
 Also -x -s are joined, and -x is continuing with ';' after option assignment \
 '=async' and -s has remove [SPACE] separator for operator '<' and value '1.3gb'.\n\n\
-Redefinition of option means, it will use the last option. For the example, \
+Redefinition of option means, it will use the last option, except for options 'regex', 'exclude-regex', 'find', 'exclude-find', 'size', 'exclude-size'. For the example, \
 this example will not use 'thread' execution at all':\n\n\
   tvplaylist -c=thread /usr/local/videos -c=none /Users/Shared/Videos\n\n\
 Note, you cannot join mnemonic option with full option, for the example:\n\n\
-  tvplaylist -bO;only-ext=m43;version\t\tWONT WORK\n\n\
+  tvplaylist -bO;ext=mp3;version\t\tWONT WORK\n\n\
 Instead try to separate mnemonic and full option, like this:\n\n\
-  tvplaylist -bO --only-ext=mp3;version\n"
+  tvplaylist -bO --ext=mp3;version\n"
 ;
 
 #if MAKE_LIB
@@ -769,7 +891,9 @@ int main(int argc, char *argv[]) {
 
 	state[OPT_SIZEOPGT] = '\0';
 	state[OPT_SIZE] 	= "0";
-	state[OPT_SIZETO] 	= "0";
+	state[OPT_EXCLSIZEOPGT] = '\0';
+	state[OPT_EXCLSIZE] 	= "0";
+
 	state[OPT_EXECUTION]= OPT_ASYNC;
 	
 	std::vector<std::string> args;
@@ -782,15 +906,26 @@ int main(int argc, char *argv[]) {
 			   , &args);
 	
 	std::set<std::string_view> invalidArgs;
+	auto getRegexSyntaxType{[](const std::string& s)
+		-> std::regex_constants::syntax_option_type {
+		if (s == "basic") return std::regex_constants::syntax_option_type::basic;
+		if (s == "extended") return std::regex_constants::syntax_option_type::extended;
+		if (s == "awk") return std::regex_constants::syntax_option_type::awk;
+		if (s == "grep") return std::regex_constants::syntax_option_type::grep;
+		if (s == "egrep") return std::regex_constants::syntax_option_type::egrep;
+		else return std::regex_constants::syntax_option_type::ECMAScript;
+	}};
 	
 	for (int i{0}; i<args.size(); ++i) {
 		if (auto isMatch{ [&](const char* with,
 							  char mnemonic,
-							  bool writeBoolean=false) {
+							  bool writeBoolean=false,
+							  const char* withOther=nullptr) {
 			auto result { (args[i].length() > 3
 					and args[i][0] == '-'
 					and args[i][1] == '-'
-					and args[i].substr(2) == with)
+					and (args[i].substr(2) == with
+						 or (withOther and args[i].substr(2) == withOther)))
 				or (args[i].length() == 2
 					and args[i][0] == '-'
 					and args[i][1] == mnemonic) };
@@ -833,12 +968,66 @@ int main(int argc, char *argv[]) {
 						i--;
 				}
 			}
+			else if (isMatch(OPT_FIND, 	'i')) {
+				if (i + 1 < args.size())
+				{
+					i++;
+					listFind.emplace_back(args[i]);
+					state[OPT_FIND] = "1";
+				} else
+					std::cout << "Expecting keyword after \""
+					<< args[i] << "\" option.\n";
+			}
+			else if (isMatch(OPT_EXCLFIND, 	'I')) {
+				if (i + 1 < args.size())
+				{
+					i++;
+					listExclFind.emplace_back(args[i]);
+					state[OPT_EXCLFIND] = "1";
+				} else
+					std::cout << "Expecting keyword after \""
+					<< args[i] << "\" option.\n";
+			}
+			else if (isMatch(OPT_REGEXSYNTAX, 	'X')) {
+				if (i + 1 < args.size())
+					for (auto arg { tolower(args[i + 1]) };
+						 auto& s : {"ecma", "basic", "extended", "awk", "grep", "egrep"})
+						if (s == arg) {
+							state[OPT_REGEXSYNTAX] = s;
+							i++;continue;
+						}
+
+				std::cout << "Expecting regular expression syntax after \""
+					<< args[i] << "\" option.\n";
+			}
+			else if (isMatch(OPT_REGEX, 	'r')) {
+				if (i + 1 < args.size())
+				{
+					i++;
+					listRegex.emplace_back(std::regex(args[i],
+									getRegexSyntaxType(state[OPT_REGEXSYNTAX])));
+					state[OPT_REGEX] = "1";
+				} else
+					std::cout << "Expecting regular expression after \""
+					<< args[i] << "\" option.\n";
+			}
+			else if (isMatch(OPT_EXCLREGEX, 	'R')) {
+				if (i + 1 < args.size())
+				{
+					i++;
+					listExclRegex.emplace_back(std::regex(args[i],
+									getRegexSyntaxType(state[OPT_REGEXSYNTAX])));
+					state[OPT_EXCLREGEX] = "1";
+				} else
+					std::cout << "Expecting regular expression after \""
+					<< args[i] << "\" option.\n";
+			}
 			else if (isMatch(OPT_OVERWRITE, 	'O', true));
 			else if (isMatch(OPT_BENCHMARK, 	'b', true));
 			else if (isMatch(OPT_SKIPSUBTITLE, 	'x', true));
 			else if (isMatch(OPT_EXCLHIDDEN, 	'n', true));
 			else if (isMatch(OPT_VERBOSE, 		'V', true)) {
-				if (i + 1 < args.size() and args[i + 1] == "all")
+				if (i + 1 < args.size() and (args[i + 1] == "all" or args[i + 1] == "info"))
 				{
 					i++;
 					state[OPT_VERBOSE] = args[i];
@@ -862,7 +1051,7 @@ int main(int argc, char *argv[]) {
 					std::cout << "Expecting extension after \""
 					<< args[i] << "\" option (eg: \"mp4, mkv\").\n";
 			}
-			else if (isMatch(OPT_FIXFILENAME, 	'f')) {
+			else if (isMatch(OPT_FIXFILENAME, 	'f', false, "fix-filename")) {
 				if (i + 1 < args.size()) {
 					i++;
 					state[args[i - 1]] = args[i];
@@ -886,77 +1075,83 @@ int main(int argc, char *argv[]) {
 					std::cout << "Expecting directory after \""
 					<< args[i] << "\" option (eg: \"Downloads/\").\n";
 			}
-			else if (isMatch(OPT_SIZE, 		's')) {
-				if (i + 1 < args.size()) {
+			else if (isMatch(OPT_SIZE, 		's') or isMatch(OPT_EXCLSIZE, 'S')) {
+				if (bool isExclude{ isMatch(OPT_EXCLSIZE, 'S') };
+					i + 1 < args.size()) {
 					if (args[i + 1][0] == '<' or args[i + 1][0] == '>')
 					{
 						i++;
-						state[OPT_SIZEOPGT] = args[i][0];
+						const auto opGT { args[i][0] };
 						
 						uintmax_t value{ 0 };
 						
 						if (args[i].size() > 1) {
 							value = getBytes(args[i].substr(1));
-							if (value == 0)
+							if (value <= 0)
 								goto SIZE_NEEDED;
 						}
 						
-						if (value == 0 and i + 1 < args.size()) {
+						if (value <= 0 and i + 1 < args.size()) {
 							value = getBytes(args[i + 1]);
 							
-							if (value == 0)
+							if (value <= 0)
 								goto SIZE_NEEDED;
 							else
 								i++;
 						}
 						
-						state[OPT_SIZE] = std::to_string(std::move(value));
+						state[isExclude ? OPT_EXCLSIZEOPGT : OPT_SIZEOPGT] = opGT;
+						state[isExclude ? OPT_EXCLSIZE : OPT_SIZE] = std::to_string(std::move(value));
+						(isExclude ? listExclSize : listSize).clear();
 					} else {
 						auto range{getRange(args[i + 1], std::move("-"))};
 						if (not range)
 							range = getRange(args[i + 1], std::move(".."));
 						
+						const std::string s_first = isExclude ? OPT_EXCLSIZE : OPT_SIZE;
+						std::string first = "0", second = "0";
+						
 						if (range)
 						{
-							state[OPT_SIZE] = std::to_string(range->first);
-							state[OPT_SIZETO] = std::to_string(range->second);
+							first = std::to_string(range->first);
+							second = std::to_string(range->second);
 							
 							i++;
 							
-							if (state[OPT_SIZETO] == "0") {
+							if (second == "0") {
 								uintmax_t value{ 0 };
 								if (i + 1 < args.size())
 									value = getBytes(args[i + 1]);
 								
-								if (value != 0) {
-									state[OPT_SIZETO] = std::to_string(value);
+								if (value > 0) {
+									second = std::to_string(value);
 									i++;
 								} else
 									goto SIZE_NEEDED;
 							}
 						} else {
 							if (i + 3 < args.size()) {
-								state[OPT_SIZE] = std::to_string(getBytes(args[i + 1]));
-								state[OPT_SIZETO] = std::to_string(getBytes(args[i + 3]));
+								first = std::to_string(getBytes(args[i + 1]));
+								second = std::to_string(getBytes(args[i + 3]));
 							} else if (i + 2 < args.size()) {
-								state[OPT_SIZE] = std::to_string(getBytes(args[i + 1]));
-								state[OPT_SIZETO] = std::to_string(getBytes(args[i + 2]));
+								first = std::to_string(getBytes(args[i + 1]));
+								second = std::to_string(getBytes(args[i + 2]));
 							}
 							
-							if (state[OPT_SIZE] != "0" and state[OPT_SIZETO] != "0")
+							if (first != "0" and second != "0")
 								i+=3;
-							else if (state[OPT_SIZE] != "0" and state[OPT_SIZETO] == "0") {
+							else if (first != "0" and second == "0") {
 								if (args[i + 2].size() > 1
 									and args[i + 2][0] == '-'
 									and std::isdigit(args[i + 2][1]))
 								{
-									state[OPT_SIZETO] = std::to_string(getBytes(args[i + 2].substr(1)));
+									second = std::to_string(getBytes(args[i + 2].substr(1)));
 								} else if (args[i + 2].size() > 2
 										   and args[i + 2][0] == '.'
 										   and args[i + 2][1] == '.'
 										   and std::isdigit(args[i + 2][2]))
 								{
-									state[OPT_SIZETO] = std::to_string(getBytes(args[i + 2].substr(2)));
+									second = std::to_string(getBytes(args[i + 2].substr(2)));
 								} else
 									goto SIZE_NEEDED;
 								i+=2;
@@ -964,13 +1159,18 @@ int main(int argc, char *argv[]) {
 								goto SIZE_NEEDED;
 						}
 						
-						if (std::stoul(state[OPT_SIZETO]) < std::stoul(state[OPT_SIZE])) {
+						state[isExclude ? OPT_EXCLSIZEOPGT : OPT_SIZEOPGT] = '\0';
+						state[s_first] = first;
+
+						if (std::stoul(second) < std::stoul(first)) {
 							std::cout << "Fail: Range is up side down! \""
-								<< groupNumber(state[OPT_SIZE]) << " bytes greater than "
-								<< groupNumber(state[OPT_SIZETO]) << " bytes\"\n";
-							state[OPT_SIZE] = "0";
-							state[OPT_SIZETO] = "0";
-						}
+								<< groupNumber(first) << " bytes greater than "
+								<< groupNumber(second) << " bytes\"\n";
+							state[s_first] = "0";
+						} else if (first != "0" and second != "0")
+							(isExclude ? listExclSize : listSize).emplace_back(std::make_pair(
+										   std::stoul(first),
+										   std::stoul(second)));
 					}
 				}
 				else
@@ -980,10 +1180,7 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 			insertTo(&bufferDirs, std::move(fs::path(args[i])));
 		
 		else if (fs::is_regular_file(std::move(fs::path(args[i])))) {
-			if (isMediaFile(fs::absolute(args[i]), state[OPT_ONLYEXT],
-							   state[OPT_SIZEOPGT][0],
-							   std::stof(state[OPT_SIZE]),
-							   std::stof(state[OPT_SIZETO])))
+			if (isValidFile(fs::absolute(args[i])))
 				insertTo(&selectFiles, std::move(fs::absolute(args[i])));
 		} else
 			invalidArgs.emplace(args[i]);
@@ -1052,7 +1249,7 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 	
 	#ifndef DEBUG
 	if (not invalidArgs.empty() or state[OPT_VERBOSE] == "all"
-		or state[OPT_BENCHMARK] == "true"
+		or state[OPT_VERBOSE] == "info" or state[OPT_BENCHMARK] == "true"
 		or state[OPT_DEBUG] == "true" or state[OPT_DEBUG] == "args")
 	#endif
 	{
@@ -1066,7 +1263,7 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 				std::cout << '"' << args[i] << '"' << (i+1>=args.size() ? "" : ", ");
 			std::cout << '\n';
 		}
-	#define PRINT_OPT(x)	(x.empty() ? "false" : x)
+#define PRINT_OPT(x)	(x.empty() ? "false" : x)
 	std::cout
 		<< OPT_EXECUTION << "\t\t: " << state[OPT_EXECUTION] << '\n'
 		<< OPT_VERBOSE << "\t\t\t: " << PRINT_OPT(state[OPT_VERBOSE]) << '\n'
@@ -1078,17 +1275,45 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 		<< OPT_OUTDIR << "\t\t\t: " << state[OPT_OUTDIR] << '\n'
 		<< OPT_SKIPSUBTITLE << "\t\t: " << PRINT_OPT(state[OPT_SKIPSUBTITLE]) << '\n'
 		<< OPT_ONLYEXT << "\t\t: " << state[OPT_ONLYEXT];
-		if (state[OPT_ONLYEXT].empty())
-			for (auto i{0}; i<DEFAULT_EXT.size(); ++i)
-				std::cout << DEFAULT_EXT[i] << (i < DEFAULT_EXT.size() - 1 ? ", " : "");
-	#undef PRINT_OPT
-	std::cout << '\n';
-	std::cout << OPT_SIZE << "\t\t\t: " << (state[OPT_SIZETO] == "0"
-			? (state[OPT_SIZEOPGT][0] == '\0' ? ">" : state[OPT_SIZEOPGT]) + " " : "")
-			<< groupNumber(state[OPT_SIZE])
-			<< (state[OPT_SIZETO] != "0" ? ".." : " bytes")
-		<< (state[OPT_SIZETO] == "0" ? "" : groupNumber(state[OPT_SIZETO]) + " bytes") << '\n'
-		<< "Inputs\t\t\t: ";
+	if (state[OPT_ONLYEXT].empty()) {
+		for (auto i{0}; i<DEFAULT_EXT.size(); ++i)
+			std::cout << DEFAULT_EXT[i] << (i < DEFAULT_EXT.size() - 1 ? ", " : "");
+		std::cout << '\n';
+	}
+#undef PRINT_OPT
+			
+	for (auto& S : {OPT_FIND, OPT_EXCLFIND}) {
+		std::cout << S << (S == OPT_FIND ? "\t\t\t: " : "\t\t: ");
+		for (auto i{0}; i<(S == OPT_FIND ? listFind : listExclFind).size(); ++i)
+			std::cout << (S == OPT_FIND ? listFind : listExclFind)[i]
+			<< (i < (S == OPT_FIND ? listFind : listExclFind).size() - 1 ? ", " : "");
+		std::cout << '\n';
+	}
+
+	for (auto& S : {OPT_REGEX, OPT_EXCLREGEX}) {
+		std::cout << S << (S == OPT_REGEX ? "\t\t\t: " : "\t\t: ");
+		for (auto i{0}; i<(S == OPT_REGEX ? listRegex : listExclRegex).size(); ++i)
+			std::cout << (S == OPT_REGEX ? listRegex : listExclRegex)[i].mark_count()
+			<< " expression"
+			<< (i < (S == OPT_REGEX ? listRegex : listExclRegex).size() - 1 ? ", " : "");
+		std::cout << '\n';
+	}
+
+	for (auto& S : {OPT_SIZE, OPT_EXCLSIZE}) {
+		std::cout << S << (S == OPT_SIZE ? "\t\t\t: " : "\t\t: ")
+				<< ((S == OPT_SIZE ? listSize : listExclSize).empty()
+					or state[S == OPT_SIZE ? OPT_SIZEOPGT
+							  : OPT_EXCLSIZEOPGT][0] != '\0'
+					? (state[S == OPT_SIZE ? OPT_SIZEOPGT
+							 : OPT_EXCLSIZEOPGT][0] == '<' ? "< " : "> ")
+					+ state[S] : "");
+		for (auto i{0}; i<(S == OPT_SIZE ? listSize : listExclSize).size(); ++i)
+			std::cout << (S == OPT_SIZE ? listSize : listExclSize)[i].first
+			<< ".." << (S == OPT_SIZE ? listSize : listExclSize)[i].second
+			<< (i < (S == OPT_SIZE ? listSize : listExclSize).size() - 1 ? ", " : "");
+		std::cout << '\n';
+	}
+	std::cout << "Inputs\t\t\t: ";
 		for (auto i{0}; i<inputDirsCount + selectFiles.size(); ++i) {
 			if (i < inputDirsCount) {
 				std::cout << inputDirs[i];
@@ -1226,17 +1451,10 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 	auto filterChildFiles{ [&records](const std::string& dir, bool recurive=false) {
 		auto filter{ [](const fs::directory_entry& f) -> bool {
 			if (not fs::is_regular_file(f.path())
-				or (fs::status(f.path()).permissions()
-					& (fs::perms::owner_read
-					   | fs::perms::group_read
-					   | fs::perms::others_read)) == fs::perms::none
-				or (state[OPT_EXCLHIDDEN] == "true" and f.path().filename().string()[0] == '.'))
+				or not isValid(f.path()))
 					return false;
 			
-			return isMediaFile(f.path(), state[OPT_ONLYEXT],
-							   state[OPT_SIZEOPGT][0],
-							   std::stof(state[OPT_SIZE]),
-							   std::stof(state[OPT_SIZETO]));
+			return isValidFile(f.path());
 		}};
 		
 		std::vector<fs::path> bufferFiles;

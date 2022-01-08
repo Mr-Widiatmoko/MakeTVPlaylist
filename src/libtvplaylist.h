@@ -59,7 +59,7 @@ void process(int argc, char *argv[], /// Inputs
 				/// Yes this process runs twice and consume double times, if you seek for performance, please see first example above.
 	 
 				for (int i=0; i<outc; ++i) {
-					char *element = out[i];
+					char *element = outs[i];
 					
 					/// Do whatever you want with 'element'.
 					

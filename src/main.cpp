@@ -834,21 +834,21 @@ Option:\n\
                                 Define as 'all' will show fail messages.\n\
                                 Define as 'info' will display options info.\n\
 -x, --skip-subtitle             Dont include subtitle file.\n\
--X, --regex-syntax [type]       Specify regular expression syntax to use.\n\
-                                Available value are: 'ecma'(Default), 'awk', 'grep', 'egrep', 'basic', 'extended'.\n\
-                                'basic' use the basic POSIX regex grammar and\n\
-								'extended' use the extended POSIX regex grammar.\n\
 -i, --find 'keyword'            Filter only files with filename contains find keyword.\n\
                                 You can specifying this multiple times.\n\
-								  Example: --find war; find invasion\n\
+                                  Example: --find war; find invasion\n\
 -I, --exclude-find 'keyword'    Filter to exclude files with filename contains find keyword.\n\
                                 You can specifying this multiple times.\n\
                                   Example: -I love; I and; I home\n\
+-X, --regex-syntax [type]       Specify regular expression syntax to use.\n\
+                                Available value are: 'ecma'(Default), 'awk', 'grep', 'egrep', 'basic', 'extended'.\n\
+                                'basic' use the basic POSIX regex grammar and\n\
+                                'extended' use the extended POSIX regex grammar.\n\
 -r, --regex 'syntax'            Filter only files with filename match regular expression.\n\
                                 You can specifying this multiple times.\n\
 -R, --exclude-regex 'syntax'    Filter to exclude files with filename match regular expression.\n\
                                 You can specifying this multiple times.\n\
--e, --ext \"extension, ...\"    Filter only files that match specific extensions, separated by comma.\n\
+-e, --ext \"extension, ...\"      Filter only files that match specific extensions, separated by comma.\n\
 				  Example: --only-ext \"pdf, docx\"\n\
 -E, --exclude-ext \"extension, ...\"Filter to exclude files that match specific extensions, separated by comma.\n\
 -s, --size < | > SIZE           Filter only files that size match, in \"KB\", \"MB\" (default), or \"GB\".\n\
@@ -895,6 +895,7 @@ int main(int argc, char *argv[]) {
 	state[OPT_EXCLSIZE] 	= "0";
 
 	state[OPT_EXECUTION]= OPT_ASYNC;
+	state[OPT_REGEXSYNTAX] = "ecma";
 	
 	std::vector<std::string> args;
 	expandArgs(argc, argv,

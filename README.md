@@ -34,15 +34,21 @@ But, if you need blasting super speed for processing, you may want to download  
 
 Thats it, and "Make TV Playlist" will automatically call "tvplaylist" for processing.
 
-To build "tvplaylist" on macOS Apple Silicon, Windows, or Linux, first you must have modern C++ compiler and cmake installed. Inside "MakeTVPlaylist" folder (or folder containing CMakeLists.txt) copy below and paste on the Terminal:
+To build "tvplaylist" on macOS Apple Silicon, Windows, Linux, or another platforms, first you must have modern C++ compiler and cmake installed. Inside "MakeTVPlaylist" folder (or folder containing CMakeLists.txt) copy below and paste on the Terminal:
 
 	mkdir Release
 	cd Release
 	cmake ../
 	cmake --build .
-	mv tvplaylist /usr/local/bin/
+	cp -f tvplaylist /usr/local/bin/
 	
 Don't forget to [Press ENTER]. Thats it, you will get "tvplaylist" on "Release" folder.
+
+If you don't have cmake installed then, form 'src' directory on Terminal, paste following:
+
+    c++ main.cpp -std=c++2b -stdlib=libc++ -o /usr/local/bin/tvplaylist
+
+Don't forget to [Press ENTER]. Thats it, you will get "tvplaylist" on "/usr/local/bin/" folder.
 
 If you need to build this as library file, then copy below and paste on the Terminal:
 
@@ -50,8 +56,8 @@ If you need to build this as library file, then copy below and paste on the Term
 	cd WHATEVER
 	cmake ../ -DMAKE_LIB=1
 	cmake --build .
-	mv libtvplaylist.dylib /usr/local/lib/
-	cp ../src/libtvplaylist.h /usr/local/include/
+	cp -f libtvplaylist.dylib /usr/local/lib/
+	cp -f ../src/libtvplaylist.h /usr/local/include/
  
 Don't forget to [Press ENTER]. Thats it, you will get "libtvplaylist.dylib" on "WHATEVER" folder. 
 

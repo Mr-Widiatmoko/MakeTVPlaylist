@@ -355,6 +355,16 @@ public:
 				return false;
 			return s not_eq "";
 		}};
+		
+		auto isPM{[](const std::string& get) -> int {
+			if (get.size() == 2 and get[1] == 'm') {
+				if (std::tolower(get[0]) == 'a')
+					return -1;
+				else if (std::tolower(get[0]) == 'p')
+					return -2;
+			}
+			return 0;
+		}};
 		std::vector<unsigned short> date;
 		std::vector<short> time;
 		std::vector<std::string> others;
@@ -365,28 +375,28 @@ public:
 					auto get{ s.substr(k, i - k) };
 					if (isDigit(get))
 						time.emplace_back(std::stoi(get));
-					else
+					else if (not get.empty())
 						others.emplace_back(get);
 				} else if (std::ispunct(s[i])) {
 					auto get{ s.substr(k, i - k) };
 					if (isDigit(get))
 						date.emplace_back(std::stoi(get));
-					else
+					else if (not get.empty())
 						others.emplace_back(get);
 				} else if (std::isspace(s[i])) {
 					if (k != i) {
-						auto get{ tolower(s.substr(k, i - k)) };
+						auto get{ s.substr(k, i - k) };
 						auto isNumber{ isDigit(get) };
 						if (std::isalpha(last)) {
-							if (get == "am" or get == "pm")
-								time.emplace_back(get == "am" ? -1 : -2);
-							else
+							if (auto pm{ isPM(get)}; pm)
+								time.emplace_back(pm);
+							else if (not get.empty())
 								others.emplace_back(get);
 						} else if (last == ':' and isNumber)
 							time.emplace_back(std::stoi(get));
 						else if ((last == '\0' or std::ispunct(last)) and isNumber)
 							date.emplace_back(std::stoi(get));
-						else
+						else if (not get.empty())
 							others.emplace_back(get);
 					}
 					last = '\0';
@@ -394,10 +404,10 @@ public:
 					continue;
 				} else {
 					if (i == s.size() - 1) {
-						auto get = tolower(s.substr(k));
-						if (get == "am" or get == "pm")
-							time.emplace_back(get == "am" ? -1 : -2);
-						else
+						auto get = s.substr(k);
+						if (auto pm{ isPM(get)}; pm)
+							time.emplace_back(pm);
+						else if (not get.empty())
 							others.emplace_back(get);
 					}
 					if (last == '\0')
@@ -409,13 +419,13 @@ public:
 				k = i + 1;
 				
 			} else if (i == s.size() - 1) {
-				auto get{ tolower(s.substr(k)) };
+				auto get{ s.substr(k) };
 				auto isNumber{ isDigit(get) };
 				if (last == ':' and isNumber)
 					time.emplace_back(std::stoi(get));
 				else if ((std::ispunct(last) or last == '\0') and isNumber)
 					date.emplace_back(std::stoi(get));
-				else
+				else if (not get.empty())
 					others.emplace_back(get);
 			}
 			
@@ -426,19 +436,31 @@ public:
 		for (auto found{ 0 };
 			auto& s : others)
 		{
+			s[0] = std::tolower(s[0]);
+			
 			if (weekDay == -1) {
 				for (auto i{ 0 }; auto& m : {
-					"sun", "mon", "tue", "wed", "thu", "fri", "sat", // en_US
-					"min", "sen", "sel", "rab", "kam", "jum", "sab", // id_ID
-					"dim", "lun", "mar", "mer", "jeu", "ven", "sam", // fr_FR
-					"sön", "mån", "tis", "ons", "tor", "fre", "lör", // sv_SE
-					"dom", "lun", "mar", "mié", "jue", "vie", "sáb", // es_ES
-					"so", "mo", "di", "mi", "do", "fr", "sa",		 // de_DE
-					"вс", "пн", "вт", "ср", "чт", "пт", "сб",		 // ru_RU
-					"日", "一", "二", "三", "四", "五", "六",			 // zh_CN
-					"日", "月", "火", "水", "木", "金", "土",  		 // ja_JP
+					/*en_US.UTF-8:*/ "fri", "sat", "sun", "mon", "tue", "wed", "thu",
+					/*id_ID       */ "min", "sen", "sel", "rab", "kam", "jum", "sab",
+					/*de_DE.UTF-8:*/ "fr", "sa", "so", "mo", "di", "mi", "do",
+					/*fr_FR.UTF-8:*/ "ven", "sam", "dim", "lun", "mar", "mer", "jeu",
+					/*sv_SE.UTF-8:*/ "fre", "lör", "sön", "mån", "tis", "ons", "tor",
+					/*es_ES.UTF-8:*/ "vie", "sáb", "dom", "lun", "mar", "mié", "jue",
+					/*ru_RU.UTF-8:*/ "пт", "сб", "вс", "пн", "вт", "ср", "чт",
+					/*ja_JP.UTF-8:*/ "金", "土", "日", "月", "火", "水", "木",
+					/*zh_CN.UTF-8:*/ "五", "六", "日", "一", "二", "三", "四",
+					
+					/*en_US.UTF-8:*/ "friday", "saturday", "sunday", "monday", "tuesday", "wednesday", "thursday",
+					/*id_ID       */ "minggu", "senin", "selasa", "rabu", "kamis", "jumat", "sabtu",
+					/*de_DE.UTF-8:*/ "freitag", "samstag", "sonntag", "montag", "dienstag", "mittwoch", "donnerstag",
+					/*fr_FR.UTF-8:*/ "vendredi", "samedi", "dimanche", "lundi", "mardi", "mercredi", "jeudi",
+					/*sv_SE.UTF-8:*/ "fredag", "lördag", "söndag", "måndag", "tisdag", "onsdag", "torsdag",
+					/*es_ES.UTF-8:*/ "viernes", "sábado", "domingo", "lunes", "martes", "miércoles", "jueves",
+					/*ru_RU.UTF-8:*/ "пятница", "суббота", "воскресенье", "понедельник", "вторник", "среда", "четверг",
+					/*ja_JP.UTF-8:*/ "金曜日", "土曜日", "日曜日", "月曜日", "火曜日", "水曜日", "木曜日",
+					/*zh_CN.UTF-8:*/ "星期五", "星期六", "星期日", "星期一", "星期二", "星期三", "星期四",
 				}) {
-					if (s.starts_with(m))
+					if (s == m)
 					{
 						weekDay = (i % 7) + 1;
 						break;
@@ -452,15 +474,25 @@ public:
 			
 			for (auto i{ 0 };
 				auto& m : {
-					"jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec", // en_US
-					"jan", "feb", "mar", "apr", "mei", "jun", "jul", "agu", "sep", "okt", "nov", "des", // id_ID
-					"jan", "feb", "mär", "apr", "mai", "jun", "jul", "aug", "sep", "okt", "nov", "dez", // de_DE
-					"ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic", // es_ES
-					"jan", "feb", "mar", "apr", "maj", "jun", "jul", "aug", "sep", "okt", "nov", "dec", // sv_SE
-					"jan", "fév", "mar", "avr", "mai", "jui", "jul", "aoû", "sep", "oct", "nov", "déc", // fr_FR
-					"янв", "фев", "мар", "апр", "май", "июн", "июл", "авг", "сен", "окт", "ноя", "дек", // ru_RU
-				}) {
-				if (s.starts_with(m))
+				/*en_US.UTF-8:*/ "jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec",
+				/*id_ID       */ "jan", "feb", "mar", "apr", "mei", "jun", "jul", "agu", "sep", "okt", "nov", "des",
+				/*de_DE.UTF-8:*/ "jan", "feb", "mär", "apr", "mai", "jun", "jul", "aug", "sep", "okt", "nov", "dez",
+				/*fr_FR.UTF-8:*/ "jan", "fév", "mar", "avr", "mai", "jui", "jul", "aoû", "sep", "oct", "nov", "déc",
+				/*sv_SE.UTF-8:*/ "jan", "feb", "mar", "apr", "maj", "jun", "jul", "aug", "sep", "okt", "nov", "dec",
+				/*es_ES.UTF-8:*/ "ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic",
+				/*ru_RU.UTF-8:*/ "янв", "фев", "мар", "апр", "май", "июн", "июл", "авг", "сен", "окт", "ноя", "дек",
+				
+				/*en_US.UTF-8:*/ "january", "february", "march", "april", "may", "june", "july", "august", "september", "october", "november", "december",
+				/*id_ID       */ "januari", "februari", "maret", "april", "mei", "juni", "juli", "agustus", "september", "oktober", "november", "desember",
+				/*de_DE.UTF-8:*/ "januar", "februar", "märz", "april", "mai", "juni", "juli", "august", "september", "oktober", "november", "dezember",
+				/*fr_FR.UTF-8:*/ "janvier", "février", "mars", "avril", "mai", "juin", "juillet", "août", "septembre", "octobre", "novembre", "décembre",
+				/*sv_SE.UTF-8:*/ "januari", "februari", "mars", "april", "maj", "juni", "juli", "augusti", "september", "oktober", "november", "december",
+				/*es_ES.UTF-8:*/ "enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre",
+				/*ru_RU.UTF-8:*/ "января", "февраля", "марта", "апреля", "мая", "июня", "июля", "августа", "сентября", "октября", "ноября", "декабря",
+				/*ja_JP.UTF-8:*/ "1月", "2月", "3月", "4月", "5月", "6月", "7月", "8月", "9月", "10月", "11月", "12月",
+				/*zh_CN.UTF-8:*/ "一月", "二月", "三月", "四月", "五月", "六月", "七月", "八月", "九月", "十月", "十一月", "十二月",
+			}) {
+				if (s == m)
 				{
 					found = (i % 12) + 1;
 					break;
@@ -792,12 +824,7 @@ func isValidFile(const fs::path& path) -> bool
 		if (found)
 			return false;
 	}
-	
-//	if (not state[OPT_DCREATED].empty()) {
-//		struct stat ftime;
-//		stat(tmp.string().c_str(), &ftime);
-//	}
-	
+		
 	return /*fs::is_regular_file(tmp) and*/ true;
 }
 

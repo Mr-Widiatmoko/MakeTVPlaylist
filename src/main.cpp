@@ -263,21 +263,39 @@ struct Date
 		#undef is_equal
 	}
 	
-	std::string string() {
+	func time_t(const Date* const d = nullptr) {
+		std::tm tm{};
+		tm.tm_year = (d ? d : this)->year-1900;
+		tm.tm_mon = (d ? d : this)->month-1; // February
+		tm.tm_mday = (d ? d : this)->day;
+		tm.tm_hour = (d ? d : this)->hour;
+		tm.tm_min = (d ? d : this)->minute;
+		tm.tm_sec = (d ? d : this)->second;
+		return std::mktime(&tm); //std::time(nullptr);
+	}
+	
+	func string(const char* const format = nullptr) -> std::string {
 		std::string s;
-		s.append(year > 0 ? std::to_string(year) : "?");
-		s.append("/" + (month > 0 ? std::to_string(month) : "?"));
-		s.append("/" + (day > 0 ? std::to_string(day) : "?"));
-		
-		s.append(" " + (hour > 0 ? std::to_string(hour) : "?"));
-		s.append(":" + (minute > 0 ? std::to_string(minute) : "?"));
-		s.append(":" + (second > 0 ? std::to_string(second) : "?"));
+		if (format) {
+			auto t { time_t() };
+			char mbstr[100];
+			if (std::strftime(mbstr, sizeof(mbstr), format, std::localtime(&t)))
+				s = mbstr;
+		} else {
+			s.append(year > 0 ? std::to_string(year) : "?");
+			s.append("/" + (month > 0 ? std::to_string(month) : "?"));
+			s.append("/" + (day > 0 ? std::to_string(day) : "?"));
+			
+			s.append(" " + std::to_string(hour));
+			s.append(":" + std::to_string(minute));
+			s.append(":" + std::to_string(second));
+		}
 		return s;
 	}
 private:
 	static
-	std::pair<unsigned long long, unsigned long long>
-	get_ull(const Date& l, const Date& r) {
+	func get_ull(const Date& l, const Date& r)
+					-> std::pair<unsigned long long, unsigned long long>{
 		std::string sleft, sright;
 		auto go{[&](const unsigned short& x, const unsigned short& y) {
 			if (x == 0 or y == 0) return;
@@ -300,7 +318,7 @@ private:
 		
 		return std::make_pair(std::stoull(sleft), std::stoull(sright));
 	}
-	unsigned long long fold() const {
+	func fold() const -> unsigned long long {
 		auto Y = std::to_string(year);
 		auto m = std::to_string(month);
 		if (m.size() not_eq 2) m.insert(0, 1, '0');
@@ -499,15 +517,20 @@ public:
 			const std::chrono::weekday friday{ static_cast<unsigned int> (weekDay) };
 			
 			auto currentYear = 0;
+			auto currentMonth = 0;
 			if (year == 0) {
 				const std::chrono::year_month_day ymd{floor<std::chrono::days>(std::chrono::system_clock::now())};
 				currentYear = int(ymd.year());
+				currentMonth = unsigned(ymd.month());
 			}
 			
 			bool found{ false };
-			for (int y {year > 0 ? year : 1983}; y <= year > 0 ? year : currentYear; ++y) {
+			for (auto& Y : {currentYear, 1970})
+			for (int y {year > 0 ? year : Y}; y <= year > 0 ? year : Y; ++y) {
 				const std::chrono::year cur_year{y};
-				for (int cur_month{year > 0 and month > 0 ? month : 1}; cur_month != 13; ++cur_month) {
+				for (int cur_month{(Y != 1970 and year > 0) and month > 0 ? month
+					: (Y == 1970 ? 1 : currentMonth)};
+					 cur_month != (Y == 1970 ? 13 : cur_month + 1); ++cur_month) {
 					const std::chrono::year_month_day 	ymd 		{ cur_year / cur_month / 13 };
 					const std::chrono::weekday 			cur_weekday	{ std::chrono::sys_days{ ymd } };
 					if (cur_weekday == friday) {
@@ -543,11 +566,11 @@ public:
 
 	}
 
-	bool isValid() {
-		return not (0 == year == month == day == hour == minute == second == ms);
+	func isValid() -> bool {
+		return (0 > year or month > 0 or day > 0 or hour <= 24 or minute <= 60 or second <= 60);
 	}
 
-	void getWeekDays(const char* const locale, const char* result[7]) {
+	func getWeekDays(const char* const locale, const char* result[7]) {
 		for (auto i{9}, k{0}; i<16; ++i, ++k) {
 			std::tm tm{};
 			tm.tm_year = 2020-1900; // 2020
@@ -1316,8 +1339,8 @@ Option:\n\
 -E, --exclude-ext \"'extension', 'extension' ...\"\n\
                  Filter to exclude files that match specific extensions, separated by comma.\n\
 -s, --size < | > 'size'\n\
-           'min size'-'maz size'\n\
-           'min size'..'max size'\n\
+           'min size'..'maz size'\n\
+           'min size'-'max size'\n\
                  Filter only files that size match, in \"KB\", \"MB\" (default), or \"GB\".\n\
                  You can specifying this multiple times for 'Range' only based size.\n\
                    Example: --size < 750\n\
@@ -1326,48 +1349,48 @@ Option:\n\
                      OR using range with '-' OR '..'\n\
                       --size 750 - 1.2gb; size=30..200.2; size 2gb .. 4gb\n\
 -S, --exclude-size < | > 'size'\n\
-                  'min size'-'maz size'\n\
-                  'min size'..'max size'\n\
+                  'min size'..'maz size'\n\
+                  'min size'-'max size'\n\
                  Filter to exclude files that size match, in \"KB\", \"MB\" (default), or \"GB\".\n\
                  You can specifying this multiple times for 'Range' only based size.\n\
 -t, --created = | < | > 'date and/or time'\n\
-              'min' - 'max'\n\
               'min' .. 'max'\n\
+              'min' - 'max'\n\
                  Filter only files that was created on specified date and/or time.\n\
                  You can specifying this multiple times, for both single value or range values.\n\
 -T, --exclude-created = | < | > 'date and/or time'\n\
-                      'min' - 'max'\n\
                       'min' .. 'max'\n\
+                      'min' - 'max'\n\
                  Filter to exclude only files that was created on specified date and/or time.\n\
                  You can specifying this multiple times, for both single value or range values.\n\
 -a, --accessed = | < | > 'date and/or time'\n\
-               'min' - 'max'\n\
                'min' .. 'max'\n\
+               'min' - 'max'\n\
                  Filter only files that was accessed on specified date and/or time.\n\
                  You can specifying this multiple times, for both single value or range values.\n\
 -A, --exclude-accessed = | < | > 'date and/or time'\n\
+                       'min' .. 'max'\n\
                        'min' - 'max'\n\
-                       'min' . .'max'\n\
                  Filter to exclude only files that was accessed on specified date and/or time.\n\
                  You can specifying this multiple times, for both single value or range values.\n\
 -m, --modified = | < | > 'date and/or time'\n\
-              'min' - 'max'\n\
               'min' .. 'max'\n\
+              'min' - 'max'\n\
                  Filter only files that was modified on specified date and/or time.\n\
                  You can specifying this multiple times, for both single value or range values.\n\
 -M, --exclude-modified = | < | > 'date and/or time'\n\
-                      'min' - 'max'\n\
                       'min' .. 'max'\n\
+                      'min' - 'max'\n\
                  Filter to exclude only files that was modified on specified date and/or time.\n\
                  You can specifying this multiple times, for both single value or range values.\n\
 -g, --changed = | < | > 'date and/or time'\n\
-              'min' - 'max'\n\
               'min' .. 'max'\n\
+              'min' - 'max'\n\
                  Filter only files that was changed on specified date and/or time.\n\
                  You can specifying this multiple times, for both single value or range values.\n\
 -G, --exclude-changed = | < | > 'date and/or time'\n\
-                      'min' - 'max'\n\
                       'min' .. 'max'\n\
+                      'min' - 'max'\n\
                  Filter to exclude only files that was changed on specified date and/or time.\n\
                  You can specifying this multiple times, for both single value or range values.\n\
 -f, --out-filename 'filename'\n\
@@ -1384,7 +1407,7 @@ Thats it, -h -O -V -v -c are joined, and -c has assignment operator '=' instead 
  using separator [SPACE]. \
 Also -x -s are joined, and -x is continuing with ';' after option assignment \
 '=async' and -s has remove [SPACE] separator for operator '<' and value '1.3gb'.\n\n\
-Redefinition of option means, it will use the last option, except for options 'regex', 'exclude-regex', 'find', 'exclude-find', 'size', 'exclude-size'. For the example, \
+Redefinition of option means, it will use the last option, except for options 'regex', 'exclude-regex', 'find', 'exclude-find', 'size', 'exclude-size', 'created', 'exclude-created', 'modified', 'exclude-modified', 'changed', 'exclude-changed', 'accessed', 'exclude-accessed'. For the example, \
 this example will not use 'thread' execution at all':\n\n\
   tvplaylist -c=thread /usr/local/videos -c=none /Users/Shared/Videos\n\n\
 Note, you cannot join mnemonic option with full option, for the example:\n\n\
@@ -1394,9 +1417,9 @@ Instead try to separate mnemonic and full option, like this:\n\n\
 Posible value for 'date and/or time' are: 'Year', 'Month Name' (mnemonic or full), 'Month Number', 'Day', 'WeekDay Name' (mnemonic or full), 'Hour' (if AM/PM defined then it is 12 hours, otherwise 24 hours), 'Minute', 'Second', AM or PM.\n\
 Example:\n\
   Filter only files created at 2009:\n\
-     --created==2009\n\
+     --created=2009\n\
   Filter only files created at 2009 with weekday is Sunday:\n\
-     --created=\"=Sunday 2009\"  OR  --created==sun/2009\n\
+     --created=\"Sunday 2009\"  OR  --created=sun/2009\n\
   Filter only files created from November 2019 thru January 2021:\n\
      --created \"nov 2019\" .. \"jan 2021\"\n\
   Filter only files created at January - March 1980 and May - June 2000 and after 2022:\n\
@@ -1408,6 +1431,9 @@ Common normal: \"Monday Jan 15 2022 7:00 PM\"\n\
                \"Mon, 15/january/2022 7:0:0 pm\"\n\
                \"Monday 1/15/2022 19:0\"\n\
 Equal and Acceptable: \"15 pm mon 7:0 2022/jan\"\n\
+If you want to test 'date and/or time' use --debug=date 'date and/or time', for the example:\n\
+     --debug=date \"pm 3:33\"\n\
+     or --debug=date wed\n\
 ";
 
 #if MAKE_LIB
@@ -1483,10 +1509,27 @@ int main(int argc, char *argv[]) {
 					;
 			}
 			else if (isMatch(OPT_DEBUG, 		'D', true)) {
-				if (i + 1 < args.size() and args[i + 1] == "args")
+				if (i + 1 < args.size() and
+					(args[i + 1] == "args"
+					 or args[i + 1] == "date"))
 				{
 					i++;
 					state[OPT_DEBUG] = args[i];
+					
+					if (args[i] == "date" and i + 1 < args.size())
+					{
+						i++;
+						Date date((args[i]));
+						std::cout << '\"' << args[i] << '\"' << " -> "
+						<< date.string() << " -> " << date.string("%c")
+						<< " " << (date.isValid() ? "✅" : "❌") << '\n';
+						return
+#ifndef MAKE_LIB
+						0
+#endif
+						;
+
+					}
 				}
 			}
 			else if (isMatch(OPT_NOOUTPUTFILE, 	'F', true)) {
@@ -1549,13 +1592,8 @@ int main(int argc, char *argv[]) {
 					 or isMatch(OPT_DEXCLMODIFIED, 	'M')
 					 )
 			{
-				if (i + 2 < args.size()
-					and (args[i + 1][0] == '<'
-							or args[i + 1][0] == '>'
-							or args[i + 1][0] == '='))
-				{
-					auto opGt = args[i + 1][0];
-					
+				
+				auto as_single{[&](const char opGt) -> bool {
 					Date date(args[i + 1]);
 					if (date.isValid()) {
 						(args[i] == OPT_DCREATED ? listDCreated
@@ -1570,8 +1608,17 @@ int main(int argc, char *argv[]) {
 
 						state[args[i]] = "1";
 						i++;
-						continue;
+						return true;
 					}
+					return false;
+				}};
+				if (i + 2 < args.size()
+					and (args[i + 1][0] == '<'
+							or args[i + 1][0] == '>'
+							or args[i + 1][0] == '='))
+				{
+					if (as_single(args[i + 1][0]))
+						continue;
 				}
 				else
 				{
@@ -1609,6 +1656,11 @@ int main(int argc, char *argv[]) {
 								i++;
 								continue;
 							}
+						}
+						
+						else {
+							if (as_single('='))
+								continue;
 						}
 					}
 				}

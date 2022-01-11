@@ -1554,8 +1554,8 @@ Option:\n\
 -d, --out-dir \"directory path\"\n\
                  Override output directory for playlist file.\n\
 \n\
-Arguments can be surrounded by \"\" (eg. \"--F;V\"), to enable using charcter ';' or anothers that belongs to Terminal or shell. To view how arguments was deduced you can pass option --debug=args.\n\
-Options can be joined, and you replace option assignment separator [SPACE] with '=' \
+Arguments can be surrounded by \"\" (eg. \"--F;V\") to enable using character ';' or anothers that belongs to Terminal or shell. To view how arguments was deduced you can pass option --debug=args.\n\
+Options can be joined, and option assignment separator [SPACE] can be replaced with '=' \
 and options can be separated by ':' or ';' after assignment. For the example:\n\n\
   tvplaylist -hOVvc=async:xs<1.3gb:e=mp4,mkv:f=My-playlist.txt\n\n\
 Thats it, -h -O -V -v -c are joined, and -c has assignment operator '=' instead of\
@@ -1592,9 +1592,9 @@ If you want to test 'date and/or time' use --debug=date 'date and/or time', for 
      --debug=date \"pm 3:33\"\n\
      or --debug=date wed\n\
 It will display:\n\
-[tvplaylist]-> Internal tvplaylist date time recognizer, with format \"Weekday Year/Month/Day Hour:Minute:Second\".\n\
+[tvplaylist]-> Showing internal tvplaylist date time recognizer, with format \"Weekday Year/Month/Day Hour:Minute:Second\".\n\
 and for comparison\n\
-[strftime(%c)]-> C/C++ standard library date time recognizer with %c format e.g. Sun Oct 17 04:41:13 2010 (locale dependent).\n\
+[strftime(%c)]-> Showing C/C++ standard library date time recognizer with %c format e.g. Sun Oct 17 04:41:13 2010 (locale dependent).\n\
 ";
 
 #if MAKE_LIB

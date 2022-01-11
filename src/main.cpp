@@ -70,7 +70,13 @@ constexpr auto OPT_DEXCLACCESSED		{"exclude-accessed"};	// A
 constexpr auto OPT_DEXCLCHANGED			{"exclude-changed"};	// G
 
 constexpr auto OPT_DEBUG			{"debug"};
-
+auto OPTS = { &OPT_HELP, &OPT_VERSION, &OPT_VERBOSE, &OPT_BENCHMARK, & OPT_OVERWRITE,
+	&OPT_SKIPSUBTITLE, &OPT_OUTDIR, &OPT_EXECUTION, &OPT_REGEXSYNTAX, &OPT_FIXFILENAME,
+	&OPT_NOOUTPUTFILE, &OPT_SIZE, &OPT_EXCLSIZE, &OPT_EXT, &OPT_EXCLEXT, &OPT_FIND,
+	&OPT_EXCLFIND, &OPT_REGEX, &OPT_EXCLREGEX, &OPT_DCREATED, &OPT_DMODIFIED,
+	&OPT_DACCESSED, &OPT_DCHANGED, &OPT_DEXCLCREATED, &OPT_DEXCLMODIFIED,
+	&OPT_DEXCLACCESSED, &OPT_DEXCLCHANGED, &OPT_DEBUG
+};
 //#include <format>
 
 #if MAKE_LIB
@@ -173,6 +179,26 @@ func after(const std::string& keyword,
 	}
 	return source;
 }
+
+inline
+func getLikely(const std::string_view& src, const std::string_view& with) {
+	auto first { src.begin() }, last { src.end() };
+	auto d_first { with.begin() };
+	float score = 0, scoreOpenent = 0;
+	if (first != last) {
+		decltype (d_first) d_last = std::next(d_first, std::distance(first, last));
+		for (decltype (first) i = first; i != last; ++i) {
+			if (i != std::find(first, i, *i))
+				continue;
+			scoreOpenent += std::count(d_first, d_last, *i);
+			score += std::count(i, last, *i);
+		}
+	}
+	
+	return scoreOpenent / score * 100;
+}
+
+
 typedef unsigned long long MAXNUM;
 func containInts(const std::string& s, std::vector<MAXNUM>* const out)
 {
@@ -222,13 +248,13 @@ func parseCommaDelimited(const std::string&& literal, std::vector<std::string>* 
 
 struct Date
 {
+	unsigned short weekday;
 	unsigned short year;
 	unsigned short month;
 	unsigned short day;
 	unsigned short hour;
 	unsigned short minute;
 	unsigned short second;
-	unsigned short ms;
 	
 	friend bool operator < (const Date& l, const Date& r) {
 		auto ull { Date::get_ull(l, r) };
@@ -258,7 +284,6 @@ struct Date
 			and is_equal(l.hour, r.hour)
 			and is_equal(l.minute, r.minute)
 			and is_equal(l.second, r.second)
-			and is_equal(l.ms, r.ms)
 			;
 		#undef is_equal
 	}
@@ -273,7 +298,7 @@ struct Date
 		tm.tm_sec = (d ? d : this)->second;
 		return std::mktime(&tm); //std::time(nullptr);
 	}
-	
+
 	func string(const char* const format = nullptr) -> std::string {
 		std::string s;
 		if (format) {
@@ -282,17 +307,73 @@ struct Date
 			if (std::strftime(mbstr, sizeof(mbstr), format, std::localtime(&t)))
 				s = mbstr;
 		} else {
-			s.append(year > 0 ? std::to_string(year) : "?");
-			s.append("/" + (month > 0 ? std::to_string(month) : "?"));
-			s.append("/" + (day > 0 ? std::to_string(day) : "?"));
+			if (weekday > 0)
+				s.append(getWeekDayName(weekday));
 			
-			s.append(" " + std::to_string(hour));
-			s.append(":" + std::to_string(minute));
-			s.append(":" + std::to_string(second));
+			if (year > 0 or month > 0 or day > 0) {
+				if (not s.empty())
+					s.append(" ");
+				s.append(year > 0 ? std::to_string(year) : "?");
+				s.append("/" + (month > 0 ? std::to_string(month) : "?"));
+				s.append("/" + (day > 0 ? std::to_string(day) : "?"));
+			}
+			if (hour > 0 or minute > 0 or second > 0) {
+				s.append(" " + std::to_string(hour));
+				s.append(":" + std::to_string(minute));
+				s.append(":" + std::to_string(second));
+			}
 		}
 		return s;
 	}
 private:
+	func getWeekDayName(unsigned short index, const char* const locale = nullptr) -> std::string {
+		if (index >= 1 or index <= 7) {
+			std::tm tm{};
+			tm.tm_year = 2020-1900; // 2020
+			tm.tm_mon = 2-1; // February
+			tm.tm_mday = 8 + index; // 15th
+			std::time_t t = std::mktime(&tm); //std::time(nullptr);
+			
+			char mbstr[20];
+			std::setlocale(LC_ALL, locale ? locale : std::locale().name().c_str());
+			if (std::strftime(mbstr, sizeof(mbstr), "%A", std::localtime(&t)))
+				return std::string(mbstr);
+		}
+		return std::string("");
+	}
+	
+	func getWeekDayIndex(int aYear = 0,
+					unsigned short aMonth = 0,
+					unsigned short aDay = 0,
+					unsigned short expectedWeekDay = 0)
+	{
+		for (int Y{ aYear > 0 ? aYear : 1970 };
+			 Y <= aYear > 0 ? aYear : 1970; ++Y)
+		{
+			auto curr_year { std::chrono::year(Y) };
+			
+			for (int cur_month{ aMonth > 0 ? aMonth : 1 };
+				 cur_month != (aYear > 0 ? aMonth + 1 : 13); ++cur_month)
+			
+				for (auto d { aDay > 0 ? aDay : 1 };
+					 d<(aDay > 0 ? aDay + 1 : 32); ++d)
+				{
+					const std::chrono::year_month_day 	ymd
+						{ curr_year / cur_month / d };
+					const std::chrono::weekday 			cur_weekday
+						{ std::chrono::sys_days{ ymd } };
+					
+					if (expectedWeekDay > 0) {
+						if (cur_weekday.iso_encoding() == expectedWeekDay)
+							return cur_weekday.iso_encoding();
+					} else
+						return cur_weekday.iso_encoding();
+				}
+		}
+			
+		return unsigned(0);
+	}
+	
 	static
 	func get_ull(const Date& l, const Date& r)
 					-> std::pair<unsigned long long, unsigned long long>{
@@ -314,7 +395,7 @@ private:
 		go(l.hour, r.hour);
 		go(l.minute, r.minute);
 		go(l.second, r.second);
-		go(l.ms, r.ms);
+		go(l.weekday, r.weekday);
 		
 		return std::make_pair(std::stoull(sleft), std::stoull(sright));
 	}
@@ -337,15 +418,15 @@ private:
 public:
 	Date(const long* tl) {
 		char a[5];
-		unsigned short * property[] = {&year, &month, &day, &hour, &minute, &second};
-		for (unsigned short i{ 0 }; auto& f : {"%Y", "%m", "%d", "%H", "%M", "%S"}) {
+		unsigned short * property[] = {&weekday, &year, &month, &day, &hour, &minute, &second};
+		for (unsigned short i{ 0 }; auto& f : {"%u", "%Y", "%m", "%d", "%H", "%M", "%S"}) {
 			std::strftime(a, sizeof(a), f, std::localtime(tl));
 			*property[i++] = std::stoi(a);
 		}
 	}
 		
-	Date(const std::string& s): year{0}, month{0}, day{0},
-								hour{0}, minute{0}, second{0}, ms{0}
+	Date(const std::string& s): year{0}, month{0}, day{0}, weekday{0},
+								hour{0}, minute{0}, second{0}
 	{
 										
 		auto isDigit{[](const std::string& s) -> bool
@@ -357,7 +438,7 @@ public:
 		}};
 		
 		auto isPM{[](const std::string& get) -> int {
-			if (get.size() == 2 and get[1] == 'm') {
+			if (get.size() == 2 and std::tolower(get[1]) == 'm') {
 				if (std::tolower(get[0]) == 'a')
 					return -1;
 				else if (std::tolower(get[0]) == 'p')
@@ -379,9 +460,12 @@ public:
 						others.emplace_back(get);
 				} else if (std::ispunct(s[i])) {
 					auto get{ s.substr(k, i - k) };
-					if (isDigit(get))
-						date.emplace_back(std::stoi(get));
-					else if (not get.empty())
+					if (isDigit(get)) {
+						if (last == ':')
+							time.emplace_back(std::stoi(get));
+						else
+							date.emplace_back(std::stoi(get));
+					} else if (not get.empty())
 						others.emplace_back(get);
 				} else if (std::isspace(s[i])) {
 					if (k != i) {
@@ -468,8 +552,11 @@ public:
 					i++;
 				}
 				
-				if (weekDay != -1)
+				if (weekDay != -1) {
+					assert(weekday == 0);
+					weekday = weekDay;
 					continue;
+				}
 			}
 			
 			for (auto i{ 0 };
@@ -529,7 +616,7 @@ public:
 					else if (day == 0)
 						day = i;
 					else
-						std::cout << "Unknown date<12: " << i << '\n';
+						std::cout << "Unknown date <12: " << i << '\n';
 				}
 			} else if (i > 12) {
 				if (day == 0)
@@ -540,59 +627,36 @@ public:
 						if (year == 0)
 							year = i;
 						else
-							std::cout << "Unknown date>12: " << i << '\n';
+							std::cout << "Unknown date >12: " << i << '\n';
 					}
 			}
 			
+		if (year > 0 and month > 0 and day > 0 and weekday == 0) {
+			weekday = std::chrono::weekday{ std::chrono::sys_days{
+				std::chrono::year_month_day{std::chrono::year(year)/month/day}
+			}}.iso_encoding();
 			
-		if (weekDay > -1) {
-			const std::chrono::weekday friday{ static_cast<unsigned int> (weekDay) };
-			
-			auto currentYear = 0;
-			auto currentMonth = 0;
-			if (year == 0) {
-				const std::chrono::year_month_day ymd{floor<std::chrono::days>(std::chrono::system_clock::now())};
-				currentYear = int(ymd.year());
-				currentMonth = unsigned(ymd.month());
-			}
-			
-			bool found{ false };
-			for (auto& Y : {currentYear, 1970})
-			for (int y {year > 0 ? year : Y}; y <= year > 0 ? year : Y; ++y) {
-				const std::chrono::year cur_year{y};
-				for (int cur_month{(Y != 1970 and year > 0) and month > 0 ? month
-					: (Y == 1970 ? 1 : currentMonth)};
-					 cur_month != (Y == 1970 ? 13 : cur_month + 1); ++cur_month) {
-					const std::chrono::year_month_day 	ymd 		{ cur_year / cur_month / 13 };
-					const std::chrono::weekday 			cur_weekday	{ std::chrono::sys_days{ ymd } };
-					if (cur_weekday == friday) {
-						if (year == 0) year = int(ymd.year());
-						if (month == 0) month = unsigned(ymd.month());
-						if (day == 0) day = unsigned(ymd.day());
-						found = true;
-						break;
-					}
-				}
-				
-				if (found)
-					break;
-			}
+			if (weekDay > -1 and weekDay != weekday)
+				std::cout << "Invalid Weekday was defined for " << string("%B %d %Y") << "!\n";
 		}
 			
-		unsigned short* property[] = {&hour, &minute, &second, &ms };
+		unsigned short* property[] = {&hour, &minute, &second };
 		auto hasPM{ false };
 		for (auto i { 0 }; auto& t : time)
 			if (t < 0) {
 				hasPM = t == -2;
 			} else if (i < sizeof(property)/sizeof(property[0]))
 				*property[i++] = t;
+			else
+				std::cout << "Invalid unit time on "
+					<< hour << ':'<< minute << ':' << second << '\n';
 		if (hasPM)
 			hour += 12;
 		
 		
 #if DEBUG
 		std::cout << "input: \"" << s << "\" -> " <<
-		year << '/' << month << '/' << day << ' ' << hour << ':' << minute << ':' << second << ':' << ms
+		year << '/' << month << '/' << day << ' ' << hour << ':' << minute << ':' << second << ':'
 		<< '\n';
 #endif
 
@@ -691,9 +755,9 @@ func isValidFile(const fs::path& path) -> bool
 		struct stat filestat;
 		stat(tmp.string().c_str(), &filestat);
 		
-		std::string st[2][4] = {
-			{ OPT_DCREATED, OPT_DACCESSED, OPT_DMODIFIED, OPT_DCHANGED },
-			{ OPT_DEXCLCREATED, OPT_DEXCLACCESSED, OPT_DEXCLMODIFIED, OPT_DEXCLCHANGED },
+		const char* const* st[2][4] = {
+			{ &OPT_DCREATED, &OPT_DACCESSED, &OPT_DMODIFIED, &OPT_DCHANGED },
+			{ &OPT_DEXCLCREATED, &OPT_DEXCLACCESSED, &OPT_DEXCLMODIFIED, &OPT_DEXCLCHANGED },
 		};
 
 		Date _ft[4] = { 				Date(&filestat.st_birthtime),
@@ -720,7 +784,7 @@ func isValidFile(const fs::path& path) -> bool
 		for (auto& z : { 0, 1 })
 		for (auto& i : { 0, 1, 2, 3 })
 		{
-			if (state[st[z][i]] not_eq "") {
+			if (state[*st[z][i]] not_eq "") {
 				for (auto& r : *rt[z][i])
 					if (ft[z][i] >= r.first and ft[z][i] <= r.second ) {
 						found[z] = true;
@@ -1186,12 +1250,15 @@ func getRange(const std::string& argv, const std::string& separator)
 	return std::make_shared<std::pair<uintmax_t, uintmax_t>>(from, to);
 }
 
+constexpr auto ARG_SEP { ':' };
+constexpr auto ARG_ASSIGN { '=' };
+
 func expandArgs(const int argc, char* const argv[],
 				const int startAt, std::vector<std::string>* const args)
 {
 	bool newFull{ false };
 	unsigned lastOptCode{ 0 };
-	auto push{ [&](char* const arg, unsigned index, int last) {
+	func push{ [&](char* const arg, unsigned index, int last) {
 		if (last < 0 or index - last <= 0) return;
 				
 		unsigned size = index - last + (newFull ? 2 : 0);
@@ -1216,15 +1283,17 @@ func expandArgs(const int argc, char* const argv[],
 	for (int i{startAt}; i<argc; ++i) {
 		auto arg { argv[i] };
 		auto len { std::strlen(arg) };
-		auto isMnemonic{ len > 1 and arg[0] == '-' and (std::isalpha(arg[1]) or arg[1] == ';') };
+		auto isMnemonic{ len > 1 and arg[0] == '-'
+			and (std::isalpha(arg[1]) or arg[1] == ARG_SEP or arg[1] == ';' ) };
 		auto isFull {false};
 		if (not isMnemonic) {
-			isFull = len > 2 and arg[0] == '-' and arg[1] == '-' and (std::isalpha(arg[2]) or arg[2] == ';');
+			isFull = len > 2 and arg[0] == '-' and arg[1] == '-'
+				and (std::isalpha(arg[2]) or arg[2] == ARG_SEP or arg[1] == ';');
 			if (isFull)
 				newFull = true;
 			else
 			{
-				if (lastOptCode > 0 and (arg[0] == ':' or arg[0] == '=')) {
+				if (lastOptCode > 0 and arg[0] == ARG_ASSIGN) {
 					if (lastOptCode == 1)
 						isMnemonic = true;
 					else
@@ -1238,16 +1307,25 @@ func expandArgs(const int argc, char* const argv[],
 					}
 				} else {
 					args->emplace_back(arg);
+					lastOptCode = 0;
 					continue;
 				}
 			}
 		}
 		
-		
-			
+		bool isLastOpt { false };
+		unsigned fallthrough { 0 };
 		unsigned index = lastOptCode == 3 ? -1 : (isFull and lastOptCode != 2 ? 1 : 0);
 		int last{ -1 };
 		while (++index < len) {
+			if (fallthrough > 0) {
+				if (arg[index] == '"') {
+					fallthrough--;
+					if (fallthrough == 0)
+						push(arg, index - 1, last);
+				}
+				continue;
+			}
 			if (last < 0 and std::isalpha(arg[index])) {
 				if (isMnemonic) {
 					lastOptCode = 1;
@@ -1255,11 +1333,12 @@ func expandArgs(const int argc, char* const argv[],
 					new_s += arg[index];
 					args->emplace_back(new_s);
 				} else if (isFull) {
-					lastOptCode = 2;
+					//lastOptCode = 2;
 					last = index;
 				}
+				isLastOpt = true;
 			} else {
-				if (arg[index] == '=' or arg[index] == ':' or std::isspace(arg[index])) {
+				if (isLastOpt and (arg[index] == ARG_ASSIGN or std::isspace(arg[index]))) {
 					if (isFull) {
 						lastOptCode = 2;
 						push(arg, index, last);
@@ -1268,20 +1347,29 @@ func expandArgs(const int argc, char* const argv[],
 						lastOptCode = 1;
 						last = index + 1;
 					}
-				} else if (arg[index] == ';') {
+					isLastOpt = false;
+				} else if ((arg[index] == ARG_SEP or arg[index] == ';')
+						   and (index + 1 == std::strlen(arg) or
+								(index + 1 < std::strlen(arg) and std::isalpha(arg[index + 1])))) {
 					lastOptCode = 1;
 					push(arg, index, last);
 					last = -1;
 					if (isFull) {
 						lastOptCode = 2;
-						newFull = true;
+						newFull = index + 1 < std::strlen(arg) and std::isalpha(arg[index + 1]);
 					}
-				} else if (isFull and last > 0 and (arg[index] == '<' or arg[index] == '>')) {
+					isLastOpt = false;
+				} else if (isLastOpt and isFull and last > 0 and (arg[index] == '<' or arg[index] == '>')) {
 					lastOptCode = 0;
 					push(arg, index, last);
 					last = index;
-				} else if (last < 0)
-					last = index;
+					isLastOpt = false;
+				} else {
+					if (arg[index] == '"')
+						fallthrough++;
+					if (last < 0)
+						last = index + (fallthrough > 0 ? 1 : 0);
+				}
 			}
 		}
 		if (last > 0)
@@ -1316,7 +1404,7 @@ func timeLapse(std::chrono::system_clock::time_point& start,
 }
 
 #undef func
-constexpr auto VERSION="version 1 (Late 2021)\n™ and © 2021 Widiatmoko. \
+constexpr auto VERSION="version 1.1 (Early 2022)\nTM and (C) 2022 Widiatmoko. \
 All Rights Reserved. License and Warranty\n";
 
 constexpr auto HELP=\
@@ -1370,9 +1458,9 @@ Option:\n\
            'min size'-'max size'\n\
                  Filter only files that size match, in \"KB\", \"MB\" (default), or \"GB\".\n\
                  You can specifying this multiple times for 'Range' only based size.\n\
-                   Example: --size < 750\n\
+                   Example: --size\"<750\"\n\
                      OR by specify the unit\n\
-                      --size > 1.2gb\n\
+                      --size\">1.2gb\"\n\
                      OR using range with '-' OR '..'\n\
                       --size 750 - 1.2gb; size=30..200.2; size 2gb .. 4gb\n\
 -S, --exclude-size < | > 'size'\n\
@@ -1428,31 +1516,33 @@ Option:\n\
                  Override output directory for playlist file.\n\
 \n\
 Options can be joined, and you replace option assignment separator [SPACE] with '=' \
-or ':' and can be separated by ';' after assignment. For the example:\n\n\
-  tvplaylist -hOVvc=async;xs<1.3gb;e=mp4,mkv;f:My-playlist.txt\n\n\
+and options can be separated by ':' or ';' after assignment. For the example:\n\n\
+  tvplaylist -hOVvc=async:xs<1.3gb:e=mp4,mkv:f=My-playlist.txt\n\n\
 Thats it, -h -O -V -v -c are joined, and -c has assignment operator '=' instead of\
  using separator [SPACE]. \
-Also -x -s are joined, and -x is continuing with ';' after option assignment \
+Also -x -s are joined, and -x is continuing with ':' after option assignment \
 '=async' and -s has remove [SPACE] separator for operator '<' and value '1.3gb'.\n\n\
 Redefinition of option means, it will use the last option, except for options 'regex', 'exclude-regex', 'find', 'exclude-find', 'size', 'exclude-size', 'created', 'exclude-created', 'modified', 'exclude-modified', 'changed', 'exclude-changed', 'accessed', 'exclude-accessed'. For the example, \
 this example will not use 'thread' execution at all':\n\n\
   tvplaylist -c=thread /usr/local/videos -c=none /Users/Shared/Videos\n\n\
 Note, you cannot join mnemonic option with full option, for the example:\n\n\
-  tvplaylist -bO;ext=mp3;version\t\tWONT WORK\n\n\
+  tvplaylist -bO:ext=mp3:version\t\tWONT WORK\n\n\
 Instead try to separate mnemonic and full option, like this:\n\n\
-  tvplaylist -bO --ext=mp3;version\n\n\
+  tvplaylist -bO --ext=mp3:version\n\n\
 Posible value for 'date and/or time' are: 'Year', 'Month Name' (mnemonic or full), 'Month Number', 'Day', 'WeekDay Name' (mnemonic or full), 'Hour' (if AM/PM defined then it is 12 hours, otherwise 24 hours), 'Minute', 'Second', AM or PM.\n\
 Example:\n\
   Filter only files created at 2009:\n\
      --created=2009\n\
+  Filter only files created on Friday:\n\
+    --created friday  OR  --created==friday\n\
   Filter only files created at 2009 with weekday is Sunday:\n\
      --created=\"Sunday 2009\"  OR  --created=sun/2009\n\
   Filter only files created from November 2019 thru January 2021:\n\
      --created \"nov 2019\" .. \"jan 2021\"\n\
   Filter only files created at January - March 1980 and May - June 2000 and after 2022:\n\
-     --create=jan/1980..march/1980; create 2000/may - jun/2000;create>2022\n\
+     --create=jan/1980..march/1980: create 2000/may - jun/2000 --create\">2022\"\n\
   Filter only files created after March 22 1990 20:44:\n\
-	 --created>\"3/22/2019 20:44\"  OR  \"20:44 22/jan/2019\"\n\
+	 --created>\"3/22/2019 20:44\"  OR  --created \"20:44 22/jan/2019\"\n\
 It's up to you how to arrange date and/or time, At least you should use common time format (eg: 23:5:30). Here the possible arrangement you can use: \n\
 Common normal: \"Monday Jan 15 2022 7:00 PM\"\n\
                \"Mon, 15/january/2022 7:0:0 pm\"\n\
@@ -1514,7 +1604,10 @@ int main(int argc, char *argv[]) {
 					and args[i][0] == '-'
 					and args[i][1] == mnemonic) };
 			if (result) {
-				args[i] = with;
+				if (args[i].length() == 2) { // convert mnemonic to full
+					args[i] = "--";
+					args[i].append(with);
+				}
 				if (writeBoolean)
 					state[with] = "true";
 			}
@@ -1525,7 +1618,7 @@ int main(int argc, char *argv[]) {
 				fs::path(argv[0]).filename().string() << ' '
 				<< VERSION << '\n';
 				
-				if (args[i] == OPT_HELP)
+				if (args[i].substr(2) == OPT_HELP)
 					std::cout << HELP << '\n';
 				
 				if (i + 1 == args.size())
@@ -1576,7 +1669,7 @@ int main(int argc, char *argv[]) {
 					 or isMatch(OPT_EXCLFIND, 	'I')) {
 				if (i + 1 < args.size())
 				{
-					(args[i] == OPT_FIND ? listFind : listExclFind)
+					(args[i].substr(2) == OPT_FIND ? listFind : listExclFind)
 						.emplace_back(args[i + 1]);
 					state[args[i]] = "1";
 					i++;
@@ -1600,10 +1693,11 @@ int main(int argc, char *argv[]) {
 					 or isMatch(OPT_EXCLREGEX, 	'R')) {
 				if (i + 1 < args.size())
 				{
-					(args[i] == OPT_REGEX ? listRegex : listExclRegex)
+					const auto opt {args[i].substr(2)};
+					(opt == OPT_REGEX ? listRegex : listExclRegex)
 						.emplace_back(std::regex(args[i + 1],
 									getRegexSyntaxType(state[OPT_REGEXSYNTAX])));
-					state[args[i]] = "1";
+					state[opt] = "1";
 					i++;
 				} else
 					std::cout << "Expecting regular expression after \""
@@ -1619,21 +1713,21 @@ int main(int argc, char *argv[]) {
 					 or isMatch(OPT_DEXCLMODIFIED, 	'M')
 					 )
 			{
-				
+				const auto opt { args[i].substr(2) };
 				auto as_single{[&](const char opGt) -> bool {
 					Date date(args[i + 1]);
 					if (date.isValid()) {
-						(args[i] == OPT_DCREATED ? listDCreated
-						 : args[i] == OPT_DCHANGED ? listDChanged
-						 : args[i] == OPT_DMODIFIED ? listDModified
-						 : args[i] == OPT_DACCESSED ? listDAccessed
-						 : args[i] == OPT_DEXCLCREATED ? listDExclCreated
-						 : args[i] == OPT_DEXCLCHANGED ? listDExclChanged
-						 : args[i] == OPT_DEXCLMODIFIED ? listDExclModified
+						(opt == OPT_DCREATED ? listDCreated
+						 : opt == OPT_DCHANGED ? listDChanged
+						 : opt == OPT_DMODIFIED ? listDModified
+						 : opt == OPT_DACCESSED ? listDAccessed
+						 : opt == OPT_DEXCLCREATED ? listDExclCreated
+						 : opt == OPT_DEXCLCHANGED ? listDExclChanged
+						 : opt == OPT_DEXCLMODIFIED ? listDExclModified
 						 : listDExclAccessed
 						 ).emplace_back(std::make_pair(opGt, date));
 
-						state[args[i]] = "1";
+						state[opt] = "1";
 						i++;
 						return true;
 					}
@@ -1650,16 +1744,16 @@ int main(int argc, char *argv[]) {
 				else
 				{
 					auto push{[&](const Date& lower, const Date& upper) {
-						(args[i] == OPT_DCREATED ? listDCreatedR
-						 : args[i] == OPT_DCHANGED ? listDChangedR
-						 : args[i] == OPT_DMODIFIED ? listDModifiedR
-						 : args[i] == OPT_DACCESSED ? listDAccessedR
-						 : args[i] == OPT_DEXCLCREATED ? listDExclCreatedR
-						 : args[i] == OPT_DEXCLCHANGED ? listDExclChangedR
-						 : args[i] == OPT_DEXCLMODIFIED ? listDExclModifiedR
+						(opt == OPT_DCREATED ? listDCreatedR
+						 : opt == OPT_DCHANGED ? listDChangedR
+						 : opt == OPT_DMODIFIED ? listDModifiedR
+						 : opt == OPT_DACCESSED ? listDAccessedR
+						 : opt == OPT_DEXCLCREATED ? listDExclCreatedR
+						 : opt == OPT_DEXCLCHANGED ? listDExclChangedR
+						 : opt == OPT_DEXCLMODIFIED ? listDExclModifiedR
 						 : listDExclAccessedR
 						 ).emplace_back(std::make_pair(lower, upper));
-						state[args[i]] = "1";
+						state[opt] = "1";
 					}};
 					if (i + 3 < args.size() and
 						(args[i + 2] == "-" or args[i + 2] == "..")) {
@@ -1672,23 +1766,32 @@ int main(int argc, char *argv[]) {
 							}
 					} else if (i + 1 < args.size()) {
 						auto pos = args[i + 1].find("..");
+						if (pos == std::string::npos) {
+							unsigned strip { 0 };
+							pos = 0;
+							for (; pos < args[i + 1].size(); ++pos)
+								strip += args[i + 1][pos] == '-' ? 1 : 0;
+							if (strip != 1)
+								pos = std::string::npos;
+						}
+							
 						if (pos not_eq std::string::npos) {
 							if (Date lower(args[i + 1].substr(0, pos));
 								lower.isValid())
-							if (Date upper(args[i + 1].substr(pos + 2));
-								upper.isValid())
-							{
-								push(lower, upper);
-								state[args[i]] = "1";
-								i++;
-								continue;
-							}
+								if (Date upper(args[i + 1].substr(pos + 2));
+									upper.isValid())
+								{
+									push(lower, upper);
+									i++;
+									continue;
+								}
 						}
 						
-						else {
-							if (as_single('='))
-								continue;
+						if (as_single('=')) {
+							i++;
+							continue;
 						}
+						
 					}
 				}
 				std::cout << "Expecting date and/or time after \""
@@ -1719,7 +1822,7 @@ int main(int argc, char *argv[]) {
 					   or isMatch(OPT_EXCLEXT, 'E')) {
 				if (i + 1 < args.size()) {
 					i++;
-					state[args[i - 1]] = args[i] == "*.*" ? "*" : args[i];
+					state[args[i - 1].substr(2)] = args[i] == "*.*" ? "*" : args[i];
 				} else
 					std::cout << "Expecting extension after \""
 					<< args[i] << "\" option (eg: \"mp4, mkv\").\n";
@@ -1727,10 +1830,10 @@ int main(int argc, char *argv[]) {
 			else if (isMatch(OPT_FIXFILENAME, 	'f', false, "fix-filename")) {
 				if (i + 1 < args.size()) {
 					i++;
-					state[args[i - 1]] = args[i];
+					state[OPT_FIXFILENAME] = args[i];
 					if (not fs::path(args[i]).parent_path().string().empty())
 					{
-						state[args[i - 1]] = fs::path(args[i]).filename().string();
+						state[OPT_FIXFILENAME] = fs::path(args[i]).filename().string();
 						state[OPT_OUTDIR] = fs::path(args[i]).parent_path().string();
 					}
 				} else
@@ -1740,17 +1843,17 @@ int main(int argc, char *argv[]) {
 			else if (isMatch(OPT_OUTDIR, 		'd')) {
 				if (i + 1 < args.size()) {
 					i++;
-					state[args[i - 1]] = fs::absolute(args[i]);
+					state[OPT_OUTDIR] = fs::absolute(args[i]);
 					if (auto tmp{args[i]};
 						tmp[tmp.size() - 1] not_eq fs::path::preferred_separator)
-						state[args[i - 1]] += fs::path::preferred_separator;
+						state[OPT_OUTDIR] += fs::path::preferred_separator;
 				} else
 					std::cout << "Expecting directory after \""
 					<< args[i] << "\" option (eg: \"Downloads/\").\n";
 			}
 			else if (isMatch(OPT_SIZE, 			's')
 					 or isMatch(OPT_EXCLSIZE, 	'S')) {
-				if (bool isExclude{ args[i] == OPT_EXCLSIZE };
+				if (bool isExclude{ args[i].substr(2) == OPT_EXCLSIZE };
 					i + 1 < args.size()) {
 					if (args[i + 1][0] == '<' or args[i + 1][0] == '>')
 					{
@@ -1864,8 +1967,31 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 		std::move(invalidArgs.begin(), invalidArgs.end(), invalid_args);
 		std::cout << "\nWhat " << (invalidArgs.size() > 1 ? "are these" : "is this") << "? :\n";
 		for (auto i{ 0 }; i<invalidArgs.size(); ++i) {
-			std::cout << '"' << invalid_args[i] << '"'
-				<< (i + 1 < invalidArgs.size() ? ", " : "");
+			auto item { &invalid_args[i] };
+			std::string others;
+			if (item->size() >= 4 and item->starts_with("--")) {
+				std::vector<std::pair<float, std::string>> possible;
+				auto substr_item = std::move(item->substr(2));
+				for (auto& opt : OPTS)
+					if (auto percentage{ getLikely(substr_item, *opt) };
+						percentage > 75)
+						possible.emplace_back(std::make_pair(percentage, *opt));
+				
+				if (not possible.empty()) {
+					std::sort(possible.begin(), possible.end(), [](
+						const std::pair<float, std::string>& a,
+						const std::pair<float, std::string>& b)
+					{
+						return a.first > b.first;
+					});
+					others = " do you mean: --" + possible[0].second + ".";
+//					for (auto k{0}; auto&& s : possible)
+//						others.append("--" + s.second + (++k == possible.size() ? "." : ", "));
+				}
+			}
+				
+			std::cout << '"' << *item << '"' << others << '\n';
+				// << (i + 1 < invalidArgs.size() ? ", " : "");
 		}
 		std::cout << "\nFor more information, please try to type \""
 			<< fs::path(argv[0]).filename().string() << " --help\"\n\n";
@@ -1923,6 +2049,7 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 		or state[OPT_DEBUG] == "true" or state[OPT_DEBUG] == "args")
 	#endif
 	{
+		constexpr auto WIDTH{ 20 };
 		if (state[OPT_DEBUG] == "true" or state[OPT_DEBUG] == "args") {
 			std::cout << "Original Arguments: ";
 			for (auto i{1}; i<argc; ++i)
@@ -1934,26 +2061,28 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 			std::cout << '\n';
 		}
 #define PRINT_OPT(x)	(x.empty() ? "false" : x)
+#define LABEL(x)	x << std::setw(unsigned(WIDTH - std::strlen(x))) << ": "
 	std::cout
-		<< OPT_EXECUTION << "\t\t: " << state[OPT_EXECUTION] << '\n'
-		<< OPT_VERBOSE << "\t\t\t: " << PRINT_OPT(state[OPT_VERBOSE]) << '\n'
-		<< OPT_BENCHMARK << "\t\t: " << PRINT_OPT(state[OPT_BENCHMARK]) << '\n'
-		<< OPT_OVERWRITE << "\t\t: " << PRINT_OPT(state[OPT_OVERWRITE]) << '\n'
-		<< OPT_NOOUTPUTFILE << "\t\t: " << PRINT_OPT(state[OPT_NOOUTPUTFILE]) << '\n'
-		<< OPT_FIXFILENAME << "\t\t: " << state[OPT_FIXFILENAME] << '\n'
-		<< "Current Directory\t: " << fs::current_path().string() << '\n'
-		<< OPT_OUTDIR << "\t\t\t: " << state[OPT_OUTDIR] << '\n'
-		<< OPT_SKIPSUBTITLE << "\t\t: " << PRINT_OPT(state[OPT_SKIPSUBTITLE]) << '\n';
+		<< LABEL(OPT_EXECUTION) << state[OPT_EXECUTION] << '\n'
+		<< LABEL(OPT_VERBOSE) << PRINT_OPT(state[OPT_VERBOSE]) << '\n'
+		<< LABEL(OPT_BENCHMARK) << PRINT_OPT(state[OPT_BENCHMARK]) << '\n'
+		<< LABEL(OPT_OVERWRITE) << PRINT_OPT(state[OPT_OVERWRITE]) << '\n'
+		<< LABEL(OPT_NOOUTPUTFILE) << PRINT_OPT(state[OPT_NOOUTPUTFILE]) << '\n'
+		<< LABEL(OPT_FIXFILENAME) << state[OPT_FIXFILENAME] << '\n'
+		<< LABEL("Current Directory") << fs::current_path().string() << '\n'
+		<< LABEL(OPT_OUTDIR) << state[OPT_OUTDIR] << '\n'
+		<< LABEL(OPT_SKIPSUBTITLE) << PRINT_OPT(state[OPT_SKIPSUBTITLE]) << '\n';
 #undef PRINT_OPT
-	std::cout << OPT_EXT << "\t\t\t: " << state[OPT_EXT];
-	if (state[OPT_EXT].empty()) {
-		for (auto i{0}; i<DEFAULT_EXT.size(); ++i)
-			std::cout << DEFAULT_EXT[i] << (i < DEFAULT_EXT.size() - 1 ? ", " : "");
+	{
+		std::cout << LABEL(OPT_EXT) << state[OPT_EXT];
+		if (state[OPT_EXT].empty())
+			for (auto i{0}; i<DEFAULT_EXT.size(); ++i)
+				std::cout << DEFAULT_EXT[i] << (i < DEFAULT_EXT.size() - 1 ? ", " : "");
+		std::cout << '\n';
 	}
-	std::cout << '\n';
 
 	for (auto& S : {OPT_FIND, OPT_EXCLFIND}) {
-		std::cout << S << (S == OPT_FIND ? "\t\t\t: " : "\t\t: ");
+		std::cout << LABEL(S);
 		for (auto i{0}; i<(S == OPT_FIND ? listFind : listExclFind).size(); ++i)
 			std::cout << (S == OPT_FIND ? listFind : listExclFind)[i]
 			<< (i < (S == OPT_FIND ? listFind : listExclFind).size() - 1 ? ", " : "");
@@ -1961,7 +2090,7 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 	}
 
 	for (auto& S : {OPT_REGEX, OPT_EXCLREGEX}) {
-		std::cout << S << (S == OPT_REGEX ? "\t\t\t: " : "\t\t: ");
+		std::cout << LABEL(S);
 		for (auto i{0}; i<(S == OPT_REGEX ? listRegex : listExclRegex).size(); ++i)
 			std::cout << (S == OPT_REGEX ? listRegex : listExclRegex)[i].mark_count()
 			<< " expression"
@@ -1970,7 +2099,7 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 	}
 
 	for (auto& S : {OPT_SIZE, OPT_EXCLSIZE}) {
-		std::cout << S << (S == OPT_SIZE ? "\t\t\t: " : "\t\t: ")
+		std::cout << LABEL(S)
 				<< ((S == OPT_SIZE ? listSize : listExclSize).empty()
 					or state[S == OPT_SIZE ? OPT_SIZEOPGT
 							  : OPT_EXCLSIZEOPGT][0] != '\0'
@@ -1985,8 +2114,8 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 	}
 			
 	{
-		std::string st[8] = { OPT_DCREATED, OPT_DCHANGED, OPT_DACCESSED, OPT_DMODIFIED,
-			OPT_DEXCLCREATED, OPT_DEXCLCHANGED, OPT_DEXCLACCESSED, OPT_DEXCLMODIFIED };
+		const char * const* st[8] = { &OPT_DCREATED, &OPT_DCHANGED, &OPT_DACCESSED, &OPT_DMODIFIED,
+			&OPT_DEXCLCREATED, &OPT_DEXCLCHANGED, &OPT_DEXCLACCESSED, &OPT_DEXCLMODIFIED };
 		
 		std::vector<std::pair<char, Date>>* ot[8] = { &listDCreated, &listDAccessed, &listDModified, &listDChanged,
 			  &listDExclCreated, &listDExclAccessed, &listDExclModified, &listDExclChanged };
@@ -1996,19 +2125,19 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 			  &listDExclCreatedR, &listDExclAccessedR, &listDExclModifiedR, &listDExclChangedR };
 		
 		for (auto i {0}; i<8; ++i) {
-			std::cout << st[i] << ": ";
+			std::cout << LABEL(*st[i]);
 			for (auto k{0}; k<ot[i]->size(); ++k) {
-				std::cout << ot[i]->at(k).first << ' ' << ot[i]->at(k).second.string() << ", ";
+				std::cout << '\"' << ot[i]->at(k).first << ' ' << ot[i]->at(k).second.string() << "\", ";
 			}
 			
 			for (auto k{0}; k<rt[i]->size(); ++k) {
-				std::cout << rt[i]->at(k).first.string() << ".." << rt[i]->at(k).second.string() << ", ";
+				std::cout << '\"' << rt[i]->at(k).first.string() << "\" .. \"" << rt[i]->at(k).second.string() << "\", ";
 			}
 			std::cout << '\n';
 		}
 	}
 	
-	std::cout << "Inputs\t\t\t: ";
+	std::cout << LABEL("Inputs");
 		for (auto i{0}; i<inputDirsCount + selectFiles.size(); ++i) {
 			if (i < inputDirsCount) {
 				std::cout << inputDirs[i];
@@ -2019,7 +2148,15 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 			std::cout  << (i < (inputDirsCount + selectFiles.size()) - 1 ? ", " : "");
 		}
 	std::cout << "\n\n";
+#undef LABEL
 	} // END Info
+					   
+	if (not invalidArgs.empty())
+		return
+#ifndef MAKE_LIB
+			0
+#endif
+			;
 					   
 	if (state[OPT_OUTDIR].empty()) {
 		if (selectFiles.empty())

@@ -290,19 +290,36 @@ struct Date
 	
 	func time_t(const Date* const d = nullptr) {
 		std::tm tm{};
-		tm.tm_year = (d ? d : this)->year-1900;
-		tm.tm_mon = (d ? d : this)->month-1; // February
-		tm.tm_mday = (d ? d : this)->day;
+		if ((d ? d : this)->year > 0)
+			tm.tm_year = (d ? d : this)->year-1900;
+		if ((d ? d : this)->month > 0)
+			tm.tm_mon = (d ? d : this)->month-1; // February
+		if ((d ? d : this)->day > 0)
+			tm.tm_mday = (d ? d : this)->day;
 		tm.tm_hour = (d ? d : this)->hour;
 		tm.tm_min = (d ? d : this)->minute;
 		tm.tm_sec = (d ? d : this)->second;
+		if ((d ? d : this)->weekday > 0)
+			tm.tm_wday = (d ? d : this)->weekday;
 		return std::mktime(&tm); //std::time(nullptr);
 	}
 
 	func string(const char* const format = nullptr) -> std::string {
 		std::string s;
 		if (format) {
-			auto t { time_t() };
+			std::tm tm{};
+			if (year > 0)
+				tm.tm_year = year-1900;
+			if (month > 0)
+				tm.tm_mon = month-1; // February
+			if (day > 0)
+				tm.tm_mday = day;
+			tm.tm_hour = hour;
+			tm.tm_min = minute;
+			tm.tm_sec = second;
+			if (weekday > 0)
+				tm.tm_wday = weekday;
+			auto t =  std::mktime(&tm);
 			char mbstr[100];
 			if (std::strftime(mbstr, sizeof(mbstr), format, std::localtime(&t)))
 				s = mbstr;
@@ -524,25 +541,28 @@ public:
 			
 			if (weekDay == -1) {
 				for (auto i{ 0 }; auto& m : {
-					/*en_US.UTF-8:*/ "fri", "sat", "sun", "mon", "tue", "wed", "thu",
+					/*en_US.UTF-8:*/ "sun", "mon", "tue", "wed", "thu", "fri", "sat",
 					/*id_ID       */ "min", "sen", "sel", "rab", "kam", "jum", "sab",
-					/*de_DE.UTF-8:*/ "fr", "sa", "so", "mo", "di", "mi", "do",
-					/*fr_FR.UTF-8:*/ "ven", "sam", "dim", "lun", "mar", "mer", "jeu",
-					/*sv_SE.UTF-8:*/ "fre", "lör", "sön", "mån", "tis", "ons", "tor",
-					/*es_ES.UTF-8:*/ "vie", "sáb", "dom", "lun", "mar", "mié", "jue",
-					/*ru_RU.UTF-8:*/ "пт", "сб", "вс", "пн", "вт", "ср", "чт",
-					/*ja_JP.UTF-8:*/ "金", "土", "日", "月", "火", "水", "木",
-					/*zh_CN.UTF-8:*/ "五", "六", "日", "一", "二", "三", "四",
+					/*de_DE.UTF-8:*/ "so", "mo", "di", "mi", "do", "fr", "sa",
+					/*fr_FR.UTF-8:*/ "dim", "lun", "mar", "mer", "jeu", "ven", "sam",
+					/*sv_SE.UTF-8:*/ "sön", "mån", "tis", "ons", "tor", "fre", "lör",
+					/*es_ES.UTF-8:*/ "dom", "lun", "mar", "mié", "jue", "vie", "sáb",
+					/*ru_RU.UTF-8:*/ "вс", "пн", "вт", "ср", "чт", "пт", "сб",
+					/*ja_JP.UTF-8:*/ "日", "月", "火", "水", "木", "金", "土",
+					/*zh_CN.UTF-8:*/ "日", "一", "二", "三", "四", "五", "六",
+					/*id_ID.UTF-8:*/ "日", "一", "二", "三", "四", "五", "六",
+
 					
-					/*en_US.UTF-8:*/ "friday", "saturday", "sunday", "monday", "tuesday", "wednesday", "thursday",
+					/*en_US.UTF-8:*/ "sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday",
 					/*id_ID       */ "minggu", "senin", "selasa", "rabu", "kamis", "jumat", "sabtu",
-					/*de_DE.UTF-8:*/ "freitag", "samstag", "sonntag", "montag", "dienstag", "mittwoch", "donnerstag",
-					/*fr_FR.UTF-8:*/ "vendredi", "samedi", "dimanche", "lundi", "mardi", "mercredi", "jeudi",
-					/*sv_SE.UTF-8:*/ "fredag", "lördag", "söndag", "måndag", "tisdag", "onsdag", "torsdag",
-					/*es_ES.UTF-8:*/ "viernes", "sábado", "domingo", "lunes", "martes", "miércoles", "jueves",
-					/*ru_RU.UTF-8:*/ "пятница", "суббота", "воскресенье", "понедельник", "вторник", "среда", "четверг",
-					/*ja_JP.UTF-8:*/ "金曜日", "土曜日", "日曜日", "月曜日", "火曜日", "水曜日", "木曜日",
-					/*zh_CN.UTF-8:*/ "星期五", "星期六", "星期日", "星期一", "星期二", "星期三", "星期四",
+					/*de_DE.UTF-8:*/ "sonntag", "montag", "dienstag", "mittwoch", "donnerstag", "freitag", "samstag",
+					/*fr_FR.UTF-8:*/ "dimanche", "lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi",
+					/*sv_SE.UTF-8:*/ "söndag", "måndag", "tisdag", "onsdag", "torsdag", "fredag", "lördag",
+					/*es_ES.UTF-8:*/ "domingo", "lunes", "martes", "miércoles", "jueves", "viernes", "sábado",
+					/*ru_RU.UTF-8:*/ "воскресенье", "понедельник", "вторник", "среда", "четверг", "пятница", "суббота",
+					/*ja_JP.UTF-8:*/ "日曜日", "月曜日", "火曜日", "水曜日", "木曜日", "金曜日", "土曜日",
+					/*zh_CN.UTF-8:*/ "星期日", "星期一", "星期二", "星期三", "星期四", "星期五", "星期六",
+					/*id_ID.UTF-8:*/ "星期日", "星期一", "星期二", "星期三", "星期四", "星期五", "星期六",
 				}) {
 					if (s == m)
 					{
@@ -601,35 +621,40 @@ public:
 			} else
 				std::cout << "Unknown other: " << s << '\n';
 		}
-										
+		
+		
 		for (auto& i : date)
-			if (i > 35)
+			if (i > 32)
 				year = i;
 			else if (i <= 12) {
-				if (month == 0 and day == 0)
+				if (month == 0)
 					month = i;
 				else {
-					if (month > 0)
+					if (day == 0)
 						day = i;
 					else if (year == 0)
 						year = i;
-					else if (day == 0)
-						day = i;
-					else
-						std::cout << "Unknown date <12: " << i << '\n';
+					else //if (time.empty())
+						time.emplace_back(i);
 				}
 			} else if (i > 12) {
 				if (day == 0)
 					day = i;
-				else
-					if (month > 0) {
-						day = month;
-						if (year == 0)
-							year = i;
-						else
-							std::cout << "Unknown date >12: " << i << '\n';
-					}
-			}
+				else {
+					if (year == 0)
+						year = i;
+					else //if (time.empty())
+						time.emplace_back(i);
+				}
+			} else //if (time.empty())
+					time.emplace_back(i);
+			
+		if (year > 0 and year < 1000) {
+			const std::chrono::year_month_day ymd{floor<std::chrono::days>(std::chrono::system_clock::now())};
+			auto Y { std::to_string(year) };
+			auto nowy { std::to_string(int(ymd.year())) };
+			year = std::stoi(nowy.substr(0, nowy.size() - Y.size()) + Y);
+		}
 			
 		if (year > 0 and month > 0 and day > 0 and weekday == 0) {
 			weekday = std::chrono::weekday{ std::chrono::sys_days{
@@ -655,9 +680,8 @@ public:
 		
 		
 #if DEBUG
-		std::cout << "input: \"" << s << "\" -> " <<
-		year << '/' << month << '/' << day << ' ' << hour << ':' << minute << ':' << second << ':'
-		<< '\n';
+		std::cout << "input: \"" << s << "\" -> " << weekday << ' ' <<
+		year << '/' << month << '/' << day << ' ' << hour << ':' << minute << ':' << second << '\n';
 #endif
 
 	}
@@ -1321,8 +1345,10 @@ func expandArgs(const int argc, char* const argv[],
 			if (fallthrough > 0) {
 				if (arg[index] == '"') {
 					fallthrough--;
-					if (fallthrough == 0)
-						push(arg, index - 1, last);
+					if (fallthrough == 0) {
+						push(arg, index, last);
+						last = -1;
+					}
 				}
 				continue;
 			}
@@ -1365,8 +1391,13 @@ func expandArgs(const int argc, char* const argv[],
 					last = index;
 					isLastOpt = false;
 				} else {
-					if (arg[index] == '"')
+					if (arg[index] == '"') {
+						if (fallthrough == 0) {
+							push(arg, index, last);
+							last = -1;
+						}
 						fallthrough++;
+					}
 					if (last < 0)
 						last = index + (fallthrough > 0 ? 1 : 0);
 				}
@@ -1458,9 +1489,9 @@ Option:\n\
            'min size'-'max size'\n\
                  Filter only files that size match, in \"KB\", \"MB\" (default), or \"GB\".\n\
                  You can specifying this multiple times for 'Range' only based size.\n\
-                   Example: --size\"<750\"\n\
+                   Example: --size<750\n\
                      OR by specify the unit\n\
-                      --size\">1.2gb\"\n\
+                      --size>1.2gb\n\
                      OR using range with '-' OR '..'\n\
                       --size 750 - 1.2gb; size=30..200.2; size 2gb .. 4gb\n\
 -S, --exclude-size < | > 'size'\n\
@@ -1472,41 +1503,49 @@ Option:\n\
               'min' .. 'max'\n\
               'min' - 'max'\n\
                  Filter only files that was created on specified date and/or time.\n\
+                 For more information about 'date and/or time' possible values, see below.\n\
                  You can specifying this multiple times, for both single value or range values.\n\
 -T, --exclude-created = | < | > 'date and/or time'\n\
                       'min' .. 'max'\n\
                       'min' - 'max'\n\
                  Filter to exclude only files that was created on specified date and/or time.\n\
+                 For more information about 'date and/or time' possible values, see below.\n\
                  You can specifying this multiple times, for both single value or range values.\n\
 -a, --accessed = | < | > 'date and/or time'\n\
                'min' .. 'max'\n\
                'min' - 'max'\n\
                  Filter only files that was accessed on specified date and/or time.\n\
                  You can specifying this multiple times, for both single value or range values.\n\
+                 For more information about 'date and/or time' possible values, see below.\n\
 -A, --exclude-accessed = | < | > 'date and/or time'\n\
                        'min' .. 'max'\n\
                        'min' - 'max'\n\
                  Filter to exclude only files that was accessed on specified date and/or time.\n\
+                 For more information about 'date and/or time' possible values, see below.\n\
                  You can specifying this multiple times, for both single value or range values.\n\
 -m, --modified = | < | > 'date and/or time'\n\
               'min' .. 'max'\n\
               'min' - 'max'\n\
                  Filter only files that was modified on specified date and/or time.\n\
+                 For more information about 'date and/or time' possible values, see below.\n\
                  You can specifying this multiple times, for both single value or range values.\n\
 -M, --exclude-modified = | < | > 'date and/or time'\n\
                       'min' .. 'max'\n\
                       'min' - 'max'\n\
                  Filter to exclude only files that was modified on specified date and/or time.\n\
+                 For more information about 'date and/or time' possible values, see below.\n\
                  You can specifying this multiple times, for both single value or range values.\n\
 -g, --changed = | < | > 'date and/or time'\n\
               'min' .. 'max'\n\
               'min' - 'max'\n\
                  Filter only files that was changed on specified date and/or time.\n\
+                 For more information about 'date and/or time' possible values, see below.\n\
                  You can specifying this multiple times, for both single value or range values.\n\
 -G, --exclude-changed = | < | > 'date and/or time'\n\
                       'min' .. 'max'\n\
                       'min' - 'max'\n\
                  Filter to exclude only files that was changed on specified date and/or time.\n\
+                 For more information about 'date and/or time' possible values, see below.\n\
                  You can specifying this multiple times, for both single value or range values.\n\
 -f, --out-filename 'filename'\n\
                  Override output playlist filename.\n\
@@ -1515,6 +1554,7 @@ Option:\n\
 -d, --out-dir \"directory path\"\n\
                  Override output directory for playlist file.\n\
 \n\
+Arguments can be surrounded by \"\" (eg. \"--F;V\"), to enable using charcter ';' or anothers that belongs to Terminal or shell. To view how arguments was deduced you can pass option --debug=args.\n\
 Options can be joined, and you replace option assignment separator [SPACE] with '=' \
 and options can be separated by ':' or ';' after assignment. For the example:\n\n\
   tvplaylist -hOVvc=async:xs<1.3gb:e=mp4,mkv:f=My-playlist.txt\n\n\
@@ -1531,16 +1571,16 @@ Instead try to separate mnemonic and full option, like this:\n\n\
   tvplaylist -bO --ext=mp3:version\n\n\
 Posible value for 'date and/or time' are: 'Year', 'Month Name' (mnemonic or full), 'Month Number', 'Day', 'WeekDay Name' (mnemonic or full), 'Hour' (if AM/PM defined then it is 12 hours, otherwise 24 hours), 'Minute', 'Second', AM or PM.\n\
 Example:\n\
-  Filter only files created at 2009:\n\
+  Filter only files created in 2009:\n\
      --created=2009\n\
   Filter only files created on Friday:\n\
     --created friday  OR  --created==friday\n\
-  Filter only files created at 2009 with weekday is Sunday:\n\
+  Filter only files created in 2009 with weekday is Sunday:\n\
      --created=\"Sunday 2009\"  OR  --created=sun/2009\n\
   Filter only files created from November 2019 thru January 2021:\n\
      --created \"nov 2019\" .. \"jan 2021\"\n\
   Filter only files created at January - March 1980 and May - June 2000 and after 2022:\n\
-     --create=jan/1980..march/1980: create 2000/may - jun/2000 --create\">2022\"\n\
+     --created=jan/1980..march/1980:created 2000/may - jun/2000 --created>2022\n\
   Filter only files created after March 22 1990 20:44:\n\
 	 --created>\"3/22/2019 20:44\"  OR  --created \"20:44 22/jan/2019\"\n\
 It's up to you how to arrange date and/or time, At least you should use common time format (eg: 23:5:30). Here the possible arrangement you can use: \n\
@@ -1551,13 +1591,17 @@ Equal and Acceptable: \"15 pm mon 7:0 2022/jan\"\n\
 If you want to test 'date and/or time' use --debug=date 'date and/or time', for the example:\n\
      --debug=date \"pm 3:33\"\n\
      or --debug=date wed\n\
+It will display:\n\
+[tvplaylist]-> Internal tvplaylist date time recognizer, with format \"Weekday Year/Month/Day Hour:Minute:Second\".\n\
+and for comparison\n\
+[strftime(%c)]-> C/C++ standard library date time recognizer with %c format e.g. Sun Oct 17 04:41:13 2010 (locale dependent).\n\
 ";
 
 #if MAKE_LIB
 void process(int argc, char *argv[], int *outc, char *outs[], unsigned long *maxLength) {
 	state[OPT_NOOUTPUTFILE] = "true";
 #else
-int main(int argc, char *argv[]) {
+int main(const int argc, char *argv[]) {
 #endif
 
 	std::vector<fs::path> bufferDirs;
@@ -1640,9 +1684,12 @@ int main(int argc, char *argv[]) {
 					{
 						i++;
 						Date date((args[i]));
-						std::cout << '\"' << args[i] << '\"' << " -> "
-						<< date.string() << " -> " << date.string("%c")
-						<< " " << (date.isValid() ? "✅" : "❌") << '\n';
+						int sz = int(args[i].size()) + 2 + 2;
+						std::string fill;
+						for (auto h { 0 }; h<sz; ++h) fill += ' ';
+						std::cout << '\"' << args[i] << '\"'
+						<< "  [tvplaylist]   -> \"" << date.string() << "\" " << (date.isValid() ? "✅" : "❌") << '\n';
+						std::cout <<  fill << "[strftime(%c)] -> \"" << date.string("%c") <<"\"\n";
 						return
 #ifndef MAKE_LIB
 						0
@@ -1733,11 +1780,20 @@ int main(int argc, char *argv[]) {
 					}
 					return false;
 				}};
-				if (i + 2 < args.size()
+				if (i + 1 < args.size()
 					and (args[i + 1][0] == '<'
 							or args[i + 1][0] == '>'
 							or args[i + 1][0] == '='))
 				{
+					if (args[i + 1] == "<" or args[i + 1] == ">"
+						or args[i + 1] == "=")
+					{
+						if (i + 2 < args.size())
+							i++;
+						else
+							goto DATE_NEEDED;
+					}
+
 					if (as_single(args[i + 1][0]))
 						continue;
 				}
@@ -1788,13 +1844,12 @@ int main(int argc, char *argv[]) {
 						}
 						
 						if (as_single('=')) {
-							i++;
 							continue;
 						}
 						
 					}
 				}
-				std::cout << "Expecting date and/or time after \""
+DATE_NEEDED:	std::cout << "Expecting date and/or time after \""
 				<< args[i] << "\" option.\n";
 			}
 			else if (isMatch(OPT_OVERWRITE, 	'O', true));

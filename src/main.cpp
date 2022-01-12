@@ -307,7 +307,7 @@ struct Date
 		return std::mktime(&tm); //std::time(nullptr);
 	}
 
-	func string(const char* const format = nullptr) -> std::string {
+	func string(const char* const format = nullptr) const -> std::string {
 		std::string s;
 		if (format) {
 			std::tm tm{};
@@ -344,7 +344,9 @@ struct Date
 		return s;
 	}
 private:
-	func getWeekDayName(unsigned short index, const char* const locale = nullptr) -> std::string {
+	func getWeekDayName(unsigned short index, const char* const locale = nullptr)
+		const -> std::string
+	{
 		if (index >= 1 or index <= 7) {
 			std::tm tm{};
 			tm.tm_year = 2020-1900; // 2020
@@ -1841,6 +1843,11 @@ int main(const int argc, char *argv[]) {
 				else
 				{
 					auto push{[&](const Date& lower, const Date& upper) {
+						if (lower > upper) {
+							std::cout << "Date range up side down!"
+							<< lower.string() << " > " << upper.string() << '\n';
+							return false;
+						}
 						if (opt == OPT_DATE) {
 							listDCreatedR.emplace_back(std::make_pair(lower, upper));
 							listDChangedR.emplace_back(std::make_pair(lower, upper));
@@ -1871,15 +1878,17 @@ int main(const int argc, char *argv[]) {
 						 ).emplace_back(std::make_pair(lower, upper));
 						state[opt] = "1";
 						}
+						return true;
 					}};
 					if (i + 3 < args.size() and
 						(args[i + 2] == "-" or args[i + 2] == "..")) {
 						if (Date lower(args[i + 1]); lower.isValid())
 							if (Date upper(args[i + 3]); upper.isValid())
 							{
-								push(lower, upper);
-								i += 3;
-								continue;
+								if (push(lower, upper)) {
+									i += 3;
+									continue;
+								}
 							}
 					} else if (i + 1 < args.size()) {
 						auto pos = args[i + 1].find("..");
@@ -1901,9 +1910,10 @@ int main(const int argc, char *argv[]) {
 								if (Date upper(args[i + 1].substr(pos));
 									upper.isValid())
 								{
-									push(lower, upper);
-									i++;
-									continue;
+									if (push(lower, upper)) {
+										i++;
+										continue;
+									}
 								}
 						}
 						

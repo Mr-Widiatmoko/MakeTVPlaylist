@@ -2442,13 +2442,13 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 				}
 				
 				putToRecord(false);
-			} else {
-				for (auto& f : fs::directory_iterator(dir))
-					if (filter(f))
-						bufferFiles.emplace_back(f);
-				
-				putToRecord(true);
 			}
+			
+			for (auto& f : fs::directory_iterator(dir))
+				if (filter(f))
+					bufferFiles.emplace_back(f);
+			
+			putToRecord(true);			
 			
 		} catch (fs::filesystem_error& e) {
 			#ifndef DEBUG

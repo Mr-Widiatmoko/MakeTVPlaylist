@@ -59,6 +59,9 @@ constexpr auto OPT_EXCLFIND			{"exclude-find"};			// I
 constexpr auto OPT_REGEX			{"regex"};					// r
 constexpr auto OPT_EXCLREGEX		{"exclude-regex"};			// R
 
+constexpr auto OPT_DATE				{"date"};					// z
+constexpr auto OPT_EXCLDATE			{"exclude-date"};			// Z
+
 constexpr auto OPT_DCREATED			{"created"};				// t
 constexpr auto OPT_DMODIFIED		{"modified"};				// m
 constexpr auto OPT_DACCESSED		{"accessed"};				// a
@@ -328,14 +331,12 @@ struct Date
 				s.append(getWeekDayName(weekday));
 			
 			if (year > 0 or month > 0 or day > 0) {
-				if (not s.empty())
-					s.append(" ");
-				s.append(year > 0 ? std::to_string(year) : "?");
+				s.append((s.empty() ? "" : " ") + (year > 0 ? std::to_string(year) : "?"));
 				s.append("/" + (month > 0 ? std::to_string(month) : "?"));
 				s.append("/" + (day > 0 ? std::to_string(day) : "?"));
 			}
 			if (hour > 0 or minute > 0 or second > 0) {
-				s.append(" " + std::to_string(hour));
+				s.append((s.empty() ? "" : " ") + std::to_string(hour));
 				s.append(":" + std::to_string(minute));
 				s.append(":" + std::to_string(second));
 			}
@@ -1499,52 +1500,70 @@ Option:\n\
                   'min size'-'max size'\n\
                  Filter to exclude files that size match, in \"KB\", \"MB\" (default), or \"GB\".\n\
                  You can specifying this multiple times for 'Range' only based size.\n\
+-z, --date = | < | > 'date and/or time'\n\
+             'min' .. 'max'\n\
+             'min' - 'max'\n\
+                 Filter only files that was created or accessed or modified or changed at specified date[s] and/or time[s].\n\
+                 If you need only specific type of date, then use --created, --accessed, --modified, or --changed respectively.\n\
+                 For more information about 'date and/or time' possible values, see below.\n\
+                 You can specifying this multiple times, for both single value or range values.\n\
+                   Example, to filter all files that has created/accessed/modified/changed with minutes from 20 to 35 for any date time and from 47 to 56 for year 2021:\n\
+                      --date=0:20-0:35 --date=\"0:47 2021\" - \"0:56 2021\"\n\
+                     OR\n\
+                      --date=0:20..0:35:date=0:47/2022..0:56/2022\n\
+-Z, --exclude-date = | < | > 'date and/or time'\n\
+                     'min' .. 'max'\n\
+                     'min' - 'max'\n\
+                 Filter to exclude only files that was created or accessed or modified or changed at specified date[s] and/or time[s].\n\
+                 If you need only specific type of date, then use --exclude-created, --exclude-accessed, --exclude-modified, or --exclude-changed respectively.\n\
+                 For more information about 'date and/or time' possible values, see below.\n\
+                 You can specifying this multiple times, for both single value or range values.\n\
 -t, --created = | < | > 'date and/or time'\n\
               'min' .. 'max'\n\
               'min' - 'max'\n\
-                 Filter only files that was created on specified date and/or time.\n\
+                 Filter only files that was created on specified date[s] and/or time[s].\n\
                  For more information about 'date and/or time' possible values, see below.\n\
                  You can specifying this multiple times, for both single value or range values.\n\
 -T, --exclude-created = | < | > 'date and/or time'\n\
                       'min' .. 'max'\n\
                       'min' - 'max'\n\
-                 Filter to exclude only files that was created on specified date and/or time.\n\
+                 Filter to exclude only files that was created on specified date[s] and/or time[s].\n\
                  For more information about 'date and/or time' possible values, see below.\n\
                  You can specifying this multiple times, for both single value or range values.\n\
 -a, --accessed = | < | > 'date and/or time'\n\
                'min' .. 'max'\n\
                'min' - 'max'\n\
-                 Filter only files that was accessed on specified date and/or time.\n\
+                 Filter only files that was accessed on specified date[s] and/or time[s].\n\
                  You can specifying this multiple times, for both single value or range values.\n\
                  For more information about 'date and/or time' possible values, see below.\n\
 -A, --exclude-accessed = | < | > 'date and/or time'\n\
                        'min' .. 'max'\n\
                        'min' - 'max'\n\
-                 Filter to exclude only files that was accessed on specified date and/or time.\n\
+                 Filter to exclude only files that was accessed on specified date[s] and/or time[s].\n\
                  For more information about 'date and/or time' possible values, see below.\n\
                  You can specifying this multiple times, for both single value or range values.\n\
 -m, --modified = | < | > 'date and/or time'\n\
               'min' .. 'max'\n\
               'min' - 'max'\n\
-                 Filter only files that was modified on specified date and/or time.\n\
+                 Filter only files that was modified on specified date[s] and/or time[s].\n\
                  For more information about 'date and/or time' possible values, see below.\n\
                  You can specifying this multiple times, for both single value or range values.\n\
 -M, --exclude-modified = | < | > 'date and/or time'\n\
                       'min' .. 'max'\n\
                       'min' - 'max'\n\
-                 Filter to exclude only files that was modified on specified date and/or time.\n\
+                 Filter to exclude only files that was modified on specified date[s] and/or time[s].\n\
                  For more information about 'date and/or time' possible values, see below.\n\
                  You can specifying this multiple times, for both single value or range values.\n\
 -g, --changed = | < | > 'date and/or time'\n\
               'min' .. 'max'\n\
               'min' - 'max'\n\
-                 Filter only files that was changed on specified date and/or time.\n\
+                 Filter only files that was changed on specified date[s] and/or time[s].\n\
                  For more information about 'date and/or time' possible values, see below.\n\
                  You can specifying this multiple times, for both single value or range values.\n\
 -G, --exclude-changed = | < | > 'date and/or time'\n\
                       'min' .. 'max'\n\
                       'min' - 'max'\n\
-                 Filter to exclude only files that was changed on specified date and/or time.\n\
+                 Filter to exclude only files that was changed on specified date[s] and/or time[s].\n\
                  For more information about 'date and/or time' possible values, see below.\n\
                  You can specifying this multiple times, for both single value or range values.\n\
 -f, --out-filename 'filename'\n\
@@ -1750,7 +1769,9 @@ int main(const int argc, char *argv[]) {
 					std::cout << "Expecting regular expression after \""
 					<< args[i] << "\" option.\n";
 			}
-			else if (isMatch(OPT_DCREATED, 		't')
+			else if (isMatch(OPT_DATE, 				'z')
+					 or isMatch(OPT_EXCLDATE, 		'Z')
+					 or isMatch(OPT_DCREATED, 	't')
 					 or isMatch(OPT_DCHANGED, 	'g')
 					 or isMatch(OPT_DACCESSED, 	'a')
 					 or isMatch(OPT_DMODIFIED, 	'm')
@@ -1764,6 +1785,25 @@ int main(const int argc, char *argv[]) {
 				auto as_single{[&](const char opGt) -> bool {
 					Date date(args[i + 1]);
 					if (date.isValid()) {
+						if (opt == OPT_DATE) {
+							listDCreated.emplace_back(std::make_pair(opGt, date));
+							listDChanged.emplace_back(std::make_pair(opGt, date));
+							listDModified.emplace_back(std::make_pair(opGt, date));
+							listDAccessed.emplace_back(std::make_pair(opGt, date));
+							state[OPT_DCREATED]  = "1";
+							state[OPT_DMODIFIED] = "1";
+							state[OPT_DACCESSED] = "1";
+							state[OPT_DCHANGED]  = "1";
+						} else if (opt == OPT_EXCLDATE) {
+							listDExclCreated.emplace_back(std::make_pair(opGt, date));
+							listDExclChanged.emplace_back(std::make_pair(opGt, date));
+							listDExclModified.emplace_back(std::make_pair(opGt, date));
+							listDExclAccessed.emplace_back(std::make_pair(opGt, date));
+							state[OPT_DEXCLCREATED]  = "1";
+							state[OPT_DEXCLMODIFIED] = "1";
+							state[OPT_DEXCLACCESSED] = "1";
+							state[OPT_DEXCLCHANGED]  = "1";
+						} else {
 						(opt == OPT_DCREATED ? listDCreated
 						 : opt == OPT_DCHANGED ? listDChanged
 						 : opt == OPT_DMODIFIED ? listDModified
@@ -1774,7 +1814,8 @@ int main(const int argc, char *argv[]) {
 						 : listDExclAccessed
 						 ).emplace_back(std::make_pair(opGt, date));
 
-						state[opt] = "1";
+							state[opt] = "1";
+						}
 						i++;
 						return true;
 					}
@@ -1800,6 +1841,25 @@ int main(const int argc, char *argv[]) {
 				else
 				{
 					auto push{[&](const Date& lower, const Date& upper) {
+						if (opt == OPT_DATE) {
+							listDCreatedR.emplace_back(std::make_pair(lower, upper));
+							listDChangedR.emplace_back(std::make_pair(lower, upper));
+							listDModifiedR.emplace_back(std::make_pair(lower, upper));
+							listDAccessedR.emplace_back(std::make_pair(lower, upper));
+							state[OPT_DCREATED]  = "1";
+							state[OPT_DMODIFIED] = "1";
+							state[OPT_DACCESSED] = "1";
+							state[OPT_DCHANGED]  = "1";
+						} else if (opt == OPT_EXCLDATE) {
+							listDExclCreatedR.emplace_back(std::make_pair(lower, upper));
+							listDExclChangedR.emplace_back(std::make_pair(lower, upper));
+							listDExclModifiedR.emplace_back(std::make_pair(lower, upper));
+							listDExclAccessedR.emplace_back(std::make_pair(lower, upper));
+							state[OPT_DEXCLCREATED]  = "1";
+							state[OPT_DEXCLMODIFIED] = "1";
+							state[OPT_DEXCLACCESSED] = "1";
+							state[OPT_DEXCLCHANGED]  = "1";
+						} else {
 						(opt == OPT_DCREATED ? listDCreatedR
 						 : opt == OPT_DCHANGED ? listDChangedR
 						 : opt == OPT_DMODIFIED ? listDModifiedR
@@ -1810,6 +1870,7 @@ int main(const int argc, char *argv[]) {
 						 : listDExclAccessedR
 						 ).emplace_back(std::make_pair(lower, upper));
 						state[opt] = "1";
+						}
 					}};
 					if (i + 3 < args.size() and
 						(args[i + 2] == "-" or args[i + 2] == "..")) {
@@ -1825,8 +1886,11 @@ int main(const int argc, char *argv[]) {
 						if (pos == std::string::npos) {
 							unsigned strip { 0 };
 							pos = 0;
-							for (; pos < args[i + 1].size(); ++pos)
-								strip += args[i + 1][pos] == '-' ? 1 : 0;
+							for (auto m{ 0 }; m < args[i + 1].size(); ++m)
+								if (args[i + 1][m] == '-') {
+									strip++;
+									pos = m;
+								}
 							if (strip != 1)
 								pos = std::string::npos;
 						}
@@ -1834,7 +1898,7 @@ int main(const int argc, char *argv[]) {
 						if (pos not_eq std::string::npos) {
 							if (Date lower(args[i + 1].substr(0, pos));
 								lower.isValid())
-								if (Date upper(args[i + 1].substr(pos + 2));
+								if (Date upper(args[i + 1].substr(pos));
 									upper.isValid())
 								{
 									push(lower, upper);
@@ -2029,7 +2093,7 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 				auto substr_item = std::move(item->substr(2));
 				for (auto& opt : OPTS)
 					if (auto percentage{ getLikely(substr_item, *opt) };
-						percentage > 75)
+						percentage > 80)
 						possible.emplace_back(std::make_pair(percentage, *opt));
 				
 				if (not possible.empty()) {
@@ -2039,14 +2103,13 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 					{
 						return a.first > b.first;
 					});
-					others = " do you mean: --" + possible[0].second + ".";
-//					for (auto k{0}; auto&& s : possible)
-//						others.append("--" + s.second + (++k == possible.size() ? "." : ", "));
+					others = " do you mean: ";
+					for (auto k{0}; auto&& s : possible)
+						others.append("--" + s.second + (++k == possible.size() ? "." : " or "));
 				}
 			}
 				
 			std::cout << '"' << *item << '"' << others << '\n';
-				// << (i + 1 < invalidArgs.size() ? ", " : "");
 		}
 		std::cout << "\nFor more information, please try to type \""
 			<< fs::path(argv[0]).filename().string() << " --help\"\n\n";
@@ -2154,8 +2217,9 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 	}
 
 	for (auto& S : {OPT_SIZE, OPT_EXCLSIZE}) {
-		std::cout << LABEL(S)
-				<< ((S == OPT_SIZE ? listSize : listExclSize).empty()
+		std::cout << LABEL(S);
+		if (S == OPT_SIZE or (S == OPT_EXCLSIZE and state[OPT_EXCLSIZEOPGT][0] != '\0'))
+			std::cout << ((S == OPT_SIZE ? listSize : listExclSize).empty()
 					or state[S == OPT_SIZE ? OPT_SIZEOPGT
 							  : OPT_EXCLSIZEOPGT][0] != '\0'
 					? (state[S == OPT_SIZE ? OPT_SIZEOPGT

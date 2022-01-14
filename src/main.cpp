@@ -443,6 +443,15 @@ public:
 			std::strftime(a, sizeof(a), f, std::localtime(tl));
 			*property[i++] = std::stoi(a);
 		}
+		
+		// Just not trust weekday returned from strftime("%u")
+		const std::chrono::year_month_day 	ymd
+			{ std::chrono::year(year) / month / day };
+		const std::chrono::weekday 			aweekday
+			{ std::chrono::sys_days{ ymd } };
+		
+		if (weekday != aweekday.iso_encoding())
+			weekday = aweekday.iso_encoding();
 	}
 		
 	Date(const std::string& s): year{0}, month{0}, day{0}, weekday{0},

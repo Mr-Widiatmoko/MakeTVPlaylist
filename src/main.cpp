@@ -1077,18 +1077,73 @@ public:
 
 struct ID3
 {
+private:
+	const char* path;
+public:
 	std::string title, artist, album, comment, genre,
 		year, track;
 	
-	ID3(const char* const path): year{0}, track{0} {
+	func write() const {
+		if (not path) return;
+		std::fstream file;
+		file.open(path);
+		
+		file.seekp(0, std::ios_base::end);
+		const int end = int(file.tellp());
+		
+		file.seekp(end - 128);
+		int pos = int(file.tellp());
+		
+		auto set{[&](const char* val, int size) {
+			if (val) {
+				if (size == 1) {
+					char ONE[1];
+					ONE[0] = std::stoi(val);
+					file.write(ONE, size);
+				} else
+					file.write(val, size);
+			}
+			pos += size;
+			file.seekp(pos);
+		}};
+				
+		set(nullptr, 3);
+		set(title.c_str(), 30);
+		set(artist.c_str(), 30);
+		set(album.c_str(), 30);
+		set(year.c_str(), 4);
+		set(comment.c_str(),  28);
+		set(nullptr, 1);
+		if (not track.empty()) {
+			set(track.c_str(), 1);
+			//genre = get(1);
+		}
+		file.close();
+	}
+	
+	func string() const -> std::string {
+		return
+		  "Title  : \"" + title + "\"\n"
+		+ "Artist : \"" + artist + "\"\n"
+		+ "Album  : \"" + album + "\"\n"
+		+ "Genre  : \"" + genre + "\"\n"
+		+ "Year   : \"" + year + "\"\n"
+		+ "Track  : \"" + track + "\"\n"
+		+ "Comment: \"" + comment + "\"\n"
+		;
+	}
+	
+	ID3(const char* const path): year{0}, track{0}, path{path} {
 		std::ifstream file;
 		file.open(path, std::ios::in | std::ios::ate);
-		if (not file.good()) { return; }
+		if (not file.good()) {
+			this->path = nullptr;
+			return;
+		}
 		
 		auto get{[&](int size, bool isGenre = false) -> std::string {
-			char buffer[size + (size > 1 ? 1 : 0)];
-			if (size > 1)
-				buffer[size] = '\0';
+			char buffer[size + 1];
+			buffer[size] = '\0';
 			for(int i = 0; i < size; ++i)
 				buffer[i] = file.get();
 
@@ -1100,6 +1155,8 @@ struct ID3
 							return g;
 						genreIndex++;
 					}
+				else
+					return std::to_string(result);
 			}
 			
 			return std::string(buffer);
@@ -1989,12 +2046,48 @@ int main(const int argc, char *argv[]) {
 			}
 			else if (isMatch(OPT_DEBUG, 		'D', true)) {
 				if (i + 1 < args.size() and
-					(args[i + 1] == "args"
+					(args[i + 1] == "args" or args[i + 1] == "id3"
 					 or args[i + 1] == "date"))
 				{
 					i++;
 					state[OPT_DEBUG] = args[i];
-					
+					if (args[i] == "id3")
+					{
+						if (i + 2 == args.size() and tolower(fs::path(args[i + 1]).extension().string()) == ".mp3")
+						{
+							ID3 id3(args[i + 1].c_str());
+							std::cout << id3.string() << '\n';
+							i++;
+						}
+						else if (i + 3 < args.size() and tolower(fs::path(args[i + 3]).extension().string()) == ".mp3")
+						{
+							ID3 id3(args[i + 3].c_str());
+							std::cout << id3.string() << '\n';
+
+							auto key { args[i + 1] };
+							auto val { args[i + 2] };
+							auto isOk { true };
+							if (key == OPT_TITLE) id3.title = val;
+							else if (key == OPT_ARTIST) id3.artist = val;
+							else if (key == OPT_ALBUM) id3.album = val;
+							else if (key == OPT_YEAR) id3.year = val;
+							else if (key == OPT_TRACK) id3.track = val;
+							else if (key == OPT_COMMENT) id3.comment = val;
+							else {
+								isOk = false;
+								std::cout << "Expecting ID3 key, but found \"" << key << "\"\n";
+							}
+							
+							if (isOk) {
+								id3.write();
+								
+								ID3 rw(args[i + 3].c_str());
+								std::cout << rw.string() << '\n';
+							}
+							i += 3;
+						}
+						return RETURN_VALUE
+					}
 					if (args[i] == "date" and i + 1 < args.size())
 					{
 						i++;

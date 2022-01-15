@@ -8,15 +8,21 @@
 //  in the LICENSE file found in the top-level directory of this
 //  distribution and at https://github.com/Mr-Widiatmoko/MakeTVPlaylist/LICENSE.txt
 //
+#if _MSC_VER && !__INTEL_COMPILER
+#pragma once
+#define EXPORT_FUNC	__declspec(dllexport)
+#else
+#define EXPORT_FUNC
+#endif
 
-#ifndef LIBPTVSHOW_H_INCLUDED
-#define LIBPTVSHOW_H_INCLUDED
+#ifndef LIBTVPLAYLIST_H_INCLUDED
+#define LIBTVPLAYLIST_H_INCLUDED
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-void process(int argc, char *argv[], /// Inputs
+EXPORT_FUNC void process(int argc, char *argv[], /// Inputs
 			 int *outc, char *outs[], unsigned long *maxLength);/// Outputs, you need to free 'outs' by your self.
 
 /** Example Usage on C:
@@ -73,4 +79,6 @@ void process(int argc, char *argv[], /// Inputs
 }
 #endif
 
-#endif /* LIBPTVSHOW_H_INCLUDED */
+#undef EXPORT_FUNC
+
+#endif /* LIBTVPLAYLIST_H_INCLUDED */

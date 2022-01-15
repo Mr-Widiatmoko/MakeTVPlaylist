@@ -67,18 +67,276 @@ constexpr auto OPT_DMODIFIED		{"modified"};				// m
 constexpr auto OPT_DACCESSED		{"accessed"};				// a
 constexpr auto OPT_DCHANGED			{"changed"};				// g
 
-constexpr auto OPT_DEXCLCREATED			{"exclude-created"};	// T
-constexpr auto OPT_DEXCLMODIFIED		{"exclude-modified"};	// M
-constexpr auto OPT_DEXCLACCESSED		{"exclude-accessed"};	// A
-constexpr auto OPT_DEXCLCHANGED			{"exclude-changed"};	// G
+constexpr auto OPT_DEXCLCREATED		{"exclude-created"};		// T
+constexpr auto OPT_DEXCLMODIFIED	{"exclude-modified"};		// M
+constexpr auto OPT_DEXCLACCESSED	{"exclude-accessed"};		// A
+constexpr auto OPT_DEXCLCHANGED		{"exclude-changed"};		// G
 
 constexpr auto OPT_DEBUG			{"debug"};
-auto OPTS = { &OPT_HELP, &OPT_VERSION, &OPT_VERBOSE, &OPT_BENCHMARK, & OPT_OVERWRITE,
-	&OPT_SKIPSUBTITLE, &OPT_OUTDIR, &OPT_EXECUTION, &OPT_REGEXSYNTAX, &OPT_FIXFILENAME,
+
+constexpr auto VERSION=\
+"tvplaylist version 1.1 (Early 2022)\nTM and (C) 2022 Widiatmoko. \
+All Rights Reserved. License and Warranty\n";
+
+constexpr auto HELP=\
+"Create playlist file '.m3u8' from vary directories and files, \
+then arranged one episode per title \
+for all input titles.\nHosted in https://github.com/Mr-Widiatmoko/MakeTVPlaylist\n\n\
+Usage:\n    tvplaylist [Option or Dir or File] ...\n\n\
+If no argument was specified, the current directory will be use.\n\n\
+Option:\n\
+-h, --help [option]\n\
+                 Display options description.\n\
+-v, --version    Display version.\n\
+";
+constexpr auto VERBOSE=\
+"-V, --verbose [all | info]\n\
+                 Display playlist content.\n\
+                 Define as 'all' will also show fail messages.\n\
+                 Define as 'info' will also display options info summary.\n\
+";
+constexpr auto BENCHMARK=\
+"-b, --benchmark  Benchmarking execution.\n\
+";
+constexpr auto OVERWRITE=\
+"-O, --overwrite  Overwrite output playlist file.\n\
+";
+constexpr auto SKIPSUBTITLE=\
+"-x, --skip-subtitle\n\
+                 Dont include subtitle file.\n\
+";
+constexpr auto OUTDIR=\
+"-d, --out-dir \"directory path\"\n\
+                 Override output directory for playlist file.\n\
+";
+constexpr auto EXECUTION=\
+"-c, --execution 'using'\n\
+                 Specify execution, using 'thread', 'async' is default, or 'linear' to execute.\n\
+";
+constexpr auto EXCLHIDDEN=\
+"-n, --exclude-hidden\n\
+                 Exclude hidden folders or files.\n\
+";
+constexpr auto FIND=\
+"-i, --find 'keyword'\n\
+                 Filter only files with filename contains find keyword.\n\
+                 You can specifying this multiple times.\n\
+                   Example: --find war; find invasion\n\
+";
+constexpr auto EXCLFIND=\
+"-I, --exclude-find 'keyword'\n\
+                 Filter to exclude files with filename contains find keyword.\n\
+                 You can specifying this multiple times.\n\
+                   Example: -I love; I and; I home\n\
+";
+constexpr auto REGEXSYNTAX=\
+"-X, --regex-syntax [type]\n\
+                 Specify regular expression syntax to use.\n\
+                 Available value are: 'ecma'(Default), 'awk', 'grep', 'egrep', 'basic', 'extended'.\n\
+                 'basic' use the basic POSIX regex grammar and\n\
+                 'extended' use the extended POSIX regex grammar.\n\
+";
+constexpr auto REGEX=\
+"-r, --regex 'syntax'\n\
+                 Filter only files with filename match regular expression.\n\
+                 You can specifying this multiple times.\n\
+";
+constexpr auto EXCLREGEX=\
+"-R, --exclude-regex 'syntax'\n\
+                 Filter to exclude files with filename match regular expression.\n\
+                 You can specifying this multiple times.\n\
+";
+constexpr auto EXT=\
+"-e, --ext \"'extension', 'extension', ...\"\n\
+                 Filter only files that match specific extensions, separated by comma.\n\
+                   Example: --ext \"pdf, docx\" or --ext=pdf,docx\n\
+                 To process all files use *, example: --ext=* \n\
+";
+constexpr auto EXCLEXT=\
+"-E, --exclude-ext \"'extension', 'extension' ...\"\n\
+                 Filter to exclude files that match specific extensions, separated by comma.\n\
+";
+constexpr auto SIZE=\
+"-s, --size < | > 'size'\n\
+           'min size'..'maz size'\n\
+           'min size'-'max size'\n\
+                 Filter only files that size match, in \"KB\", \"MB\" (default), or \"GB\".\n\
+                 You can specifying this multiple times for 'Range' only based size.\n\
+                   Example: --size<750\n\
+                     OR by specify the unit\n\
+                      --size>1.2gb\n\
+                     OR using range with '-' OR '..'\n\
+                      --size 750 - 1.2gb; size=30..200.2; size 2gb .. 4gb\n\
+";
+constexpr auto EXCLSIZE=\
+"-S, --exclude-size < | > 'size'\n\
+                  'min size'..'maz size'\n\
+                  'min size'-'max size'\n\
+                 Filter to exclude files that size match, in \"KB\", \"MB\" (default), or \"GB\".\n\
+                 You can specifying this multiple times for 'Range' only based size.\n\
+";
+constexpr auto DATE=\
+"-z, --date = | < | > 'date and/or time'\n\
+             'min' .. 'max'\n\
+             'min' - 'max'\n\
+                 Filter only files that was created or accessed or modified or changed at specified date[s] and/or time[s].\n\
+                 If you need only specific type of date, then use --created, --accessed, --modified, or --changed respectively.\n\
+                 For more information about 'date and/or time' possible values, see below.\n\
+                 You can specifying this multiple times, for both single value or range values.\n\
+                   Example, to filter all files that has created/accessed/modified/changed with minutes from 20 to 35 for any date time and from 47 to 56 for year 2021:\n\
+                      --date=0:20-0:35 --date=\"0:47 2021\" - \"0:56 2021\"\n\
+                     OR\n\
+                      --date=0:20..0:35:date=0:47/2022..0:56/2022\n\
+";
+constexpr auto EXCLDATE=\
+"-Z, --exclude-date = | < | > 'date and/or time'\n\
+                   'min' .. 'max'\n\
+                   'min' - 'max'\n\
+                 Filter to exclude only files that was created or accessed or modified or changed at specified date[s] and/or time[s].\n\
+                 If you need only specific type of date, then use --exclude-created, --exclude-accessed, --exclude-modified, or --exclude-changed respectively.\n\
+                 For more information about 'date and/or time' possible values, see below.\n\
+                 You can specifying this multiple times, for both single value or range values.\n\
+";
+constexpr auto CREATED=\
+"-t, --created = | < | > 'date and/or time'\n\
+              'min' .. 'max'\n\
+              'min' - 'max'\n\
+                 Filter only files that was created on specified date[s] and/or time[s].\n\
+                 For more information about 'date and/or time' possible values, see below.\n\
+                 You can specifying this multiple times, for both single value or range values.\n\
+";
+constexpr auto EXCLCREATED=\
+"-T, --exclude-created = | < | > 'date and/or time'\n\
+                      'min' .. 'max'\n\
+                      'min' - 'max'\n\
+                 Filter to exclude only files that was created on specified date[s] and/or time[s].\n\
+                 For more information about 'date and/or time' possible values, see below.\n\
+                 You can specifying this multiple times, for both single value or range values.\n\
+";
+constexpr auto ACCESSED=\
+"-a, --accessed = | < | > 'date and/or time'\n\
+               'min' .. 'max'\n\
+               'min' - 'max'\n\
+                 Filter only files that was accessed on specified date[s] and/or time[s].\n\
+                 You can specifying this multiple times, for both single value or range values.\n\
+                 For more information about 'date and/or time' possible values, see below.\n\
+";
+constexpr auto EXCLACCESSED=\
+"-A, --exclude-accessed = | < | > 'date and/or time'\n\
+                       'min' .. 'max'\n\
+                       'min' - 'max'\n\
+                 Filter to exclude only files that was accessed on specified date[s] and/or time[s].\n\
+                 For more information about 'date and/or time' possible values, see below.\n\
+                 You can specifying this multiple times, for both single value or range values.\n\
+";
+constexpr auto MODIFIED=\
+"-m, --modified = | < | > 'date and/or time'\n\
+              'min' .. 'max'\n\
+              'min' - 'max'\n\
+                 Filter only files that was modified on specified date[s] and/or time[s].\n\
+                 For more information about 'date and/or time' possible values, see below.\n\
+                 You can specifying this multiple times, for both single value or range values.\n\
+";
+constexpr auto EXCLMODIFIED=\
+"-M, --exclude-modified = | < | > 'date and/or time'\n\
+                      'min' .. 'max'\n\
+                      'min' - 'max'\n\
+                 Filter to exclude only files that was modified on specified date[s] and/or time[s].\n\
+                 For more information about 'date and/or time' possible values, see below.\n\
+                 You can specifying this multiple times, for both single value or range values.\n\
+";
+constexpr auto CHANGED=\
+"-g, --changed = | < | > 'date and/or time'\n\
+              'min' .. 'max'\n\
+              'min' - 'max'\n\
+                 Filter only files that was changed on specified date[s] and/or time[s].\n\
+                 For more information about 'date and/or time' possible values, see below.\n\
+                 You can specifying this multiple times, for both single value or range values.\n\
+";
+constexpr auto EXCLCHANGED=\
+"-G, --exclude-changed = | < | > 'date and/or time'\n\
+                      'min' .. 'max'\n\
+                      'min' - 'max'\n\
+                 Filter to exclude only files that was changed on specified date[s] and/or time[s].\n\
+                 For more information about 'date and/or time' possible values, see below.\n\
+                 You can specifying this multiple times, for both single value or range values.\n\
+";
+constexpr auto FIXFILENAME=\
+"-f, --out-filename 'filename'\n\
+                 Override output playlist filename.\n\
+";
+constexpr auto NOOUTPUTFILE=\
+"-F, --no-ouput-file [yes | no]\n\
+                 Choose to create playlist file or no. Default 'yes' if option was declared or if was build as library.\n\
+";
+constexpr auto HELP_REST=\
+"\n\
+Arguments can be surrounded by \"\" (eg. \"--F;V\") to enable using character ';' or anothers that belongs to Terminal or shell. To view how arguments was deduced you can pass option --debug=args.\n\
+Options can be joined, and option assignment separator [SPACE] can be replaced with '=' \
+and options can be separated by ':' or ';' after assignment. For the example:\n\n\
+  tvplaylist -hOVvc=async:xs<1.3gb:e=mp4,mkv:f=My-playlist.txt\n\n\
+Thats it, -h -O -V -v -c are joined, and -c has assignment operator '=' instead of\
+ using separator [SPACE]. \
+Also -x -s are joined, and -x is continuing with ':' after option assignment \
+'=async' and -s has remove [SPACE] separator for operator '<' and value '1.3gb'.\n\n\
+Redefinition of option means, it will use the last option, except for options 'regex', 'exclude-regex', 'find', 'exclude-find', 'size', 'exclude-size', 'date', 'exclude-date', 'created', 'exclude-created', 'modified', 'exclude-modified', 'changed', 'exclude-changed', 'accessed', 'exclude-accessed'. For the example, \
+this example will not use 'thread' execution at all':\n\n\
+  tvplaylist -c=thread /usr/local/videos -c=none /Users/Shared/Videos\n\n\
+Note, you cannot join mnemonic option with full option, for the example:\n\n\
+  tvplaylist -bO:ext=mp3:version\t\tWONT WORK\n\n\
+Instead try to separate mnemonic and full option, like this:\n\n\
+  tvplaylist -bO --ext=mp3:version\n\n\
+";
+constexpr auto HELP_DATE_REST=\
+"Posible value for 'date and/or time' are: 'Year', 'Month Name' (mnemonic or full), 'Month Number', 'Day', 'WeekDay Name' (mnemonic or full), 'Hour' (if AM/PM defined then it is 12 hours, otherwise 24 hours), 'Minute', 'Second', AM or PM.\n\
+Example:\n\
+  Filter only files created in 2009:\n\
+     --created=2009\n\
+  Filter only files created on Friday:\n\
+    --created friday  OR  --created==friday\n\
+  Filter only files created in 2009 with weekday is Sunday:\n\
+     --created=\"Sunday 2009\"  OR  --created=sun/2009\n\
+  Filter only files created from November 2019 thru January 2021:\n\
+     --created \"nov 2019\" .. \"jan 2021\"\n\
+  Filter only files created at January - March 1980 and May - June 2000 and after 2022:\n\
+     --created=jan/1980..march/1980:created 2000/may - jun/2000 --created>2022\n\
+  Filter only files created after March 22 1990 20:44:\n\
+     --created>\"3/22/2019 20:44\"  OR  --created \"20:44 22/jan/2019\"\n\
+It's up to you how to arrange date and/or time, At least you should use common time format (eg: 23:5:30). Here the possible arrangement you can use: \n\
+Common normal: \"Monday Jan 15 2022 7:00 PM\"\n\
+               \"Mon, 15/january/2022 7:0:0 pm\"\n\
+               \"Monday 1/15/2022 19:0\"\n\
+Equal and Acceptable: \"15 pm mon 7:0 2022/jan\"\n\
+If you want to test 'date and/or time' use --debug=date 'date and/or time', for the example:\n\
+     --debug=date \"pm 3:33\"\n\
+     or --debug=date wed\n\
+It will display:\n\
+[tvplaylist]-> Showing internal tvplaylist date time recognizer, with format \"Weekday Year/Month/Day Hour:Minute:Second\".\n\
+and for comparison\n\
+[strftime(%c)]-> Showing C/C++ standard library date time recognizer with %c format e.g. Sun Oct 17 04:41:13 2010 (locale dependent).\n\
+";
+
+
+auto OPTS = { &OPT_VERSION, &OPT_HELP, &OPT_VERBOSE, &OPT_BENCHMARK, & OPT_OVERWRITE,
+	&OPT_SKIPSUBTITLE, &OPT_OUTDIR, &OPT_EXECUTION, &OPT_FIXFILENAME,
 	&OPT_NOOUTPUTFILE, &OPT_SIZE, &OPT_EXCLSIZE, &OPT_EXT, &OPT_EXCLEXT, &OPT_FIND,
-	&OPT_EXCLFIND, &OPT_REGEX, &OPT_EXCLREGEX, &OPT_DCREATED, &OPT_DMODIFIED,
-	&OPT_DACCESSED, &OPT_DCHANGED, &OPT_DEXCLCREATED, &OPT_DEXCLMODIFIED,
-	&OPT_DEXCLACCESSED, &OPT_DEXCLCHANGED, &OPT_DEBUG
+	&OPT_EXCLFIND, &OPT_REGEXSYNTAX, &OPT_REGEX, &OPT_EXCLREGEX, &OPT_EXCLHIDDEN,
+	
+	&OPT_DATE, &OPT_EXCLDATE,
+	&OPT_DCREATED, &OPT_DMODIFIED, &OPT_DACCESSED, &OPT_DCHANGED,
+	&OPT_DEXCLCREATED, &OPT_DEXCLMODIFIED, &OPT_DEXCLACCESSED, &OPT_DEXCLCHANGED,
+	&OPT_DEBUG
+};
+
+constexpr const char* const* HELPS[] = { &VERSION, &HELP, &VERBOSE, &BENCHMARK, & OVERWRITE,
+    &SKIPSUBTITLE, &OUTDIR, &EXECUTION, &FIXFILENAME,
+    &NOOUTPUTFILE, &SIZE, &EXCLSIZE, &EXT, &EXCLEXT, &FIND,
+    &EXCLFIND, &REGEXSYNTAX, &REGEX, &EXCLREGEX, &EXCLHIDDEN,
+	
+	&DATE, &EXCLDATE,
+	&CREATED, &MODIFIED, &ACCESSED, &CHANGED,
+	&EXCLCREATED, &EXCLMODIFIED, &EXCLACCESSED, &EXCLCHANGED,
+	&HELP_REST, &HELP_DATE_REST
 };
 //#include <format>
 
@@ -199,6 +457,47 @@ func getLikely(const std::string_view& src, const std::string_view& with) {
 	}
 	
 	return scoreOpenent / score * 100;
+}
+
+func printHelp(const char* const arg = nullptr)
+{
+	if (auto i{0}; arg) {
+		for (auto& opt : OPTS) {
+			if (0 == std::strcmp(arg, *opt)) {
+				if (0 == std::strcmp(arg, OPT_HELP))
+				{
+					for (auto& help : HELPS)
+						std::cout << *help;
+				} else {
+					std::cout << *HELPS[i];
+								
+					if (0 == std::strcmp(arg, OPT_DATE) or 0 == std::strcmp(arg, OPT_EXCLDATE)
+						or 0 == std::strcmp(arg, OPT_DCREATED) or 0 == std::strcmp(arg, OPT_DEXCLCREATED)
+						or 0 == std::strcmp(arg, OPT_DCHANGED) or 0 == std::strcmp(arg, OPT_DEXCLCHANGED)
+						or 0 == std::strcmp(arg, OPT_DMODIFIED) or 0 == std::strcmp(arg, OPT_DEXCLMODIFIED)
+						or 0 == std::strcmp(arg, OPT_DACCESSED) or 0 == std::strcmp(arg, OPT_DEXCLACCESSED)
+						)
+						std::cout << HELP_DATE_REST;
+				}
+				break;
+			}
+			i++;
+			if (i >= OPTS.size() - 2) {
+				std::cout << "No option named \"" << arg << '\"';
+				std::vector<std::string> found;
+				for (auto& opt : OPTS)
+					if (getLikely(arg, *opt) > 80)
+						found.emplace_back(*opt);
+				if (not found.empty()) {
+					std::cout << ", do you mean ";
+					for (auto k{0}; k<found.size(); ++k)
+						std::cout << '\"' << found[k] << '\"' << (k + 1 == found.size() ? "." : " or ");
+				}
+				std::cout << '\n';
+				break;
+			}
+		}
+	}
 }
 
 
@@ -1447,185 +1746,6 @@ func timeLapse(std::chrono::system_clock::time_point& start,
 }
 
 #undef func
-constexpr auto VERSION="version 1.1 (Early 2022)\nTM and (C) 2022 Widiatmoko. \
-All Rights Reserved. License and Warranty\n";
-
-constexpr auto HELP=\
-"Create playlist file '.m3u8' from vary directories and files, \
-then arranged one episode per title \
-for all input titles.\nHosted in https://github.com/Mr-Widiatmoko/MakeTVPlaylist\n\n\
-Usage:\n    tvplaylist [Option or Dir or File] ...\n\n\
-If no argument was specified, the current directory will be use.\n\n\
-Option:\n\
--h, --help       Display this screen.\n\
--c, --execution 'using'\n\
-                 Specify execution, using 'thread', 'async' is default, or 'linear' to execute.\n\
--b, --benchmark  Benchmarking execution.\n\
--n, --exclude-hidden\n\
-                 Exclude hidden folders or files.\n\
--O, --overwrite  Overwrite output playlist file.\n\
--v, --version    Display version.\n\
--V, --verbose [all | info]\n\
-                 Display playlist content.\n\
-                 Define as 'all' will show fail messages.\n\
-                 Define as 'info' will display options info.\n\
--x, --skip-subtitle\n\
-                 Dont include subtitle file.\n\
--i, --find 'keyword'\n\
-                 Filter only files with filename contains find keyword.\n\
-                 You can specifying this multiple times.\n\
-                   Example: --find war; find invasion\n\
--I, --exclude-find 'keyword'\n\
-                 Filter to exclude files with filename contains find keyword.\n\
-                 You can specifying this multiple times.\n\
-                   Example: -I love; I and; I home\n\
--X, --regex-syntax [type]\n\
-                 Specify regular expression syntax to use.\n\
-                 Available value are: 'ecma'(Default), 'awk', 'grep', 'egrep', 'basic', 'extended'.\n\
-                 'basic' use the basic POSIX regex grammar and\n\
-                 'extended' use the extended POSIX regex grammar.\n\
--r, --regex 'syntax'\n\
-                 Filter only files with filename match regular expression.\n\
-                 You can specifying this multiple times.\n\
--R, --exclude-regex 'syntax'\n\
-                 Filter to exclude files with filename match regular expression.\n\
-                 You can specifying this multiple times.\n\
--e, --ext \"'extension', 'extension', ...\"\n\
-                 Filter only files that match specific extensions, separated by comma.\n\
-                   Example: --ext \"pdf, docx\" or --ext=pdf,docx\n\
-                 To process all files use *, example: --ext=* \n\
--E, --exclude-ext \"'extension', 'extension' ...\"\n\
-                 Filter to exclude files that match specific extensions, separated by comma.\n\
--s, --size < | > 'size'\n\
-           'min size'..'maz size'\n\
-           'min size'-'max size'\n\
-                 Filter only files that size match, in \"KB\", \"MB\" (default), or \"GB\".\n\
-                 You can specifying this multiple times for 'Range' only based size.\n\
-                   Example: --size<750\n\
-                     OR by specify the unit\n\
-                      --size>1.2gb\n\
-                     OR using range with '-' OR '..'\n\
-                      --size 750 - 1.2gb; size=30..200.2; size 2gb .. 4gb\n\
--S, --exclude-size < | > 'size'\n\
-                  'min size'..'maz size'\n\
-                  'min size'-'max size'\n\
-                 Filter to exclude files that size match, in \"KB\", \"MB\" (default), or \"GB\".\n\
-                 You can specifying this multiple times for 'Range' only based size.\n\
--z, --date = | < | > 'date and/or time'\n\
-             'min' .. 'max'\n\
-             'min' - 'max'\n\
-                 Filter only files that was created or accessed or modified or changed at specified date[s] and/or time[s].\n\
-                 If you need only specific type of date, then use --created, --accessed, --modified, or --changed respectively.\n\
-                 For more information about 'date and/or time' possible values, see below.\n\
-                 You can specifying this multiple times, for both single value or range values.\n\
-                   Example, to filter all files that has created/accessed/modified/changed with minutes from 20 to 35 for any date time and from 47 to 56 for year 2021:\n\
-                      --date=0:20-0:35 --date=\"0:47 2021\" - \"0:56 2021\"\n\
-                     OR\n\
-                      --date=0:20..0:35:date=0:47/2022..0:56/2022\n\
--Z, --exclude-date = | < | > 'date and/or time'\n\
-                     'min' .. 'max'\n\
-                     'min' - 'max'\n\
-                 Filter to exclude only files that was created or accessed or modified or changed at specified date[s] and/or time[s].\n\
-                 If you need only specific type of date, then use --exclude-created, --exclude-accessed, --exclude-modified, or --exclude-changed respectively.\n\
-                 For more information about 'date and/or time' possible values, see below.\n\
-                 You can specifying this multiple times, for both single value or range values.\n\
--t, --created = | < | > 'date and/or time'\n\
-              'min' .. 'max'\n\
-              'min' - 'max'\n\
-                 Filter only files that was created on specified date[s] and/or time[s].\n\
-                 For more information about 'date and/or time' possible values, see below.\n\
-                 You can specifying this multiple times, for both single value or range values.\n\
--T, --exclude-created = | < | > 'date and/or time'\n\
-                      'min' .. 'max'\n\
-                      'min' - 'max'\n\
-                 Filter to exclude only files that was created on specified date[s] and/or time[s].\n\
-                 For more information about 'date and/or time' possible values, see below.\n\
-                 You can specifying this multiple times, for both single value or range values.\n\
--a, --accessed = | < | > 'date and/or time'\n\
-               'min' .. 'max'\n\
-               'min' - 'max'\n\
-                 Filter only files that was accessed on specified date[s] and/or time[s].\n\
-                 You can specifying this multiple times, for both single value or range values.\n\
-                 For more information about 'date and/or time' possible values, see below.\n\
--A, --exclude-accessed = | < | > 'date and/or time'\n\
-                       'min' .. 'max'\n\
-                       'min' - 'max'\n\
-                 Filter to exclude only files that was accessed on specified date[s] and/or time[s].\n\
-                 For more information about 'date and/or time' possible values, see below.\n\
-                 You can specifying this multiple times, for both single value or range values.\n\
--m, --modified = | < | > 'date and/or time'\n\
-              'min' .. 'max'\n\
-              'min' - 'max'\n\
-                 Filter only files that was modified on specified date[s] and/or time[s].\n\
-                 For more information about 'date and/or time' possible values, see below.\n\
-                 You can specifying this multiple times, for both single value or range values.\n\
--M, --exclude-modified = | < | > 'date and/or time'\n\
-                      'min' .. 'max'\n\
-                      'min' - 'max'\n\
-                 Filter to exclude only files that was modified on specified date[s] and/or time[s].\n\
-                 For more information about 'date and/or time' possible values, see below.\n\
-                 You can specifying this multiple times, for both single value or range values.\n\
--g, --changed = | < | > 'date and/or time'\n\
-              'min' .. 'max'\n\
-              'min' - 'max'\n\
-                 Filter only files that was changed on specified date[s] and/or time[s].\n\
-                 For more information about 'date and/or time' possible values, see below.\n\
-                 You can specifying this multiple times, for both single value or range values.\n\
--G, --exclude-changed = | < | > 'date and/or time'\n\
-                      'min' .. 'max'\n\
-                      'min' - 'max'\n\
-                 Filter to exclude only files that was changed on specified date[s] and/or time[s].\n\
-                 For more information about 'date and/or time' possible values, see below.\n\
-                 You can specifying this multiple times, for both single value or range values.\n\
--f, --out-filename 'filename'\n\
-                 Override output playlist filename.\n\
--F, --no-ouput-file [yes | no]\n\
-                 Choose to create playlist file or no. Default 'yes' if option was declared or if was build as library.\n\
--d, --out-dir \"directory path\"\n\
-                 Override output directory for playlist file.\n\
-\n\
-Arguments can be surrounded by \"\" (eg. \"--F;V\") to enable using character ';' or anothers that belongs to Terminal or shell. To view how arguments was deduced you can pass option --debug=args.\n\
-Options can be joined, and option assignment separator [SPACE] can be replaced with '=' \
-and options can be separated by ':' or ';' after assignment. For the example:\n\n\
-  tvplaylist -hOVvc=async:xs<1.3gb:e=mp4,mkv:f=My-playlist.txt\n\n\
-Thats it, -h -O -V -v -c are joined, and -c has assignment operator '=' instead of\
- using separator [SPACE]. \
-Also -x -s are joined, and -x is continuing with ':' after option assignment \
-'=async' and -s has remove [SPACE] separator for operator '<' and value '1.3gb'.\n\n\
-Redefinition of option means, it will use the last option, except for options 'regex', 'exclude-regex', 'find', 'exclude-find', 'size', 'exclude-size', 'created', 'exclude-created', 'modified', 'exclude-modified', 'changed', 'exclude-changed', 'accessed', 'exclude-accessed'. For the example, \
-this example will not use 'thread' execution at all':\n\n\
-  tvplaylist -c=thread /usr/local/videos -c=none /Users/Shared/Videos\n\n\
-Note, you cannot join mnemonic option with full option, for the example:\n\n\
-  tvplaylist -bO:ext=mp3:version\t\tWONT WORK\n\n\
-Instead try to separate mnemonic and full option, like this:\n\n\
-  tvplaylist -bO --ext=mp3:version\n\n\
-Posible value for 'date and/or time' are: 'Year', 'Month Name' (mnemonic or full), 'Month Number', 'Day', 'WeekDay Name' (mnemonic or full), 'Hour' (if AM/PM defined then it is 12 hours, otherwise 24 hours), 'Minute', 'Second', AM or PM.\n\
-Example:\n\
-  Filter only files created in 2009:\n\
-     --created=2009\n\
-  Filter only files created on Friday:\n\
-    --created friday  OR  --created==friday\n\
-  Filter only files created in 2009 with weekday is Sunday:\n\
-     --created=\"Sunday 2009\"  OR  --created=sun/2009\n\
-  Filter only files created from November 2019 thru January 2021:\n\
-     --created \"nov 2019\" .. \"jan 2021\"\n\
-  Filter only files created at January - March 1980 and May - June 2000 and after 2022:\n\
-     --created=jan/1980..march/1980:created 2000/may - jun/2000 --created>2022\n\
-  Filter only files created after March 22 1990 20:44:\n\
-	 --created>\"3/22/2019 20:44\"  OR  --created \"20:44 22/jan/2019\"\n\
-It's up to you how to arrange date and/or time, At least you should use common time format (eg: 23:5:30). Here the possible arrangement you can use: \n\
-Common normal: \"Monday Jan 15 2022 7:00 PM\"\n\
-               \"Mon, 15/january/2022 7:0:0 pm\"\n\
-               \"Monday 1/15/2022 19:0\"\n\
-Equal and Acceptable: \"15 pm mon 7:0 2022/jan\"\n\
-If you want to test 'date and/or time' use --debug=date 'date and/or time', for the example:\n\
-     --debug=date \"pm 3:33\"\n\
-     or --debug=date wed\n\
-It will display:\n\
-[tvplaylist]-> Showing internal tvplaylist date time recognizer, with format \"Weekday Year/Month/Day Hour:Minute:Second\".\n\
-and for comparison\n\
-[strftime(%c)]-> Showing C/C++ standard library date time recognizer with %c format e.g. Sun Oct 17 04:41:13 2010 (locale dependent).\n\
-";
 
 #if MAKE_LIB
 void process(int argc, char *argv[], int *outc, char *outs[], unsigned long *maxLength) {
@@ -1672,8 +1792,8 @@ int main(const int argc, char *argv[]) {
 			auto result { (args[i].length() > 3
 					and args[i][0] == '-'
 					and args[i][1] == '-'
-					and (args[i].substr(2) == with
-						 or (withOther and args[i].substr(2) == withOther)))
+					and (tolower(args[i].substr(2)) == with
+						 or (withOther and tolower(args[i].substr(2)) == withOther)))
 				or (args[i].length() == 2
 					and args[i][0] == '-'
 					and args[i][1] == mnemonic) };
@@ -1688,12 +1808,11 @@ int main(const int argc, char *argv[]) {
 			return result;
 		} }; isMatch(OPT_HELP, 'h') or isMatch(OPT_VERSION, 'v'))
 			{
-				std::cout <<
-				fs::path(argv[0]).filename().string() << ' '
-				<< VERSION << '\n';
-				
-				if (args[i].substr(2) == OPT_HELP)
-					std::cout << HELP << '\n';
+				printHelp(i + 1 < args.size()
+						  ? (args[i + 1][0] == '-' and args[i + 1][1] == '-'
+							 ? tolower(args[++i].substr(2)).c_str()
+							 : tolower(args[++i]).c_str())
+						  : args[i].substr(2).c_str());
 				
 				if (i + 1 == args.size())
 					return

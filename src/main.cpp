@@ -72,6 +72,14 @@ constexpr auto OPT_DEXCLMODIFIED	{"exclude-modified"};		// M
 constexpr auto OPT_DEXCLACCESSED	{"exclude-accessed"};		// A
 constexpr auto OPT_DEXCLCHANGED		{"exclude-changed"};		// G
 
+constexpr auto OPT_TITLE			{"title"};
+constexpr auto OPT_ARTIST			{"artist"};
+constexpr auto OPT_ALBUM			{"album"};
+constexpr auto OPT_COMMENT			{"comment"};
+constexpr auto OPT_GENRE			{"genre"};
+constexpr auto OPT_YEAR				{"year"};
+constexpr auto OPT_TRACK			{"track"};
+
 constexpr auto OPT_DEBUG			{"debug"};
 
 constexpr auto VERSION=\
@@ -121,13 +129,19 @@ constexpr auto FIND=\
 "-i, --find 'keyword'\n\
                  Filter only files with filename contains find keyword.\n\
                  You can specifying this multiple times.\n\
-                   Example: --find war; find invasion\n\
+                   Example: --find war: find invasion\n\
+                 To find by using MP3 ID3 tags, use format --find 'key'='value' or --find='key'='value'.\n\
+                 Possible 'key' are: \"title\", \"artist\", \"album\", \"genre\", \"comment\", \"year\", and \"track\".\n\
+                   Example: --find artist=Koko  or  --find=artist=Koko\n\
 ";
 constexpr auto EXCLFIND=\
 "-I, --exclude-find 'keyword'\n\
                  Filter to exclude files with filename contains find keyword.\n\
                  You can specifying this multiple times.\n\
                    Example: -I love; I and; I home\n\
+                 To find by using MP3 ID3 tags, use format --find 'key'='value' or --find='key'='value'.\n\
+                 Possible 'key' are: \"title\", \"artist\", \"album\", \"genre\", \"comment\", \"year\", and \"track\".\n\
+                   Example: --find year=2007  or  --find=year=2007\n\
 ";
 constexpr auto REGEXSYNTAX=\
 "-X, --regex-syntax [type]\n\
@@ -310,10 +324,7 @@ Equal and Acceptable: \"15 pm mon 7:0 2022/jan\"\n\
 If you want to test 'date and/or time' use --debug=date 'date and/or time', for the example:\n\
      --debug=date \"pm 3:33\"\n\
      or --debug=date wed\n\
-It will display:\n\
-[tvplaylist]-> Showing internal tvplaylist date time recognizer, with format \"Weekday Year/Month/Day Hour:Minute:Second\".\n\
-and for comparison\n\
-[strftime(%c)]-> Showing C/C++ standard library date time recognizer with %c format e.g. Sun Oct 17 04:41:13 2010 (locale dependent).\n\
+It will showing internal tvplaylist date time recognizer, with format \"Weekday Year/Month/Day Hour:Minute:Second\".\n\
 ";
 
 
@@ -337,6 +348,41 @@ constexpr const char* const* HELPS[] = { &VERSION, &HELP, &VERBOSE, &BENCHMARK, 
 	&CREATED, &MODIFIED, &ACCESSED, &CHANGED,
 	&EXCLCREATED, &EXCLMODIFIED, &EXCLACCESSED, &EXCLCHANGED,
 	&HELP_REST, &HELP_DATE_REST
+};
+
+auto GENRES = {
+"Blues", "Classic rock", "Country", "Dance", "Disco", "Funk", "Grunge",
+"Hip-Hop", "Jazz", "Metal", "New Age", "Oldies", "Other", "Pop",
+"Rhythm and Blues", "Rap", "Reggae", "Rock", "Techno", "Industrial",
+"Alternative", "Ska", "Death metal", "Pranks", "Soundtrack", "Euro-Techno",
+"Ambient", "Trip-Hop", "Vocal", "Jazz & Funk", "Fusion", "Trance", "Classical",
+"Instrumental", "Acid", "House", "Game", "Sound clip", "Gospel", "Noise",
+"Alternative Rock", "Bass", "Soul", "Punk", "Space", "Meditative",
+"Instrumental Pop", "Instrumental Rock", "Ethnic", "Gothic", "Darkwave",
+"Techno-Industrial", "Electronic", "Pop-Folk", "Eurodance", "Dream",
+"Southern Rock", "Comedy", "Cult", "Gangsta", "Top 40", "Christian Rap",
+"Pop/Funk", "Jungle", "Native US", "Cabaret", "New Wave", "Psychedelic",
+"Rave", "Show tunes", "Trailer", "Lo-Fi", "Tribal", "Acid Punk", "Acid Jazz",
+"Polka", "Retro", "Musical", "Rock ’n’ Roll", "Hard rock",
+"Folk", "Folk-Rock", "National Folk", "Swing", "Fast Fusion", "Bebop", "Latin",
+"Revival", "Celtic", "Bluegrass", "Avantgarde", "Gothic Rock", "Progressive Rock",
+"Psychedelic Rock", "Symphonic Rock","Slow rock", "Big Band", "Chorus",
+"Easy Listening", "Acoustic", "119", "Humour", "Speech", "Chanson", "Opera",
+"Chamber music", "Sonata", "Symphony", "Booty bass", "Primus", "Porn groove",
+"Satire", "Slow jam", "Club", "Tango", "Samba", "Folklore", "Ballad",
+"Power ballad", "Rhythmic Soul", "Freestyle", "Duet", "Punk Rock", "Drum solo",
+"A cappella", "Euro-House", "Dancehall", "Goa", "Drum & Bass", "Club-House",
+"Hardcore Techno", "Terror", "Indie", "BritPop", "Negerpunk", "Polsk Punk",
+"Beat", "Christian Gangsta Rap", "Heavy Metal", "Black Metal", "Crossover",
+"Contemporary Christian", "Christian rock", "Merengue", "Salsa", "Thrash Metal",
+"Anime", "Jpop", "Synthpop", "Abstract", "Art Rock", "Baroque", "Bhangra",
+"Big beat", "Breakbeat", "Chillout", "Downtempo", "Dub", "EBM", "Eclectic",
+"Electro", "Electroclash", "Emo", "Experimental", "Garage", "Global", "IDM",
+"Illbient", "Industro-Goth", "Jam Band", "Krautrock", "Leftfield", "Lounge",
+"Math Rock", "New Romantic", "Nu-Breakz", "Post-Punk", "Post-Rock", "Psytrance",
+"Shoegaze", "Space Rock", "Trop Rock", "World Music", "Neoclassical",
+"Audiobook", "Audio theatre", "Neue Deutsche Welle", "Podcast", "Indie-Rock",
+"G-Funk", "Dubstep", "Garage Rock", "Psybient",
 };
 //#include <format>
 
@@ -399,6 +445,14 @@ func trim(const std::string& s) -> std::string
 	return s.substr(start, end);
 }
 
+func isEqual(const std::string_view& source,
+             const std::initializer_list<const std::string_view>& list) {
+	for (auto& s : list) {
+		if (source == s)
+			return true;
+	}
+	return false;
+}
 func isEqual(const std::string& source, const std::vector<std::string>* args) -> bool
 {
 	for (auto& check : *args)
@@ -1021,6 +1075,66 @@ public:
 
 };
 
+struct ID3
+{
+	std::string title, artist, album, comment, genre,
+		year, track;
+	
+	ID3(const char* const path): year{0}, track{0} {
+		std::ifstream file;
+		file.open(path, std::ios::in | std::ios::ate);
+		if (not file.good()) { return; }
+		
+		auto get{[&](int size, bool isGenre = false) -> std::string {
+			char buffer[size + (size > 1 ? 1 : 0)];
+			if (size > 1)
+				buffer[size] = '\0';
+			for(int i = 0; i < size; ++i)
+				buffer[i] = file.get();
+
+			if (size == 1) {
+				int result = buffer[0];
+				if (auto genreIndex{0}; isGenre)
+					for (auto& g : GENRES) {
+						if (result == genreIndex)
+							return g;
+						genreIndex++;
+					}
+			}
+			
+			return std::string(buffer);
+		}};
+		
+		const int end = int(file.tellg());
+		file.seekg(end - 128);
+		if (get(3) == "TAG")
+		{
+			title = get(30);
+			artist = get(30);
+			album = get(30);
+			year = get(4);
+			comment = get(28);
+			get(/*Zero Track*/ 1);
+			track = get(1);
+			genre = get(1, true);
+			
+			//file.seekg(0, std::ios::end);
+//			file.seekg(end - (128 + 227));
+//			if (get("Extended", 4) == "TAG+")
+//			{
+//				get("Title", 60);
+//				get("Artist", 60);
+//				get("Album", 60);
+//				get("speed", 1);
+//				get("Genre", 30);
+//				get("Start-Time", 6);
+//				get("End-Time", 6);
+//			}
+		}
+		
+		file.close();
+	}
+};
 
 std::vector<std::string> EXCLUDE_EXT;
 std::vector<std::string> DEFAULT_EXT {
@@ -1169,22 +1283,75 @@ func isValidFile(const fs::path& path) -> bool
 			if (std::regex_search(filename, regex))
 				return false;
 	
+	
+	func findId3{[&](const std::string& keyword, bool* found) -> bool {
+		auto pos = keyword.find("=");
+		if (pos != std::string::npos) {
+			auto key { keyword.substr(0, pos) };
+			
+			if (pos + 2 < keyword.size() and isEqual(key, { OPT_TITLE,
+				OPT_ARTIST, OPT_ALBUM, OPT_COMMENT, OPT_GENRE, OPT_YEAR, OPT_TRACK}))
+			{
+				auto val { keyword.substr(pos + 1) };
+									
+				ID3 id3(tmp.string().c_str());
+				
+				if (key == OPT_TITLE)
+					*found = id3.title.find(val) != std::string::npos;
+				else if (key == OPT_ARTIST)
+					*found = id3.artist.find(val) != std::string::npos;
+				else if (key == OPT_ALBUM)
+					*found = id3.album.find(val) != std::string::npos;
+				else if (key == OPT_COMMENT)
+					*found = id3.comment.find(val) != std::string::npos;
+				else if (key == OPT_GENRE)
+					*found = id3.genre.find(val) != std::string::npos;
+				else if (key == OPT_YEAR)
+					*found = id3.comment == val;
+				else if (key == OPT_TRACK)
+					*found = id3.track == val;
+				
+				return true;
+			}
+		}
+		return false;
+	}};
+	
 	if (bool found{ false }; not state[OPT_FIND].empty()) {
+		auto ismp3 { tmp.extension().string() == ".mp3" };
 		for (auto filename{ excludeExtension(tmp.filename()) };
 			 auto& keyword : listFind)
-			if (filename.find(keyword) != std::string::npos) {
+		{
+			auto handled { false };
+			if (ismp3)
+				handled = findId3(keyword, &found);
+				
+			
+			if (not handled and filename.find(keyword) != std::string::npos) {
 				found = true;
 				break;
 			}
+		}
 		if (not found)
 			return false;
 	}
 
-	if (not state[OPT_EXCLFIND].empty())
+	if (not state[OPT_EXCLFIND].empty()) {
+		auto ismp3 { tmp.extension().string() == ".mp3" };
 		for (auto filename{ excludeExtension(tmp.filename()) };
 			 auto& keyword : listExclFind)
-			if (filename.find(keyword) != std::string::npos)
+		{
+			auto handled { false };
+			if (auto found { false }; ismp3) {
+				auto handled{ findId3(keyword, &found) };
+				if (handled and found)
+					return false;
+			}
+			
+			if (not handled and filename.find(keyword) != std::string::npos)
 				return false;
+		}
+	}
 
 	if (bool found{ false };
 		not listSize.empty()
@@ -1648,7 +1815,7 @@ func expandArgs(const int argc, char* const argv[],
 			}
 		}
 		
-		bool isLastOpt { false };
+		unsigned equalOpCount{ 0 };
 		unsigned fallthrough { 0 };
 		unsigned index = lastOptCode == 3 ? -1 : (isFull and lastOptCode != 2 ? 1 : 0);
 		int last{ -1 };
@@ -1673,9 +1840,8 @@ func expandArgs(const int argc, char* const argv[],
 					//lastOptCode = 2;
 					last = index;
 				}
-				isLastOpt = true;
 			} else {
-				if (isLastOpt and (arg[index] == ARG_ASSIGN or std::isspace(arg[index]))) {
+				if (equalOpCount == 0 and (arg[index] == ARG_ASSIGN or std::isspace(arg[index]))) {
 					if (isFull) {
 						lastOptCode = 2;
 						push(arg, index, last);
@@ -1684,7 +1850,7 @@ func expandArgs(const int argc, char* const argv[],
 						lastOptCode = 1;
 						last = index + 1;
 					}
-					isLastOpt = false;
+					equalOpCount++;
 				} else if ((arg[index] == ARG_SEP or arg[index] == ';')
 						   and (index + 1 == std::strlen(arg) or
 								(index + 1 < std::strlen(arg) and std::isalpha(arg[index + 1])))) {
@@ -1695,12 +1861,14 @@ func expandArgs(const int argc, char* const argv[],
 						lastOptCode = 2;
 						newFull = index + 1 < std::strlen(arg) and std::isalpha(arg[index + 1]);
 					}
-					isLastOpt = false;
-				} else if (isLastOpt and isFull and last > 0 and (arg[index] == '<' or arg[index] == '>')) {
+					equalOpCount = 0;
+				} else if (isFull and last > 0 and (arg[index] == '<' or arg[index] == '>')) {
+					if (arg[last - 1] == ARG_ASSIGN or arg[last - 1] == '<' or arg[last - 1] == '>')
+						continue;
+					
 					lastOptCode = 0;
 					push(arg, index, last);
 					last = index;
-					isLastOpt = false;
 				} else {
 					if (arg[index] == '"') {
 						if (fallthrough == 0) {
@@ -1748,9 +1916,11 @@ func timeLapse(std::chrono::system_clock::time_point& start,
 #undef func
 
 #if MAKE_LIB
+#define RETURN_VALUE	;
 void process(int argc, char *argv[], int *outc, char *outs[], unsigned long *maxLength) {
 	state[OPT_NOOUTPUTFILE] = "true";
 #else
+#define RETURN_VALUE	EXIT_SUCCESS;
 int main(const int argc, char *argv[]) {
 #endif
 
@@ -1815,11 +1985,7 @@ int main(const int argc, char *argv[]) {
 						  : args[i].substr(2).c_str());
 				
 				if (i + 1 == args.size())
-					return
-#ifndef MAKE_LIB
-					0
-#endif
-					;
+					return RETURN_VALUE
 			}
 			else if (isMatch(OPT_DEBUG, 		'D', true)) {
 				if (i + 1 < args.size() and
@@ -1833,17 +1999,13 @@ int main(const int argc, char *argv[]) {
 					{
 						i++;
 						Date date((args[i]));
-						int sz = int(args[i].size()) + 2 + 2;
-						std::string fill;
-						for (auto h { 0 }; h<sz; ++h) fill += ' ';
+//						int sz = int(args[i].size()) + 2 + 2;
+//						std::string fill;
+//						for (auto h { 0 }; h<sz; ++h) fill += ' ';
 						std::cout << '\"' << args[i] << '\"'
-						<< "  [tvplaylist]   -> \"" << date.string() << "\" " << (date.isValid() ? "✅" : "❌") << '\n';
-						std::cout <<  fill << "[strftime(%c)] -> \"" << date.string("%c") <<"\"\n";
-						return
-#ifndef MAKE_LIB
-						0
-#endif
-						;
+						<< "  -> \"" << date.string() << "\" " << (date.isValid() ? "✅" : "❌") << '\n';
+//						std::cout <<  fill << "[strftime(%c)] -> \"" << date.string("%c") <<"\"\n";
+						return RETURN_VALUE
 
 					}
 				}
@@ -2356,7 +2518,7 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 
 	for (auto& S : {OPT_SIZE, OPT_EXCLSIZE}) {
 		std::cout << LABEL(S);
-		if (S == OPT_SIZE or (S == OPT_EXCLSIZE and state[OPT_EXCLSIZEOPGT][0] != '\0'))
+		if (S == OPT_SIZE or (state[OPT_SIZEOPGT][0] != '\0' or state[OPT_EXCLSIZEOPGT][0] != '\0'))
 			std::cout << ((S == OPT_SIZE ? listSize : listExclSize).empty()
 					or state[S == OPT_SIZE ? OPT_SIZEOPGT
 							  : OPT_EXCLSIZEOPGT][0] != '\0'
@@ -2409,11 +2571,7 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 	} // END Info
 					   
 	if (not invalidArgs.empty())
-		return
-#ifndef MAKE_LIB
-			0
-#endif
-			;
+		return RETURN_VALUE
 					   
 	if (state[OPT_OUTDIR].empty()) {
 		if (selectFiles.empty())

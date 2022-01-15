@@ -1748,7 +1748,7 @@ int main(const int argc, char *argv[]) {
 				{
 					(args[i].substr(2) == OPT_FIND ? listFind : listExclFind)
 						.emplace_back(args[i + 1]);
-					state[args[i]] = "1";
+					state[args[i].substr(2)] = "1";
 					i++;
 				} else
 					std::cout << "Expecting keyword after \""

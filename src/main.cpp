@@ -1127,10 +1127,16 @@ public:
 		set(year.c_str(), 4);
 		set(comment.c_str(),  28);
 		set(nullptr, 1);
-		if (not track.empty()) {
-			set(track.c_str(), 1);
-			//genre = get(1);
-		}
+		set(track.empty() ? nullptr : track.c_str(), 1);
+		if (not genre.empty())
+			for (auto i{0}; auto& g : GENRES) {
+				if (genre == g) {
+					set(std::to_string(i).c_str(), 1);
+					break;
+				}
+				i++;
+			}
+		
 		file.close();
 	}
 	
@@ -1400,7 +1406,7 @@ func isValidFile(const fs::path& path) -> bool
 			filename = tolower(filename);
 	}
 	
-	if (bool found{ false }; not state[OPT_FIND].empty()) {
+	if (bool found{ false }; not state[OPT_FIND].empty() and not listFind.empty()) {
 		for (auto& keyword : listFind)
 		{
 			auto handled { keyword[0] == char(1) };
@@ -2737,7 +2743,21 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 					   
 	if (not invalidArgs.empty())
 		return RETURN_VALUE
-					   
+
+	{///Clean up dir=??? in listFind and listExclFind
+		std::vector<std::string> tmp;
+		for (auto i{0}; i<listFind.size(); ++i)
+			if (listFind[i][0] != char(1))
+				tmp.emplace_back(std::move(listFind[i]));
+		listFind = std::move(tmp);
+		
+		tmp.clear();
+		for (auto i{0}; i<listExclFind.size(); ++i)
+			if (listExclFind[i][0] != char(1))
+				tmp.emplace_back(std::move(listExclFind[i]));
+		listExclFind = std::move(tmp);
+	}
+                       
 	if (state[OPT_OUTDIR].empty()) {
 		if (selectFiles.empty())
 			state[OPT_OUTDIR] = fs::current_path().string();

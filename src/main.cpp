@@ -41,6 +41,7 @@ constexpr auto OPT_THREAD			{"thread"};
 constexpr auto OPT_ASYNC			{"async"};
 constexpr auto OPT_EXCLHIDDEN		{"exclude-hidden"};			// n
 constexpr auto OPT_REGEXSYNTAX		{"regex-syntax"};			// X
+constexpr auto OPT_CASEINSENSITIVE	{"make-case-insensitive"};	// N
 
 constexpr auto OPT_FIXFILENAME 		{"out-filename"};			// f
 constexpr auto OPT_NOOUTPUTFILE 	{"no-output-file"};			// F
@@ -80,7 +81,7 @@ constexpr auto OPT_GENRE			{"genre"};
 constexpr auto OPT_YEAR				{"year"};
 constexpr auto OPT_TRACK			{"track"};
 
-constexpr auto OPT_DEBUG			{"debug"};
+constexpr auto OPT_DEBUG			{"debug"};                  // D
 
 constexpr auto VERSION=\
 "tvplaylist version 1.1 (Early 2022)\nTM and (C) 2022 Widiatmoko. \
@@ -125,23 +126,33 @@ constexpr auto EXCLHIDDEN=\
 "-n, --exclude-hidden\n\
                  Exclude hidden folders or files.\n\
 ";
+constexpr auto CASEINSENSITIVE=\
+"-N, --make-case-insensitive\n\
+                 Make --find and --exclude-find case-insensitive.\n\
+";
 constexpr auto FIND=\
 "-i, --find 'keyword'\n\
                  Filter only files with filename contains find keyword.\n\
                  You can specifying this multiple times.\n\
                    Example: --find war: find invasion\n\
+                 To filter only for directory name, use --find dir='value' or --find=dir='value'.\n\
+                   Example: --find dir=war  or  --find=dir=war\n\
                  To find by using MP3 ID3 tags, use format --find 'key'='value' or --find='key'='value'.\n\
                  Possible 'key' are: \"title\", \"artist\", \"album\", \"genre\", \"comment\", \"year\", and \"track\".\n\
                    Example: --find artist=Koko  or  --find=artist=Koko\n\
+                 To enable case-insensitive, declare -N or --make-case-insensitive option.\n\
 ";
 constexpr auto EXCLFIND=\
 "-I, --exclude-find 'keyword'\n\
                  Filter to exclude files with filename contains find keyword.\n\
                  You can specifying this multiple times.\n\
                    Example: -I love; I and; I home\n\
-                 To find by using MP3 ID3 tags, use format --find 'key'='value' or --find='key'='value'.\n\
+                 To filter only for directory name, use --exclude-find dir='value' or --exclude-find=dir='value'.\n\
+                   Example: --exclude-find dir=war  or  --exclude-find=dir=war\n\
+                 To find by using MP3 ID3 tags, use format --exclude-find 'key'='value' or --exclude-find='key'='value'.\n\
                  Possible 'key' are: \"title\", \"artist\", \"album\", \"genre\", \"comment\", \"year\", and \"track\".\n\
-                   Example: --find year=2007  or  --find=year=2007\n\
+                   Example: --exclude-find year=2007  or  --exclude-find=year=2007\n\
+                 To enable case-insensitive, use -N or --make-case-insensitive option.\n\
 ";
 constexpr auto REGEXSYNTAX=\
 "-X, --regex-syntax [type]\n\
@@ -328,9 +339,10 @@ It will showing internal tvplaylist date time recognizer, with format \"Weekday 
 ";
 
 
-auto OPTS = { &OPT_VERSION, &OPT_HELP, &OPT_VERBOSE, &OPT_BENCHMARK, & OPT_OVERWRITE,
+constexpr auto OPTS = { &OPT_VERSION, &OPT_HELP, &OPT_VERBOSE, &OPT_BENCHMARK, & OPT_OVERWRITE,
 	&OPT_SKIPSUBTITLE, &OPT_OUTDIR, &OPT_EXECUTION, &OPT_FIXFILENAME,
-	&OPT_NOOUTPUTFILE, &OPT_SIZE, &OPT_EXCLSIZE, &OPT_EXT, &OPT_EXCLEXT, &OPT_FIND,
+	&OPT_NOOUTPUTFILE, &OPT_SIZE, &OPT_EXCLSIZE, &OPT_EXT, &OPT_EXCLEXT,
+    &OPT_CASEINSENSITIVE, &OPT_FIND,
 	&OPT_EXCLFIND, &OPT_REGEXSYNTAX, &OPT_REGEX, &OPT_EXCLREGEX, &OPT_EXCLHIDDEN,
 	
 	&OPT_DATE, &OPT_EXCLDATE,
@@ -341,7 +353,8 @@ auto OPTS = { &OPT_VERSION, &OPT_HELP, &OPT_VERBOSE, &OPT_BENCHMARK, & OPT_OVERW
 
 constexpr const char* const* HELPS[] = { &VERSION, &HELP, &VERBOSE, &BENCHMARK, & OVERWRITE,
     &SKIPSUBTITLE, &OUTDIR, &EXECUTION, &FIXFILENAME,
-    &NOOUTPUTFILE, &SIZE, &EXCLSIZE, &EXT, &EXCLEXT, &FIND,
+    &NOOUTPUTFILE, &SIZE, &EXCLSIZE, &EXT, &EXCLEXT,
+    &CASEINSENSITIVE, &FIND,
     &EXCLFIND, &REGEXSYNTAX, &REGEX, &EXCLREGEX, &EXCLHIDDEN,
 	
 	&DATE, &EXCLDATE,
@@ -350,7 +363,7 @@ constexpr const char* const* HELPS[] = { &VERSION, &HELP, &VERBOSE, &BENCHMARK, 
 	&HELP_REST, &HELP_DATE_REST
 };
 
-auto GENRES = {
+constexpr auto GENRES = {
 "Blues", "Classic rock", "Country", "Dance", "Disco", "Funk", "Grunge",
 "Hip-Hop", "Jazz", "Metal", "New Age", "Oldies", "Other", "Pop",
 "Rhythm and Blues", "Rap", "Reggae", "Rock", "Techno", "Industrial",
@@ -1213,6 +1226,8 @@ std::vector<std::pair<Date, Date>> listDCreatedR, listDModifiedR, listDAccessedR
 	listDExclCreatedR, listDExclModifiedR, listDExclAccessedR, listDExclChangedR;
 std::vector<std::pair<std::uintmax_t, std::uintmax_t>> listSize, listExclSize;
 
+std::vector<std::string> listFindDir, listExclFindDir;
+
 func isValidFile(const fs::path& path) -> bool
 {
 	if (not fs::exists(path))
@@ -1352,17 +1367,17 @@ func isValidFile(const fs::path& path) -> bool
 				auto val { keyword.substr(pos + 1) };
 									
 				ID3 id3(tmp.string().c_str());
-				
+				const auto isCaseInsensitive { state[OPT_CASEINSENSITIVE] == "true" };
 				if (key == OPT_TITLE)
-					*found = id3.title.find(val) != std::string::npos;
+					*found = (isCaseInsensitive ? tolower(id3.title): id3.title).find(val) != std::string::npos;
 				else if (key == OPT_ARTIST)
-					*found = id3.artist.find(val) != std::string::npos;
+					*found = (isCaseInsensitive ? tolower(id3.artist) : id3.artist).find(val) != std::string::npos;
 				else if (key == OPT_ALBUM)
-					*found = id3.album.find(val) != std::string::npos;
+					*found = (isCaseInsensitive ? tolower(id3.album) : id3.album).find(val) != std::string::npos;
 				else if (key == OPT_COMMENT)
-					*found = id3.comment.find(val) != std::string::npos;
+					*found = (isCaseInsensitive ? tolower(id3.comment) : id3.comment).find(val) != std::string::npos;
 				else if (key == OPT_GENRE)
-					*found = id3.genre.find(val) != std::string::npos;
+					*found = (isCaseInsensitive ? tolower(id3.genre) : id3.genre).find(val) != std::string::npos;
 				else if (key == OPT_YEAR)
 					*found = id3.comment == val;
 				else if (key == OPT_TRACK)
@@ -1374,13 +1389,22 @@ func isValidFile(const fs::path& path) -> bool
 		return false;
 	}};
 	
+	
+	std::string  filename;
+	bool ismp3 = false;
+	if (not state[OPT_FIND].empty() or not state[OPT_EXCLFIND].empty())
+	{
+		ismp3 = tmp.extension().string() == ".mp3";
+		filename = excludeExtension(tmp.filename());
+		if (state[OPT_CASEINSENSITIVE] == "true")
+			filename = tolower(filename);
+	}
+	
 	if (bool found{ false }; not state[OPT_FIND].empty()) {
-		auto ismp3 { tmp.extension().string() == ".mp3" };
-		for (auto filename{ excludeExtension(tmp.filename()) };
-			 auto& keyword : listFind)
+		for (auto& keyword : listFind)
 		{
-			auto handled { false };
-			if (ismp3)
+			auto handled { keyword[0] == char(1) };
+			if (not handled and ismp3)
 				handled = findId3(keyword, &found);
 				
 			
@@ -1394,13 +1418,11 @@ func isValidFile(const fs::path& path) -> bool
 	}
 
 	if (not state[OPT_EXCLFIND].empty()) {
-		auto ismp3 { tmp.extension().string() == ".mp3" };
-		for (auto filename{ excludeExtension(tmp.filename()) };
-			 auto& keyword : listExclFind)
+		for (auto& keyword : listExclFind)
 		{
-			auto handled { false };
-			if (auto found { false }; ismp3) {
-				auto handled{ findId3(keyword, &found) };
+			auto handled { keyword[0] == char(1) };
+			if (auto found { false }; not handled and ismp3) {
+				handled = findId3(keyword, &found);
 				if (handled and found)
 					return false;
 			}
@@ -1542,6 +1564,33 @@ func sortFiles(std::vector<fs::path>* const selectFiles)
 			}
 		}
 	}
+}
+
+func isDirNameValid(const fs::path& dir)
+{
+	if (listFindDir.empty() and listExclFindDir.empty())
+		return true;
+	
+	const auto filename { state[OPT_CASEINSENSITIVE] == "true"
+		? tolower(dir.filename().string())
+		: dir.filename().string() };
+	
+	for (auto& keyword : listFindDir)
+		if (filename.find(keyword) != std::string::npos)
+			return true;
+	
+	auto result { true };
+	for (auto& keyword : listExclFindDir)
+		if (filename.find(keyword) != std::string::npos)
+		{
+			result = false;
+			break;
+		}
+	
+	if (not result)
+		return true;
+		
+	return false;
 }
 
 func recursiveDirectory(const char* const dir,
@@ -2116,14 +2165,37 @@ int main(const int argc, char *argv[]) {
 						i--;
 				}
 			}
+			else if (isMatch(OPT_CASEINSENSITIVE, 'N', true)
+                     or isMatch("case-insensitive", 'N')
+                     or isMatch("caseinsensitive", 'N')
+                     or isMatch("ignore-case", 'N')
+                     or isMatch("ignorecase", 'N'))
+			{
+                state[OPT_CASEINSENSITIVE] = "true";
+                
+				for (auto& k : listFindDir) k = tolower(k);
+				for (auto& k : listExclFindDir) k = tolower(k);
+				for (auto& k : listFind) k = tolower(k);
+				for (auto& k : listExclFind) k = tolower(k);
+			}
 			else if (isMatch(OPT_FIND, 			'i')
 					 or isMatch(OPT_EXCLFIND, 	'I')) {
 				if (i + 1 < args.size())
 				{
-					(args[i].substr(2) == OPT_FIND ? listFind : listExclFind)
-						.emplace_back(args[i + 1]);
-					state[args[i].substr(2)] = "1";
+					const auto opt { args[i].substr(2) };
+					const auto isExclude { opt == OPT_EXCLFIND };
 					i++;
+					if (args[i].starts_with("dir="))
+					{
+						auto value { args[i].substr(4) };
+						if (state[OPT_CASEINSENSITIVE] == "true")
+							value = tolower(value);
+						(isExclude ? listExclFindDir : listFindDir)
+							.emplace_back(value);
+						args[i].insert(0, 1, char(1));
+					}
+					(isExclude ? listExclFind : listFind).emplace_back(state[OPT_CASEINSENSITIVE] == "true" ? tolower(args[i]) : args[i]);
+					state[opt] = "1";
 				} else
 					std::cout << "Expecting keyword after \""
 					<< args[i] << "\" option.\n";
@@ -2583,7 +2655,6 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 		<< LABEL("Current Directory") << fs::current_path().string() << '\n'
 		<< LABEL(OPT_OUTDIR) << state[OPT_OUTDIR] << '\n'
 		<< LABEL(OPT_SKIPSUBTITLE) << PRINT_OPT(state[OPT_SKIPSUBTITLE]) << '\n';
-#undef PRINT_OPT
 	{
 		std::cout << LABEL(OPT_EXT) << state[OPT_EXT];
 		if (state[OPT_EXT].empty())
@@ -2591,7 +2662,8 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 				std::cout << DEFAULT_EXT[i] << (i < DEFAULT_EXT.size() - 1 ? ", " : "");
 		std::cout << '\n';
 	}
-
+    std::cout << LABEL("case-insensitive") << PRINT_OPT(state[OPT_CASEINSENSITIVE]) << '\n';
+#undef PRINT_OPT
 	for (auto& S : {OPT_FIND, OPT_EXCLFIND}) {
 		std::cout << LABEL(S);
 		for (auto i{0}; i<(S == OPT_FIND ? listFind : listExclFind).size(); ++i)
@@ -2852,7 +2924,7 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 		for (auto& x : {1, 2})
 			if (i < (x == 1 ? regularDirSize : seasonDirSize) )
 				if (auto dir { (x == 1 ? regularDirs[i] : seasonDirs[i]).string() };
-					not dir.empty()) {
+					not dir.empty() and isDirNameValid(dir)) {
 					if (state[OPT_EXECUTION] == OPT_THREAD)
 						threads.emplace_back([&, dir]() {
 							filterChildFiles(dir, x == 2);

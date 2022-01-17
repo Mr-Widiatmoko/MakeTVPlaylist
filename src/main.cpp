@@ -405,6 +405,22 @@ constexpr auto GENRES = {
 
 #define func auto
 
+func isEqual(const char* l, const char* r)
+{
+	if (not l or not r) return false;
+	
+	const char* _l = l;
+	const char*_r = r;
+	while (_l and _r) {
+		if (*_l != *_r)
+			return false;
+		_l++;
+		_r++;
+	}
+	return true;
+}
+
+
 func tolower(std::string s) -> std::string
 {
 	std::transform(s.begin(), s.end(), s.begin(),
@@ -530,19 +546,19 @@ func printHelp(const char* const arg = nullptr)
 {
 	if (auto i{0}; arg) {
 		for (auto& opt : OPTS) {
-			if (0 == std::strcmp(arg, *opt)) {
-				if (0 == std::strcmp(arg, OPT_HELP))
+			if (isEqual(arg, *opt)) {
+				if (isEqual(arg, OPT_HELP))
 				{
 					for (auto& help : HELPS)
 						std::cout << *help;
 				} else {
 					std::cout << *HELPS[i];
 								
-					if (0 == std::strcmp(arg, OPT_DATE) or 0 == std::strcmp(arg, OPT_EXCLDATE)
-						or 0 == std::strcmp(arg, OPT_DCREATED) or 0 == std::strcmp(arg, OPT_DEXCLCREATED)
-						or 0 == std::strcmp(arg, OPT_DCHANGED) or 0 == std::strcmp(arg, OPT_DEXCLCHANGED)
-						or 0 == std::strcmp(arg, OPT_DMODIFIED) or 0 == std::strcmp(arg, OPT_DEXCLMODIFIED)
-						or 0 == std::strcmp(arg, OPT_DACCESSED) or 0 == std::strcmp(arg, OPT_DEXCLACCESSED)
+					if (isEqual(arg, OPT_DATE) or isEqual(arg, OPT_EXCLDATE)
+						or isEqual(arg, OPT_DCREATED) or isEqual(arg, OPT_DEXCLCREATED)
+						or isEqual(arg, OPT_DCHANGED) or isEqual(arg, OPT_DEXCLCHANGED)
+						or isEqual(arg, OPT_DMODIFIED) or isEqual(arg, OPT_DEXCLMODIFIED)
+						or isEqual(arg, OPT_DACCESSED) or isEqual(arg, OPT_DEXCLACCESSED)
 						)
 						std::cout << HELP_DATE_REST;
 				}
@@ -1092,9 +1108,56 @@ struct ID3
 {
 private:
 	const char* path;
+	bool isCaseInsensitive;
+	
+	static constexpr auto TAGS = {
+		"id3",
+		OPT_TITLE,
+		OPT_ARTIST,
+		OPT_ALBUM,
+		OPT_COMMENT,
+		OPT_GENRE,
+		OPT_YEAR,
+		OPT_TRACK, };
 public:
 	std::string title, artist, album, comment, genre,
 		year, track;
+	
+
+	friend bool operator % (const ID3& l, const std::string& keyword) {
+		const std::string* values[] {
+			&l.title, &l.artist, &l.album, &l.comment, &l.genre, &l.year, &l.track
+		};
+		
+		std::string val;
+		auto index{ 0 };
+		for (auto& tag : TAGS)
+		{
+			const auto sz { std::strlen(tag) };
+							
+			if (const auto c{ keyword[sz] };
+				
+				keyword.size() > sz + 1
+				and keyword.starts_with(tag)
+				and (c == '=' or c == '<' or c == '>'))
+			{
+				val = keyword.substr(sz + (c == '=' ? 1 : 0));
+				if (l.isCaseInsensitive)
+					val = tolower(val);
+				break;
+			}
+			index++;
+		}
+		
+		if (index == 0) {
+			for (const auto& value : values)
+				if ((*value).find(val) != std::string::npos)
+					return true;
+		} else
+			return (*values[index - 1]).find(val) != std::string::npos;
+		
+		return false;
+	}
 	
 	func write() const {
 		if (not path) return;
@@ -1152,7 +1215,9 @@ public:
 		;
 	}
 	
-	ID3(const char* const path): year{0}, track{0}, path{path} {
+	ID3(const char* const path, bool case_insensitive = false):
+		year{0}, track{0}, path{path}, isCaseInsensitive{case_insensitive}
+	{
 		std::ifstream file;
 		file.open(path, std::ios::in | std::ios::ate);
 		if (not file.good()) {
@@ -1171,11 +1236,15 @@ public:
 				if (auto genreIndex{0}; isGenre)
 					for (auto& g : GENRES) {
 						if (result == genreIndex)
-							return g;
+							return case_insensitive
+										? tolower(g)
+										: g;
 						genreIndex++;
 					}
 				else
-					return std::to_string(result);
+					return case_insensitive
+								? tolower(std::to_string(result))
+								: std::to_string(result);
 			}
 			
 			return std::string(buffer);
@@ -1361,48 +1430,15 @@ func isValidFile(const fs::path& path) -> bool
 			if (std::regex_search(filename, regex))
 				return false;
 	
-	
-	func findId3{[&](const std::string& keyword, bool* found) -> bool {
-		auto pos = keyword.find("=");
-		if (pos != std::string::npos) {
-			auto key { keyword.substr(0, pos) };
-			
-			if (pos + 2 < keyword.size() and isEqual(key, { OPT_TITLE,
-				OPT_ARTIST, OPT_ALBUM, OPT_COMMENT, OPT_GENRE, OPT_YEAR, OPT_TRACK}))
-			{
-				auto val { keyword.substr(pos + 1) };
-									
-				ID3 id3(tmp.string().c_str());
-				const auto isCaseInsensitive { state[OPT_CASEINSENSITIVE] == "true" };
-				if (key == OPT_TITLE)
-					*found = (isCaseInsensitive ? tolower(id3.title): id3.title).find(val) != std::string::npos;
-				else if (key == OPT_ARTIST)
-					*found = (isCaseInsensitive ? tolower(id3.artist) : id3.artist).find(val) != std::string::npos;
-				else if (key == OPT_ALBUM)
-					*found = (isCaseInsensitive ? tolower(id3.album) : id3.album).find(val) != std::string::npos;
-				else if (key == OPT_COMMENT)
-					*found = (isCaseInsensitive ? tolower(id3.comment) : id3.comment).find(val) != std::string::npos;
-				else if (key == OPT_GENRE)
-					*found = (isCaseInsensitive ? tolower(id3.genre) : id3.genre).find(val) != std::string::npos;
-				else if (key == OPT_YEAR)
-					*found = id3.comment == val;
-				else if (key == OPT_TRACK)
-					*found = id3.track == val;
-				
-				return true;
-			}
-		}
-		return false;
-	}};
-	
-	
 	std::string  filename;
-	bool ismp3 = false;
+	auto ismp3 { false };
+	auto isCaseInsensitive { false };
 	if (not state[OPT_FIND].empty() or not state[OPT_EXCLFIND].empty())
 	{
 		ismp3 = tmp.extension().string() == ".mp3";
 		filename = excludeExtension(tmp.filename());
-		if (state[OPT_CASEINSENSITIVE] == "true")
+		isCaseInsensitive = state[OPT_CASEINSENSITIVE] == "true";
+		if (isCaseInsensitive)
 			filename = tolower(filename);
 	}
 	
@@ -1410,9 +1446,8 @@ func isValidFile(const fs::path& path) -> bool
 		for (auto& keyword : listFind)
 		{
 			auto handled { keyword[0] == char(1) };
-			if (not handled and ismp3)
-				handled = findId3(keyword, &found);
-				
+			if (not handled and ismp3 and (handled = true))
+				found = ID3(tmp.string().c_str(), isCaseInsensitive) % keyword;
 			
 			if (not handled and filename.find(keyword) != std::string::npos) {
 				found = true;
@@ -1427,8 +1462,8 @@ func isValidFile(const fs::path& path) -> bool
 		for (auto& keyword : listExclFind)
 		{
 			auto handled { keyword[0] == char(1) };
-			if (auto found { false }; not handled and ismp3) {
-				handled = findId3(keyword, &found);
+			if (auto found { false }; not handled and ismp3 and (handled = true)) {
+				found = ID3(tmp.string().c_str(), isCaseInsensitive) % keyword;
 				if (handled and found)
 					return false;
 			}

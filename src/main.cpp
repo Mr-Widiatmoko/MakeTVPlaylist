@@ -17,6 +17,7 @@
 #include <charconv>
 #include <vector>
 #include <set>
+#include <unordered_map>
 #include <map>
 #include <filesystem>
 #include <thread>
@@ -72,14 +73,6 @@ constexpr auto OPT_DEXCLCREATED		{"exclude-created"};		// T
 constexpr auto OPT_DEXCLMODIFIED	{"exclude-modified"};		// M
 constexpr auto OPT_DEXCLACCESSED	{"exclude-accessed"};		// A
 constexpr auto OPT_DEXCLCHANGED		{"exclude-changed"};		// G
-
-constexpr auto OPT_TITLE			{"title"};
-constexpr auto OPT_ARTIST			{"artist"};
-constexpr auto OPT_ALBUM			{"album"};
-constexpr auto OPT_COMMENT			{"comment"};
-constexpr auto OPT_GENRE			{"genre"};
-constexpr auto OPT_YEAR				{"year"};
-constexpr auto OPT_TRACK			{"track"};
 
 constexpr auto OPT_DEBUG			{"debug"};                  // D
 
@@ -363,40 +356,6 @@ constexpr const char* const* HELPS[] = { &VERSION, &HELP, &VERBOSE, &BENCHMARK, 
 	&HELP_REST, &HELP_DATE_REST
 };
 
-constexpr auto GENRES = {
-"Blues", "Classic rock", "Country", "Dance", "Disco", "Funk", "Grunge",
-"Hip-Hop", "Jazz", "Metal", "New Age", "Oldies", "Other", "Pop",
-"Rhythm and Blues", "Rap", "Reggae", "Rock", "Techno", "Industrial",
-"Alternative", "Ska", "Death metal", "Pranks", "Soundtrack", "Euro-Techno",
-"Ambient", "Trip-Hop", "Vocal", "Jazz & Funk", "Fusion", "Trance", "Classical",
-"Instrumental", "Acid", "House", "Game", "Sound clip", "Gospel", "Noise",
-"Alternative Rock", "Bass", "Soul", "Punk", "Space", "Meditative",
-"Instrumental Pop", "Instrumental Rock", "Ethnic", "Gothic", "Darkwave",
-"Techno-Industrial", "Electronic", "Pop-Folk", "Eurodance", "Dream",
-"Southern Rock", "Comedy", "Cult", "Gangsta", "Top 40", "Christian Rap",
-"Pop/Funk", "Jungle", "Native US", "Cabaret", "New Wave", "Psychedelic",
-"Rave", "Show tunes", "Trailer", "Lo-Fi", "Tribal", "Acid Punk", "Acid Jazz",
-"Polka", "Retro", "Musical", "Rock ’n’ Roll", "Hard rock",
-"Folk", "Folk-Rock", "National Folk", "Swing", "Fast Fusion", "Bebop", "Latin",
-"Revival", "Celtic", "Bluegrass", "Avantgarde", "Gothic Rock", "Progressive Rock",
-"Psychedelic Rock", "Symphonic Rock","Slow rock", "Big Band", "Chorus",
-"Easy Listening", "Acoustic", "119", "Humour", "Speech", "Chanson", "Opera",
-"Chamber music", "Sonata", "Symphony", "Booty bass", "Primus", "Porn groove",
-"Satire", "Slow jam", "Club", "Tango", "Samba", "Folklore", "Ballad",
-"Power ballad", "Rhythmic Soul", "Freestyle", "Duet", "Punk Rock", "Drum solo",
-"A cappella", "Euro-House", "Dancehall", "Goa", "Drum & Bass", "Club-House",
-"Hardcore Techno", "Terror", "Indie", "BritPop", "Negerpunk", "Polsk Punk",
-"Beat", "Christian Gangsta Rap", "Heavy Metal", "Black Metal", "Crossover",
-"Contemporary Christian", "Christian rock", "Merengue", "Salsa", "Thrash Metal",
-"Anime", "Jpop", "Synthpop", "Abstract", "Art Rock", "Baroque", "Bhangra",
-"Big beat", "Breakbeat", "Chillout", "Downtempo", "Dub", "EBM", "Eclectic",
-"Electro", "Electroclash", "Emo", "Experimental", "Garage", "Global", "IDM",
-"Illbient", "Industro-Goth", "Jam Band", "Krautrock", "Leftfield", "Lounge",
-"Math Rock", "New Romantic", "Nu-Breakz", "Post-Punk", "Post-Rock", "Psytrance",
-"Shoegaze", "Space Rock", "Trop Rock", "World Music", "Neoclassical",
-"Audiobook", "Audio theatre", "Neue Deutsche Welle", "Podcast", "Indie-Rock",
-"G-Funk", "Dubstep", "Garage Rock", "Psybient",
-};
 //#include <format>
 
 #if MAKE_LIB
@@ -408,10 +367,13 @@ constexpr auto GENRES = {
 func isEqual(const char* l, const char* r)
 {
 	if (not l or not r) return false;
+	auto sz1 { std::strlen(l) };
+	auto sz2 { std::strlen(r) };
+	if (sz1 != sz2) return false;
 	
 	const char* _l = l;
 	const char*_r = r;
-	while (_l and _r) {
+	while (sz1-- > 0) {
 		if (*_l != *_r)
 			return false;
 		_l++;
@@ -1104,65 +1066,331 @@ public:
 
 };
 
+#define property
 struct ID3
 {
-private:
-	const char* path;
-	bool isCaseInsensitive;
-	
+	property std::unordered_map<std::string_view, std::string> tags;
+
 	static constexpr auto TAGS = {
 		"id3",
-		OPT_TITLE,
-		OPT_ARTIST,
-		OPT_ALBUM,
-		OPT_COMMENT,
-		OPT_GENRE,
-		OPT_YEAR,
-		OPT_TRACK, };
-public:
-	std::string title, artist, album, comment, genre,
-		year, track;
+		"version",								// both		2.3		2.4
+		"audio_encryption", 					// AENC
+		"attached_picture",						// APIC
+		"audio_seek_point_index",				//					ASPI
+		"comment", 								// COMM
+		"commercial_frame",						// COMR
+		"size",									//			TSIZ
+		"encryption_method_registration", 		// ENCR
+		"equalization",							//			EQUA	EQU2
+		"event_timing_codes",					// ETCO
+		"general_encapsulation_object",			// GEOB
+		"group_identification_registration",	// GRID
+		"linked_information", 					// LINK
+		"music_cd_identifier",					// MCDI
+		"mpeg_location_lookup_table",			// MLLT
+		"ownership_frame", 						// OWNE
+		"play_counter",							// PCNT
+		"popularimeter", 						// POPM
+		"position_sync_frame",					// POSS
+		"private_frame",						// PRIV
+		"recommended_buffer_size",				// RBUF
+		"relative_volume_adjustment",			//			RVAD	RVA2
+		"reverb",								// RVRB
+		"seek_frame",							//					SEEK
+		"signature_frame",						//					SIGN
+		"sync_lyric",							// SYLT
+		"sync_tempo_codes",						// SYTC
+		"album", 								// TALB
+		"bpm",									// TBPM
+		"composer",								// TCOM
+		"genre",								// TCON
+		"copyright_message",					// TCOP
+		"encoding_time",						//					TDEN
+		"playlist_delay",						// TDLY
+		"original_release_year",				//			TORY	TDOR
+		"date",									// 			TDAT	TDRC
+		"recording_date",						// 			TRDA	TDRC
+		"recording_time",						//					TDRC
+		"time",									//			TIME	TDRC
+		"year", 								//			TYER	TDRC
+		"release_time",							//					TDRL
+		"tagging_time",							//					TDTG
+		"encoder",								// TENC
+		"lyric",								// TEXT
+		"file_type",							// TFLT
+		"involved_people_list",					//			IPLS	TIPL
+		"content_group_description",			// TIT1
+		"title",								// TIT2
+		"subtitle_refinement",					// TIT3
+		"initial_key",							// TKEY
+		"language",								// TLAN
+		"length",								// TLEN
+		"musician_credits_list",				//					TMCL
+		"media_type",							// TMED
+		"mood",									//					TMOO
+		"original_album_title",					// TOAL
+		"original_filename",					// TOFN
+		"original_lyricist_writer",				// TOLY
+		"original_artist",						// TOPE
+		"file_license",							// TOWN
+		"artist",								// TPE1
+		"band",									// TPE2
+		"conductor_refinement",					// TPE3
+		"remixed",								// TPE4
+		"part_of_set",							// TPOS
+		"produced_notice",						//					TPRO
+		"publisher",							// TPUB
+		"track",								// TRCK
+		"internet_radio_station_name",			// TRSN
+		"internet_radio_station_owner",			// TRSO
+		"album_sort_order",						//					TSOA
+		"performer_sort_order",					//					TSOP
+		"title_sort_order",						//					TSOT
+		"isrc",									// TSRC
+		"encoding_setting",						// TSSE
+		"set_subtitle",							//					TSST
+		"user_defined_text_info_frame",			// TXXX
+		"unique_file_identifier",				// UFID
+		"term_of_use",							// USER
+		"unsync_lyric_transcription",			// USLT
+		"commercial_information",				// WCOM
+		"copyright_information",				// WCOP
+		"official_audio_file_webpage",			// WOAF
+		"official_atist_webpage",				// WOAR
+		"official_audio_source_webpage",		// WOAS
+		"official_internet_radio_station_homepage", // WORS
+		"payment",								// WPAY
+		"publisher_official_webpage",			// WPUB
+		"user_defined_url_link_frame"			// WXXX
+	};
 	
+	static constexpr auto GENRES = {
+		"Blues", "Classic rock", "Country", "Dance", "Disco", "Funk", "Grunge",
+		"Hip-Hop", "Jazz", "Metal", "New Age", "Oldies", "Other", "Pop",
+		"Rhythm and Blues", "Rap", "Reggae", "Rock", "Techno", "Industrial",
+		"Alternative", "Ska", "Death metal", "Pranks", "Soundtrack", "Euro-Techno",
+		"Ambient", "Trip-Hop", "Vocal", "Jazz & Funk", "Fusion", "Trance", "Classical",
+		"Instrumental", "Acid", "House", "Game", "Sound clip", "Gospel", "Noise",
+		"Alternative Rock", "Bass", "Soul", "Punk", "Space", "Meditative",
+		"Instrumental Pop", "Instrumental Rock", "Ethnic", "Gothic", "Darkwave",
+		"Techno-Industrial", "Electronic", "Pop-Folk", "Eurodance", "Dream",
+		"Southern Rock", "Comedy", "Cult", "Gangsta", "Top 40", "Christian Rap",
+		"Pop/Funk", "Jungle", "Native US", "Cabaret", "New Wave", "Psychedelic",
+		"Rave", "Show tunes", "Trailer", "Lo-Fi", "Tribal", "Acid Punk", "Acid Jazz",
+		"Polka", "Retro", "Musical", "Rock ’n’ Roll", "Hard rock",
+		"Folk", "Folk-Rock", "National Folk", "Swing", "Fast Fusion", "Bebop", "Latin",
+		"Revival", "Celtic", "Bluegrass", "Avantgarde", "Gothic Rock", "Progressive Rock",
+		"Psychedelic Rock", "Symphonic Rock","Slow rock", "Big Band", "Chorus",
+		"Easy Listening", "Acoustic", "119", "Humour", "Speech", "Chanson", "Opera",
+		"Chamber music", "Sonata", "Symphony", "Booty bass", "Primus", "Porn groove",
+		"Satire", "Slow jam", "Club", "Tango", "Samba", "Folklore", "Ballad",
+		"Power ballad", "Rhythmic Soul", "Freestyle", "Duet", "Punk Rock", "Drum solo",
+		"A cappella", "Euro-House", "Dancehall", "Goa", "Drum & Bass", "Club-House",
+		"Hardcore Techno", "Terror", "Indie", "BritPop", "Negerpunk", "Polsk Punk",
+		"Beat", "Christian Gangsta Rap", "Heavy Metal", "Black Metal", "Crossover",
+		"Contemporary Christian", "Christian rock", "Merengue", "Salsa", "Thrash Metal",
+		"Anime", "Jpop", "Synthpop", "Abstract", "Art Rock", "Baroque", "Bhangra",
+		"Big beat", "Breakbeat", "Chillout", "Downtempo", "Dub", "EBM", "Eclectic",
+		"Electro", "Electroclash", "Emo", "Experimental", "Garage", "Global", "IDM",
+		"Illbient", "Industro-Goth", "Jam Band", "Krautrock", "Leftfield", "Lounge",
+		"Math Rock", "New Romantic", "Nu-Breakz", "Post-Punk", "Post-Rock", "Psytrance",
+		"Shoegaze", "Space Rock", "Trop Rock", "World Music", "Neoclassical",
+		"Audiobook", "Audio theatre", "Neue Deutsche Welle", "Podcast", "Indie-Rock",
+		"G-Funk", "Dubstep", "Garage Rock", "Psybient",
+	};
 
+							
 	friend bool operator % (const ID3& l, const std::string& keyword) {
-		const std::string* values[] {
-			&l.title, &l.artist, &l.album, &l.comment, &l.genre, &l.year, &l.track
-		};
-		
 		std::string val;
-		auto index{ 0 };
+		std::string selectedTag;
 		for (auto& tag : TAGS)
 		{
 			const auto sz { std::strlen(tag) };
-							
+			
 			if (const auto c{ keyword[sz] };
 				
 				keyword.size() > sz + 1
 				and keyword.starts_with(tag)
 				and (c == '=' or c == '<' or c == '>'))
-			{
-				val = keyword.substr(sz + (c == '=' ? 1 : 0));
-				if (l.isCaseInsensitive)
-					val = tolower(val);
-				break;
-			}
-			index++;
+				{
+					selectedTag = tag;
+					val = keyword.substr(sz + (c == '=' ? 1 : 0));
+					if (l.isCaseInsensitive)
+						val = tolower(val);
+					break;
+				}
 		}
 		
-		if (index == 0) {
-			for (const auto& value : values)
-				if ((*value).find(val) != std::string::npos)
+		if (selectedTag == "id3") {
+			for (const auto& tag : l.tags)
+				if (tag.second.find(val) != std::string::npos)
 					return true;
 		} else
-			return (*values[index - 1]).find(val) != std::string::npos;
+			return l.tags.at(selectedTag).find(val) != std::string::npos;
 		
 		return false;
 	}
+private:
+	const char* path;
+	bool isCaseInsensitive;
 	
-	func write() const {
-		if (not path) return;
+	static unsigned int btoi(const char* bytes, int size, int offset)
+	{
+		unsigned int result = 0x00;
+		int i = 0;
+		for(i = 0; i < size; ++i)
+			{
+				result = result << 8;
+				result = result | (unsigned char) bytes[offset + i];
+			}
+		
+		return result;
+	}
+	
+//	static char* itob(int integer)
+//	{
+//		int i;
+//		int size = 4;
+//		char* result = (char*) malloc(sizeof(char) * size);
+//
+//		// We need to reverse the bytes because Intel uses little endian.
+//		char* aux = (char*) &integer;
+//		for(i = size - 1; i >= 0; i--)
+//			{
+//				result[size - 1 - i] = aux[i];
+//			}
+//
+//		return result;
+//	}
+	
+//	static int syncint_encode(int value)
+//	{
+//		int out, mask = 0x7F;
+//
+//		while (mask ^ 0x7FFFFFFF) {
+//			out = value & ~mask;
+//			out <<= 1;
+//			out |= value & mask;
+//			mask = ((mask + 1) << 8) - 1;
+//			value = out;
+//		}
+//
+//		return out;
+//	}
+	
+	static int syncint_decode(int value)
+	{
+		unsigned int a, b, c, d, result = 0x0;
+		a = value & 0xFF;
+		b = (value >> 8) & 0xFF;
+		c = (value >> 16) & 0xFF;
+		d = (value >> 24) & 0xFF;
+		
+		result = result | a;
+		result = result | (b << 7);
+		result = result | (c << 14);
+		result = result | (d << 21);
+		
+		return result;
+	}
+	
+	struct V2 {
+		static constexpr auto SZ_HEADER 				= 10;
+		static constexpr auto SZ_TAG 					= 3;
+		static constexpr auto SZ_VERSION 				= 1;
+		static constexpr auto SZ_REVISION				= 1;
+		static constexpr auto SZ_FLAGS 					= 1;
+		static constexpr auto SZ_HEADER_SIZE 			= 4;
+		static constexpr auto SZ_EXTENDED_HEADER_SIZE 	= 4;
+		
+		
+		property char 	tag[SZ_TAG];
+		property char 	major_version,
+						minor_version,
+						flags;
+		property int 	tag_size,
+						extended_header_size;
+		
+		V2(const char* buffer) :
+			major_version{0x0}, minor_version{0x0}, flags{0x0},
+			tag_size{0}, extended_header_size{0}
+		{
+			auto position{ 0 };
+			std::memcpy(tag, buffer, SZ_TAG);
+			major_version = buffer[position += SZ_TAG];
+			minor_version = buffer[position += SZ_VERSION];
+			flags = buffer[position += SZ_REVISION];
+			tag_size = syncint_decode(
+				btoi(buffer, SZ_HEADER_SIZE, position += SZ_FLAGS));
+			
+			if ((flags & (1 << 6)) == (1 << 6))
+				extended_header_size = syncint_decode(
+					btoi(buffer, SZ_EXTENDED_HEADER_SIZE, position += SZ_HEADER_SIZE));
+		}
+		
+		struct Frame {
+			static constexpr auto SZ_HEADER 					= 10;
+			static constexpr auto SZ_ID 						= 4;
+			static constexpr auto SZ_SIZE 						= 4;
+			static constexpr auto SZ_FLAGS 						= 2;
+			static constexpr auto SZ_ENCODING 					= 1;
+			static constexpr auto SZ_LANGUAGE 					= 3;
+			static constexpr auto SZ_SHORT_DESCRIPTION 			= 1;
+			
+			static constexpr auto INVALID_FRAME 	= 0;
+			static constexpr auto TEXT_FRAME 		= 1;
+			static constexpr auto COMMENT_FRAME 	= 2;
+			static constexpr auto APIC_FRAME 		= 3;
+			
+			static constexpr auto ISO_ENCODING 		= 0;
+			static constexpr auto UTF_16_ENCODING 	= 1;
+			
+			property char id[SZ_ID];
+			property char flags[SZ_FLAGS];
+			property int size;
+			property std::string data;
+			
+			func isValid() const
+			{
+				return size != 0;
+			}
+			
+			Frame(const char* const raw, int offset, int major_version) :
+				size{0}
+			{
+				std::memcpy(id, raw + offset, SZ_ID);
+				if (0 == std::memcmp(id, "\0\0\0\0", 4))
+					return;
+				size = btoi(raw, 4, offset += SZ_ID);
+				if (major_version == 4)
+					size = syncint_decode(size);
+				
+				std::memcpy(flags, raw + (offset += SZ_SIZE), 2);
+				
+				// Load frame data
+				auto tmp = raw;
+				if (*(tmp + (offset + SZ_FLAGS)) == '\0')
+					offset++;
+				
+				char _data[size];
+				std::memcpy(_data, raw + (offset += SZ_FLAGS), size);
+				_data[size - 1] = '\0';
+				data = std::string(_data);
+			}
+		};
+		#if 0
+		property std::vector<Frame> frames;
+		#endif
+	};
+	
+	
+public:
+	
+	func write(const char* a_path = nullptr) const {
+		if (not path and not a_path)
+			return;
 		std::fstream file;
-		file.open(path);
+		file.open(a_path ? a_path : path);
 		
 		file.seekp(0, std::ios_base::end);
 		const int end = int(file.tellp());
@@ -1182,104 +1410,358 @@ public:
 			pos += size;
 			file.seekp(pos);
 		}};
-				
+		
 		set(nullptr, 3);
-		set(title.c_str(), 30);
-		set(artist.c_str(), 30);
-		set(album.c_str(), 30);
-		set(year.c_str(), 4);
-		set(comment.c_str(),  28);
+		set(tags.at("title").c_str(), 30);
+		set(tags.at("artist").c_str(), 30);
+		set(tags.at("album").c_str(), 30);
+		set(tags.at("year").c_str(), 4);
+		set(tags.at("comment").c_str(),  28);
 		set(nullptr, 1);
-		set(track.empty() ? nullptr : track.c_str(), 1);
-		if (not genre.empty())
-			for (auto i{0}; auto& g : GENRES) {
-				if (genre == g) {
-					set(std::to_string(i).c_str(), 1);
-					break;
-				}
-				i++;
+		set(tags.at("track").empty() ? nullptr : tags.at("track").c_str(), 1);
+		
+		for (auto i{0}; auto& g : GENRES) {
+			if (tags.at("genre") == g) {
+				set(std::to_string(i).c_str(), 1);
+				break;
 			}
+			i++;
+		}
+		
+		file.seekp(0);
+		
 		
 		file.close();
 	}
 	
 	func string() const -> std::string {
-		return
-		  "Title  : \"" + title + "\"\n"
-		+ "Artist : \"" + artist + "\"\n"
-		+ "Album  : \"" + album + "\"\n"
-		+ "Genre  : \"" + genre + "\"\n"
-		+ "Year   : \"" + year + "\"\n"
-		+ "Track  : \"" + track + "\"\n"
-		+ "Comment: \"" + comment + "\"\n"
-		;
+		std::string s;
+		
+		for (auto& tag : tags)
+		{
+			if (tag.second.empty())
+				continue;
+			s.append(tag.first);
+			
+			s += " : \"";
+			s.append(tag.second);
+			s += "\"\n";
+		}
+		
+		return s;
 	}
-	
+	ID3() {}
 	ID3(const char* const path, bool case_insensitive = false):
-		year{0}, track{0}, path{path}, isCaseInsensitive{case_insensitive}
+		path{path}, isCaseInsensitive{case_insensitive}
 	{
 		std::ifstream file;
-		file.open(path, std::ios::in | std::ios::ate);
+		file.open(path, std::ios::in | std::ios::ate | std::ios::binary);
 		if (not file.good()) {
 			this->path = nullptr;
 			return;
 		}
 		
-		auto get{[&](int size, bool isGenre = false) -> std::string {
-			char buffer[size + 1];
-			buffer[size] = '\0';
-			for(int i = 0; i < size; ++i)
-				buffer[i] = file.get();
-
-			if (size == 1) {
-				int result = buffer[0];
-				if (auto genreIndex{0}; isGenre)
-					for (auto& g : GENRES) {
-						if (result == genreIndex)
-							return case_insensitive
-										? tolower(g)
-										: g;
-						genreIndex++;
-					}
-				else
-					return case_insensitive
-								? tolower(std::to_string(result))
-								: std::to_string(result);
-			}
-			
-			return std::string(buffer);
-		}};
-		
-		const int end = int(file.tellg());
-		file.seekg(end - 128);
-		if (get(3) == "TAG")
+		file.seekg(0);
+		if (char s_tag[V2::SZ_HEADER];
+			file.read(s_tag, V2::SZ_HEADER)
+			and 0 == std::strncmp(s_tag, "ID3", 3))
 		{
-			title = get(30);
-			artist = get(30);
-			album = get(30);
-			year = get(4);
-			comment = get(28);
-			get(/*Zero Track*/ 1);
-			track = get(1);
-			genre = get(1, true);
+			V2 tag(s_tag);
+			if (char bytes[tag.tag_size + 10];
+				
+				tag.major_version != 0
+				and file.read(bytes, tag.tag_size + 10))
+			{
+				
+				tags["version"] = "2." + std::to_string(tag.major_version)
+				+ (tag.minor_version > 0
+					? "." + std::to_string(tag.minor_version)
+					: "");
+				
+				//unsigned bytes_index { 0 };
+				//skip header
+				//offset += 10;
+				//if (tag.extended_header_size)
+					//extended header exists?, skip
+				//offset += tag.extended_header_size + 4;
+				//char raw[tag.tag_size];
+				//std::memcpy(raw, bytes + bytes_index, tag.tag_size);
+				
+				auto isv24 { tag.major_version == 4 };
+				auto isv23 { tag.major_version == 3 };
+				
+				auto offset{ 0 };
+				
+				while (offset < tag.tag_size)
+				{
+					V2::Frame frame(bytes, offset, tag.major_version);
+					if (frame.isValid())
+					{
+						offset += frame.size + 10;
+						
+						if (isEqual(frame.id, "AENC"))
+							tags.emplace(std::make_pair("audio_encryption", frame.data));
+						else if (isEqual(frame.id, "APIC"))
+							tags.emplace(std::make_pair("attached_picture", frame.data));
+						else if (isEqual(frame.id, "ASPI") and isv24)
+							tags.emplace(std::make_pair("audio_seek_point_index", frame.data));
+						else if (isEqual(frame.id, "COMM"))
+							tags.emplace(std::make_pair("comment", frame.data));
+						else if (isEqual(frame.id, "COMR"))
+							tags.emplace(std::make_pair("commercial_frame", frame.data));
+						else if (isEqual(frame.id, "TSIZ") and isv23)
+							tags.emplace(std::make_pair("size", frame.data));
+						else if (isEqual(frame.id, "ENCR"))
+							tags.emplace(std::make_pair("encryption_method_registration", frame.data));
+						else if (isEqual(frame.id, "EQU2") and isv24)
+							tags.emplace(std::make_pair("equalization", frame.data));
+						else if (isEqual(frame.id, "EQUA") and isv23)
+							tags.emplace(std::make_pair("equalization", frame.data));
+						else if (isEqual(frame.id, "ETCO"))
+							tags.emplace(std::make_pair("event_timing_codes", frame.data));
+						else if (isEqual(frame.id, "GEOB"))
+							tags.emplace(std::make_pair("general_encapsulation_object", frame.data));
+						else if (isEqual(frame.id, "GRID"))
+							tags.emplace(std::make_pair("group_identification_registration", frame.data));
+						else if (isEqual(frame.id, "LINK"))
+							tags.emplace(std::make_pair("linked_information", frame.data));
+						else if (isEqual(frame.id, "MCDI"))
+							tags.emplace(std::make_pair("music_cd_identifier", frame.data));
+						else if (isEqual(frame.id, "MLLT"))
+							tags.emplace(std::make_pair("mpeg_location_lookup_table", frame.data));
+						else if (isEqual(frame.id, "OWNE"))
+							tags.emplace(std::make_pair("ownership_frame", frame.data));
+						else if (isEqual(frame.id, "PCNT"))
+							tags.emplace(std::make_pair("play_counter", frame.data));
+						else if (isEqual(frame.id, "POPM"))
+							tags.emplace(std::make_pair("popularimeter", frame.data));
+						else if (isEqual(frame.id, "POSS"))
+							tags.emplace(std::make_pair("position_sync_frame", frame.data));
+						else if (isEqual(frame.id, "PRIV"))
+							tags.emplace(std::make_pair("private_frame", frame.data));
+						else if (isEqual(frame.id, "RBUF"))
+							tags.emplace(std::make_pair("recommended_buffer_size", frame.data));
+						else if (isEqual(frame.id, "RVA2") and isv24)
+							tags.emplace(std::make_pair("relative_volume_adjustment", frame.data));
+						else if (isEqual(frame.id, "RVAD") and isv23)
+							tags.emplace(std::make_pair("relative_volume_adjustment", frame.data));
+						else if (isEqual(frame.id, "RVRB"))
+							tags.emplace(std::make_pair("reverb", frame.data));
+						else if (isEqual(frame.id, "SEEK") and isv24)
+							tags.emplace(std::make_pair("seek_frame", frame.data));
+						else if (isEqual(frame.id, "SIGN") and isv24)
+							tags.emplace(std::make_pair("signature_frame", frame.data));
+						else if (isEqual(frame.id, "SYLT"))
+							tags.emplace(std::make_pair("sync_lyric", frame.data));
+						else if (isEqual(frame.id, "SYTC"))
+							tags.emplace(std::make_pair("sync_tempo_codes", frame.data));
+						else if (isEqual(frame.id, "TALB"))
+							tags.emplace(std::make_pair("album", frame.data));
+						else if (isEqual(frame.id, "TBPM"))
+							tags.emplace(std::make_pair("bpm", frame.data));
+						else if (isEqual(frame.id, "TCOM"))
+							tags.emplace(std::make_pair("composer", frame.data));
+						else if (isEqual(frame.id, "TCON"))
+							tags.emplace(std::make_pair("genre", frame.data));
+						else if (isEqual(frame.id, "TCOP"))
+							tags.emplace(std::make_pair("copyright_message", frame.data));
+						else if (isEqual(frame.id, "TDEN") and isv24)
+							tags.emplace(std::make_pair("encoding_time", frame.data));
+						else if (isEqual(frame.id, "TDLY"))
+							tags.emplace(std::make_pair("playlist_delay", frame.data));
+						else if (isEqual(frame.id, "TDOR") and isv24)
+							tags.emplace(std::make_pair("original_release_year", frame.data));
+						else if (isEqual(frame.id, "TORY") and isv23)
+							tags.emplace(std::make_pair("original_release_year", frame.data));
+						
+						else if (isEqual(frame.id, "TDAT") and isv23)
+							tags.emplace(std::make_pair("date", frame.data));
+						else if (isEqual(frame.id, "TRDA") and isv23)
+							tags.emplace(std::make_pair("recording_date", frame.data));
+						else if (isEqual(frame.id, "TIME") and isv23)
+							tags.emplace(std::make_pair("time", frame.data));
+						else if (isEqual(frame.id, "TYER") and isv23)
+							tags.emplace(std::make_pair("year", frame.data));
+						
+						
+						else if (isEqual(frame.id, "TDRC") and isv24)
+						{
+							tags.emplace(std::make_pair("date", frame.data));
+							tags.emplace(std::make_pair("recording_date", frame.data));
+							tags.emplace(std::make_pair("recording_time", frame.data));
+							tags.emplace(std::make_pair("time", frame.data));
+							tags.emplace(std::make_pair("year", frame.data));
+						}
+						
+						else if (isEqual(frame.id, "TDRL") and isv24)
+							tags.emplace(std::make_pair("release_time", frame.data));
+						else if (isEqual(frame.id, "TDTG") and isv24)
+							tags.emplace(std::make_pair("tagging_time", frame.data));
+						else if (isEqual(frame.id, "TENC"))
+							tags.emplace(std::make_pair("encoder", frame.data));
+						else if (isEqual(frame.id, "TEXT"))
+							tags.emplace(std::make_pair("lyric", frame.data));
+						else if (isEqual(frame.id, "TFLT"))
+							tags.emplace(std::make_pair("file_type", frame.data));
+						else if (isEqual(frame.id, "TIPL") and isv24)
+							tags.emplace(std::make_pair("involved_people_list", frame.data));
+						else if (isEqual(frame.id, "IPLS") and isv23)
+							tags.emplace(std::make_pair("involved_people_list", frame.data));
+						
+						else if (isEqual(frame.id, "TIT1"))
+							tags.emplace(std::make_pair("content_group_description", frame.data));
+						else if (isEqual(frame.id, "TIT2"))
+							tags.emplace(std::make_pair("title", frame.data));
+						else if (isEqual(frame.id, "TIT3"))
+							tags.emplace(std::make_pair("subtitle_refinement", frame.data));
+						else if (isEqual(frame.id, "TKEY"))
+							tags.emplace(std::make_pair("initial_key", frame.data));
+						else if (isEqual(frame.id, "TLAN"))
+							tags.emplace(std::make_pair("language", frame.data));
+						else if (isEqual(frame.id, "TLEN"))
+							tags.emplace(std::make_pair("length", frame.data));
+						else if (isEqual(frame.id, "TMCL") and isv24)
+							tags.emplace(std::make_pair("musician_credits_list", frame.data));
+						else if (isEqual(frame.id, "TMED"))
+							tags.emplace(std::make_pair("media_type", frame.data));
+						else if (isEqual(frame.id, "TMOO") and isv24)
+							tags.emplace(std::make_pair("mood", frame.data));
+						else if (isEqual(frame.id, "TOAL"))
+							tags.emplace(std::make_pair("original_album_title", frame.data));
+						else if (isEqual(frame.id, "TOFN"))
+							tags.emplace(std::make_pair("original_filename", frame.data));
+						else if (isEqual(frame.id, "TOLY"))
+							tags.emplace(std::make_pair("original_lyricist_writer", frame.data));
+						else if (isEqual(frame.id, "TOPE"))
+							tags.emplace(std::make_pair("original_artist", frame.data));
+						else if (isEqual(frame.id, "TOWN"))
+							tags.emplace(std::make_pair("file_license", frame.data));
+						else if (isEqual(frame.id, "TPE1"))
+							tags.emplace(std::make_pair("artist", frame.data));
+						else if (isEqual(frame.id, "TPE2"))
+							tags.emplace(std::make_pair("band", frame.data));
+						else if (isEqual(frame.id, "TPE3"))
+							tags.emplace(std::make_pair("conductor_refinement", frame.data));
+						else if (isEqual(frame.id, "TPE4"))
+							tags.emplace(std::make_pair("remixed", frame.data));
+						else if (isEqual(frame.id, "TPOS"))
+							tags.emplace(std::make_pair("part_of_set", frame.data));
+						else if (isEqual(frame.id, "TPRO") and isv24)
+							tags.emplace(std::make_pair("produced_notice", frame.data));
+						else if (isEqual(frame.id, "TPUB"))
+							tags.emplace(std::make_pair("publisher", frame.data));
+						else if (isEqual(frame.id, "TRCK"))
+							tags.emplace(std::make_pair("track", frame.data));
+						else if (isEqual(frame.id, "TRSN"))
+							tags.emplace(std::make_pair("internet_radio_station_name", frame.data));
+						else if (isEqual(frame.id, "TPSO"))
+							tags.emplace(std::make_pair("internet_radio_station_owner", frame.data));
+						else if (isEqual(frame.id, "TSOA") and isv24)
+							tags.emplace(std::make_pair("album_sort_order", frame.data));
+						else if (isEqual(frame.id, "TSOP") and isv24)
+							tags.emplace(std::make_pair("performer_sort_order", frame.data));
+						else if (isEqual(frame.id, "TSOT") and isv24)
+							tags.emplace(std::make_pair("title_sort_order", frame.data));
+						else if (isEqual(frame.id, "TSRC"))
+							tags.emplace(std::make_pair("isrc", frame.data));
+						else if (isEqual(frame.id, "TSSE"))
+							tags.emplace(std::make_pair("encoding_setting", frame.data));
+						else if (isEqual(frame.id, "TSST") and isv24)
+							tags.emplace(std::make_pair("set_subtitle", frame.data));
+						else if (isEqual(frame.id, "TXXX"))
+							tags.emplace(std::make_pair("user_defined_text_info_frame", frame.data));
+						else if (isEqual(frame.id, "UFID"))
+							tags.emplace(std::make_pair("unique_file_identifier", frame.data));
+						else if (isEqual(frame.id, "USER"))
+							tags.emplace(std::make_pair("term_of_use", frame.data));
+						else if (isEqual(frame.id, "USLT"))
+							tags.emplace(std::make_pair("unsync_lyric_transcription", frame.data));
+						else if (isEqual(frame.id, "WCOM"))
+							tags.emplace(std::make_pair("commercial_information", frame.data));
+						else if (isEqual(frame.id, "WCOP"))
+							tags.emplace(std::make_pair("copyright_information", frame.data));
+						else if (isEqual(frame.id, "WOAF"))
+							tags.emplace(std::make_pair("official_audio_file_webpage", frame.data));
+						else if (isEqual(frame.id, "WOAR"))
+							tags.emplace(std::make_pair("official_atist_webpage", frame.data));
+						else if (isEqual(frame.id, "WOAS"))
+							tags.emplace(std::make_pair("official_audio_source_webpage", frame.data));
+						else if (isEqual(frame.id, "WORS"))
+							tags.emplace(std::make_pair("official_internet_radio_station_homepage", frame.data));
+						else if (isEqual(frame.id, "WPAY"))
+							tags.emplace(std::make_pair("payment", frame.data));
+						else if (isEqual(frame.id, "WPUB"))
+							tags.emplace(std::make_pair("publisher_official_webpage", frame.data));
+						else if (isEqual(frame.id, "WXXX"))
+							tags.emplace(std::make_pair("user_defined_url_link_frame", frame.data));
+						#if 0
+						std::cout << "Frame: " << frame.frame_id << " = " << frame.data << '\n';
+						
+						tag.frames.emplace_back(std::move(frame));
+						#endif
+					} else
+						break;
+				}
+			}
+			#if 0
+			std::cout << string() << '\n';
+			#endif
+		} else {
+			func get{[&](int size, bool isGenre = false) -> std::string {
+				char buffer[size + 1];
+				buffer[size] = '\0';
+				for(int i = 0; i < size; ++i)
+					buffer[i] = file.get();
+				
+				if (size == 1) {
+					int result = buffer[0];
+					if (auto genreIndex{0}; isGenre)
+						for (auto& g : GENRES) {
+							if (result == genreIndex)
+								return g;
+							genreIndex++;
+						}
+					else
+						return std::to_string(result);
+				}
+				
+				return std::string(buffer);
+			}};
 			
-			//file.seekg(0, std::ios::end);
-//			file.seekg(end - (128 + 227));
-//			if (get("Extended", 4) == "TAG+")
-//			{
-//				get("Title", 60);
-//				get("Artist", 60);
-//				get("Album", 60);
-//				get("speed", 1);
-//				get("Genre", 30);
-//				get("Start-Time", 6);
-//				get("End-Time", 6);
-//			}
+			const int end = int(file.tellg());
+			file.seekg(end - 128);
+			if (get(3) == "TAG")
+			{
+				tags.emplace(std::make_pair("version", "1.0"));
+				tags.emplace(std::make_pair("title", get(30)));
+				tags.emplace(std::make_pair("artist", get(30)));
+				tags.emplace(std::make_pair("album", get(30)));
+				tags.emplace(std::make_pair("year", get(4)));
+				tags.emplace(std::make_pair("comment", get(28)));
+				get(/*Zero Track*/ 1);
+				tags.emplace(std::make_pair("track", get(1)));
+				tags.emplace(std::make_pair("genre", get(1, true)));
+				
+				file.seekg(0, std::ios::end);
+				file.seekg(end - (128 + 227));
+				if (get(4) == "TAG+")
+				{
+					tags.emplace(std::make_pair("version", "1.1 Extended"));
+					tags.emplace(std::make_pair("title", get(60)));
+					tags.emplace(std::make_pair("artist", get(60)));
+					tags.emplace(std::make_pair("album", get(60)));
+					/*"Speed*/get(1);
+					tags.emplace(std::make_pair("genre", get(30)));
+					/*"Start*/get(6);
+					/*"End*/get(6);
+				}
+			}
 		}
 		
 		file.close();
 	}
 };
+#undef property
 
 std::vector<std::string> EXCLUDE_EXT;
 std::vector<std::string> DEFAULT_EXT {
@@ -1433,6 +1915,7 @@ func isValidFile(const fs::path& path) -> bool
 	std::string  filename;
 	auto ismp3 { false };
 	auto isCaseInsensitive { false };
+	ID3 id3;
 	if (not state[OPT_FIND].empty() or not state[OPT_EXCLFIND].empty())
 	{
 		ismp3 = tmp.extension().string() == ".mp3";
@@ -1440,6 +1923,8 @@ func isValidFile(const fs::path& path) -> bool
 		isCaseInsensitive = state[OPT_CASEINSENSITIVE] == "true";
 		if (isCaseInsensitive)
 			filename = tolower(filename);
+		if (ismp3)
+			id3 = ID3(tmp.string().c_str(), isCaseInsensitive);
 	}
 	
 	if (bool found{ false }; not state[OPT_FIND].empty() and not listFind.empty()) {
@@ -1447,7 +1932,7 @@ func isValidFile(const fs::path& path) -> bool
 		{
 			auto handled { keyword[0] == char(1) };
 			if (not handled and ismp3 and (handled = true))
-				found = ID3(tmp.string().c_str(), isCaseInsensitive) % keyword;
+				found = id3 % keyword;
 			
 			if (not handled and filename.find(keyword) != std::string::npos) {
 				found = true;
@@ -1463,7 +1948,7 @@ func isValidFile(const fs::path& path) -> bool
 		{
 			auto handled { keyword[0] == char(1) };
 			if (auto found { false }; not handled and ismp3 and (handled = true)) {
-				found = ID3(tmp.string().c_str(), isCaseInsensitive) % keyword;
+				found = id3 % keyword;
 				if (handled and found)
 					return false;
 			}
@@ -2157,16 +2642,7 @@ int main(const int argc, char *argv[]) {
 							auto key { args[i + 1] };
 							auto val { args[i + 2] };
 							auto isOk { true };
-							if (key == OPT_TITLE) id3.title = val;
-							else if (key == OPT_ARTIST) id3.artist = val;
-							else if (key == OPT_ALBUM) id3.album = val;
-							else if (key == OPT_YEAR) id3.year = val;
-							else if (key == OPT_TRACK) id3.track = val;
-							else if (key == OPT_COMMENT) id3.comment = val;
-							else {
-								isOk = false;
-								std::cout << "Expecting ID3 key, but found \"" << key << "\"\n";
-							}
+							id3.tags.at(key) = val;
 							
 							if (isOk) {
 								id3.write();

@@ -363,40 +363,6 @@ constexpr const char* const* HELPS[] = { &VERSION, &HELP, &VERBOSE, &BENCHMARK, 
 	&HELP_REST, &HELP_DATE_REST
 };
 
-constexpr auto GENRES = {
-"Blues", "Classic rock", "Country", "Dance", "Disco", "Funk", "Grunge",
-"Hip-Hop", "Jazz", "Metal", "New Age", "Oldies", "Other", "Pop",
-"Rhythm and Blues", "Rap", "Reggae", "Rock", "Techno", "Industrial",
-"Alternative", "Ska", "Death metal", "Pranks", "Soundtrack", "Euro-Techno",
-"Ambient", "Trip-Hop", "Vocal", "Jazz & Funk", "Fusion", "Trance", "Classical",
-"Instrumental", "Acid", "House", "Game", "Sound clip", "Gospel", "Noise",
-"Alternative Rock", "Bass", "Soul", "Punk", "Space", "Meditative",
-"Instrumental Pop", "Instrumental Rock", "Ethnic", "Gothic", "Darkwave",
-"Techno-Industrial", "Electronic", "Pop-Folk", "Eurodance", "Dream",
-"Southern Rock", "Comedy", "Cult", "Gangsta", "Top 40", "Christian Rap",
-"Pop/Funk", "Jungle", "Native US", "Cabaret", "New Wave", "Psychedelic",
-"Rave", "Show tunes", "Trailer", "Lo-Fi", "Tribal", "Acid Punk", "Acid Jazz",
-"Polka", "Retro", "Musical", "Rock ’n’ Roll", "Hard rock",
-"Folk", "Folk-Rock", "National Folk", "Swing", "Fast Fusion", "Bebop", "Latin",
-"Revival", "Celtic", "Bluegrass", "Avantgarde", "Gothic Rock", "Progressive Rock",
-"Psychedelic Rock", "Symphonic Rock","Slow rock", "Big Band", "Chorus",
-"Easy Listening", "Acoustic", "119", "Humour", "Speech", "Chanson", "Opera",
-"Chamber music", "Sonata", "Symphony", "Booty bass", "Primus", "Porn groove",
-"Satire", "Slow jam", "Club", "Tango", "Samba", "Folklore", "Ballad",
-"Power ballad", "Rhythmic Soul", "Freestyle", "Duet", "Punk Rock", "Drum solo",
-"A cappella", "Euro-House", "Dancehall", "Goa", "Drum & Bass", "Club-House",
-"Hardcore Techno", "Terror", "Indie", "BritPop", "Negerpunk", "Polsk Punk",
-"Beat", "Christian Gangsta Rap", "Heavy Metal", "Black Metal", "Crossover",
-"Contemporary Christian", "Christian rock", "Merengue", "Salsa", "Thrash Metal",
-"Anime", "Jpop", "Synthpop", "Abstract", "Art Rock", "Baroque", "Bhangra",
-"Big beat", "Breakbeat", "Chillout", "Downtempo", "Dub", "EBM", "Eclectic",
-"Electro", "Electroclash", "Emo", "Experimental", "Garage", "Global", "IDM",
-"Illbient", "Industro-Goth", "Jam Band", "Krautrock", "Leftfield", "Lounge",
-"Math Rock", "New Romantic", "Nu-Breakz", "Post-Punk", "Post-Rock", "Psytrance",
-"Shoegaze", "Space Rock", "Trop Rock", "World Music", "Neoclassical",
-"Audiobook", "Audio theatre", "Neue Deutsche Welle", "Podcast", "Indie-Rock",
-"G-Funk", "Dubstep", "Garage Rock", "Psybient",
-};
 //#include <format>
 
 #if MAKE_LIB
@@ -408,10 +374,13 @@ constexpr auto GENRES = {
 func isEqual(const char* l, const char* r)
 {
 	if (not l or not r) return false;
+	auto sz1 { std::strlen(l) };
+	auto sz2 { std::strlen(r) };
+	if (sz1 != sz2) return false;
 	
 	const char* _l = l;
 	const char*_r = r;
-	while (_l and _r) {
+	while (sz1-- > 0) {
 		if (*_l != *_r)
 			return false;
 		_l++;
@@ -1119,6 +1088,42 @@ private:
 		OPT_GENRE,
 		OPT_YEAR,
 		OPT_TRACK, };
+	
+	static constexpr auto GENRES = {
+	"Blues", "Classic rock", "Country", "Dance", "Disco", "Funk", "Grunge",
+	"Hip-Hop", "Jazz", "Metal", "New Age", "Oldies", "Other", "Pop",
+	"Rhythm and Blues", "Rap", "Reggae", "Rock", "Techno", "Industrial",
+	"Alternative", "Ska", "Death metal", "Pranks", "Soundtrack", "Euro-Techno",
+	"Ambient", "Trip-Hop", "Vocal", "Jazz & Funk", "Fusion", "Trance", "Classical",
+	"Instrumental", "Acid", "House", "Game", "Sound clip", "Gospel", "Noise",
+	"Alternative Rock", "Bass", "Soul", "Punk", "Space", "Meditative",
+	"Instrumental Pop", "Instrumental Rock", "Ethnic", "Gothic", "Darkwave",
+	"Techno-Industrial", "Electronic", "Pop-Folk", "Eurodance", "Dream",
+	"Southern Rock", "Comedy", "Cult", "Gangsta", "Top 40", "Christian Rap",
+	"Pop/Funk", "Jungle", "Native US", "Cabaret", "New Wave", "Psychedelic",
+	"Rave", "Show tunes", "Trailer", "Lo-Fi", "Tribal", "Acid Punk", "Acid Jazz",
+	"Polka", "Retro", "Musical", "Rock ’n’ Roll", "Hard rock",
+	"Folk", "Folk-Rock", "National Folk", "Swing", "Fast Fusion", "Bebop", "Latin",
+	"Revival", "Celtic", "Bluegrass", "Avantgarde", "Gothic Rock", "Progressive Rock",
+	"Psychedelic Rock", "Symphonic Rock","Slow rock", "Big Band", "Chorus",
+	"Easy Listening", "Acoustic", "119", "Humour", "Speech", "Chanson", "Opera",
+	"Chamber music", "Sonata", "Symphony", "Booty bass", "Primus", "Porn groove",
+	"Satire", "Slow jam", "Club", "Tango", "Samba", "Folklore", "Ballad",
+	"Power ballad", "Rhythmic Soul", "Freestyle", "Duet", "Punk Rock", "Drum solo",
+	"A cappella", "Euro-House", "Dancehall", "Goa", "Drum & Bass", "Club-House",
+	"Hardcore Techno", "Terror", "Indie", "BritPop", "Negerpunk", "Polsk Punk",
+	"Beat", "Christian Gangsta Rap", "Heavy Metal", "Black Metal", "Crossover",
+	"Contemporary Christian", "Christian rock", "Merengue", "Salsa", "Thrash Metal",
+	"Anime", "Jpop", "Synthpop", "Abstract", "Art Rock", "Baroque", "Bhangra",
+	"Big beat", "Breakbeat", "Chillout", "Downtempo", "Dub", "EBM", "Eclectic",
+	"Electro", "Electroclash", "Emo", "Experimental", "Garage", "Global", "IDM",
+	"Illbient", "Industro-Goth", "Jam Band", "Krautrock", "Leftfield", "Lounge",
+	"Math Rock", "New Romantic", "Nu-Breakz", "Post-Punk", "Post-Rock", "Psytrance",
+	"Shoegaze", "Space Rock", "Trop Rock", "World Music", "Neoclassical",
+	"Audiobook", "Audio theatre", "Neue Deutsche Welle", "Podcast", "Indie-Rock",
+	"G-Funk", "Dubstep", "Garage Rock", "Psybient",
+	};
+
 public:
 	std::string title, artist, album, comment, genre,
 		year, track;
@@ -1131,6 +1136,7 @@ public:
 		
 		std::string val;
 		auto index{ 0 };
+		auto found{ false };
 		for (auto& tag : TAGS)
 		{
 			const auto sz { std::strlen(tag) };
@@ -1144,17 +1150,20 @@ public:
 				val = keyword.substr(sz + (c == '=' ? 1 : 0));
 				if (l.isCaseInsensitive)
 					val = tolower(val);
+				found = true;
 				break;
 			}
 			index++;
 		}
 		
-		if (index == 0) {
-			for (const auto& value : values)
-				if ((*value).find(val) != std::string::npos)
-					return true;
-		} else
-			return (*values[index - 1]).find(val) != std::string::npos;
+		if (found) {
+			if (index == 0) {
+				for (const auto& value : values)
+					if ((*value).find(val) != std::string::npos)
+						return true;
+			} else
+				return (*values[index - 1]).find(val) != std::string::npos;
+		}
 		
 		return false;
 	}
@@ -1215,6 +1224,7 @@ public:
 		;
 	}
 	
+	ID3() {}
 	ID3(const char* const path, bool case_insensitive = false):
 		year{0}, track{0}, path{path}, isCaseInsensitive{case_insensitive}
 	{
@@ -1262,19 +1272,6 @@ public:
 			get(/*Zero Track*/ 1);
 			track = get(1);
 			genre = get(1, true);
-			
-			//file.seekg(0, std::ios::end);
-//			file.seekg(end - (128 + 227));
-//			if (get("Extended", 4) == "TAG+")
-//			{
-//				get("Title", 60);
-//				get("Artist", 60);
-//				get("Album", 60);
-//				get("speed", 1);
-//				get("Genre", 30);
-//				get("Start-Time", 6);
-//				get("End-Time", 6);
-//			}
 		}
 		
 		file.close();
@@ -1433,6 +1430,7 @@ func isValidFile(const fs::path& path) -> bool
 	std::string  filename;
 	auto ismp3 { false };
 	auto isCaseInsensitive { false };
+	ID3 id3;
 	if (not state[OPT_FIND].empty() or not state[OPT_EXCLFIND].empty())
 	{
 		ismp3 = tmp.extension().string() == ".mp3";
@@ -1440,6 +1438,8 @@ func isValidFile(const fs::path& path) -> bool
 		isCaseInsensitive = state[OPT_CASEINSENSITIVE] == "true";
 		if (isCaseInsensitive)
 			filename = tolower(filename);
+		if (ismp3)
+			id3 = ID3(tmp.string().c_str(), isCaseInsensitive);
 	}
 	
 	if (bool found{ false }; not state[OPT_FIND].empty() and not listFind.empty()) {
@@ -1447,7 +1447,7 @@ func isValidFile(const fs::path& path) -> bool
 		{
 			auto handled { keyword[0] == char(1) };
 			if (not handled and ismp3 and (handled = true))
-				found = ID3(tmp.string().c_str(), isCaseInsensitive) % keyword;
+				found = id3 % keyword;
 			
 			if (not handled and filename.find(keyword) != std::string::npos) {
 				found = true;
@@ -1463,7 +1463,7 @@ func isValidFile(const fs::path& path) -> bool
 		{
 			auto handled { keyword[0] == char(1) };
 			if (auto found { false }; not handled and ismp3 and (handled = true)) {
-				found = ID3(tmp.string().c_str(), isCaseInsensitive) % keyword;
+				found = id3 % keyword;
 				if (handled and found)
 					return false;
 			}

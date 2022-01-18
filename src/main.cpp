@@ -16,20 +16,24 @@
 #include <string>
 #include <charconv>
 #include <vector>
-#include <set>
+#include <unordered_set>
 #include <unordered_map>
-#include <map>
 #include <filesystem>
 #include <thread>
 #include <future>
 #include <cstdarg>
 #include <algorithm>
-#include <fstream>
 #include <regex>
 #include <clocale>
 #include <sys/stat.h>
+#include <fstream>
 
-std::map<std::string, std::string> state;
+std::unordered_map<std::string, std::string> state;
+constexpr auto OPT_ARRANGEMENT 		{"arrangement"};			// w
+constexpr auto OPT_ARRANGEMENT_DEFAULT		{"default"};
+constexpr auto OPT_ARRANGEMENT_UNORDERED	{"unordered"};
+constexpr auto OPT_ARRANGEMENT_ASCENDING	{"ascending"};
+constexpr auto OPT_ARRANGEMENT_PERTITLE		{"per-title"};
 constexpr auto OPT_HELP 			{"help"};					// h
 constexpr auto OPT_VERSION 			{"version"};				// v
 constexpr auto OPT_VERBOSE 			{"verbose"};				// V
@@ -38,12 +42,13 @@ constexpr auto OPT_OVERWRITE 		{"overwrite"};				// O
 constexpr auto OPT_SKIPSUBTITLE 	{"skip-subtitle"};			// x
 constexpr auto OPT_OUTDIR 			{"out-dir"};				// d
 constexpr auto OPT_EXECUTION		{"execution"};				// c
-constexpr auto OPT_THREAD			{"thread"};
-constexpr auto OPT_ASYNC			{"async"};
+constexpr auto OPT_EXECUTION_THREAD			{"thread"};
+constexpr auto OPT_EXECUTION_ASYNC			{"async"};
 constexpr auto OPT_EXCLHIDDEN		{"exclude-hidden"};			// n
 constexpr auto OPT_REGEXSYNTAX		{"regex-syntax"};			// X
 constexpr auto OPT_CASEINSENSITIVE	{"make-case-insensitive"};	// N
 
+constexpr auto OPT_PLAYLIST_TYPE 	{"playlist-type"};			// W
 constexpr auto OPT_FIXFILENAME 		{"out-filename"};			// f
 constexpr auto OPT_NOOUTPUTFILE 	{"no-output-file"};			// F
 
@@ -88,204 +93,228 @@ Usage:\n    tvplaylist [Option or Dir or File] ...\n\n\
 If no argument was specified, the current directory will be use.\n\n\
 Option:\n\
 -h, --help [option]\n\
-                 Display options description.\n\
--v, --version    Display version.\n\
+        Display options description.\n\
+-v, --version\n\
+        Display version.\n\
 ";
 constexpr auto VERBOSE=\
 "-V, --verbose [all | info]\n\
-                 Display playlist content.\n\
-                 Define as 'all' will also show fail messages.\n\
-                 Define as 'info' will also display options info summary.\n\
+        Display playlist content.\n\
+        Define as 'all' will also show fail messages.\n\
+        Define as 'info' will also display options info summary.\n\
 ";
 constexpr auto BENCHMARK=\
-"-b, --benchmark  Benchmarking execution.\n\
+"-b, --benchmark\n\
+        Benchmarking execution.\n\
 ";
+constexpr auto ARRANGEMENT=\
+"-w, --arrangement [default | unordered | per-title | ascending] \n\
+        Specifying how playlist content was arrangged.\n\
+        default   : One file per Title, Title sorted ascending.\n\
+        unordered : One file per Title, Title sorted unordered.\n\
+        per-title : All files sorted ascending grouped per Title/Directory.\n\
+        ascending : All files sorted ascending by filenames, regardless directory name order.\n\
+"; //TODO: HELP ARRANGEMENT
 constexpr auto OVERWRITE=\
-"-O, --overwrite  Overwrite output playlist file.\n\
+"-O, --overwrite\n\
+        Overwrite output playlist file.\n\
 ";
 constexpr auto SKIPSUBTITLE=\
 "-x, --skip-subtitle\n\
-                 Dont include subtitle file.\n\
+        Dont include subtitle file.\n\
 ";
 constexpr auto OUTDIR=\
 "-d, --out-dir \"directory path\"\n\
-                 Override output directory for playlist file.\n\
+        Override output directory for playlist file.\n\
 ";
 constexpr auto EXECUTION=\
 "-c, --execution 'using'\n\
-                 Specify execution, using 'thread', 'async' is default, or 'linear' to execute.\n\
+        Specify execution, using 'thread', 'async' is default, or 'linear' to execute.\n\
 ";
 constexpr auto EXCLHIDDEN=\
 "-n, --exclude-hidden\n\
-                 Exclude hidden folders or files.\n\
+        Exclude hidden folders or files (not for Windows).\n\
 ";
 constexpr auto CASEINSENSITIVE=\
 "-N, --make-case-insensitive\n\
-                 Make --find and --exclude-find case-insensitive.\n\
+     --case-insensitive\n\
+     --caseinsensitive\n\
+     --ignore-case\n\
+     --ignorecase\n\
+        Make --find and --exclude-find case-insensitive.\n\
+        To make case-sensitive again, pass --ignorecase=false.\n\
 ";
 constexpr auto FIND=\
 "-i, --find 'keyword'\n\
-                 Filter only files with filename contains find keyword.\n\
-                 You can specifying this multiple times.\n\
-                   Example: --find war: find invasion\n\
-                 To filter only for directory name, use --find dir='value' or --find=dir='value'.\n\
-                   Example: --find dir=war  or  --find=dir=war\n\
-                 To find by using MP3 ID3 tags, use format --find 'key'='value' or --find='key'='value'.\n\
-                 Possible 'key' are: \"title\", \"artist\", \"album\", \"genre\", \"comment\", \"year\", and \"track\".\n\
-                   Example: --find artist=Koko  or  --find=artist=Koko\n\
-                 To enable case-insensitive, declare -N or --make-case-insensitive option.\n\
+        Filter only files with filename contains find keyword.\n\
+        You can specifying this multiple times.\n\
+            Example: --find=war:find=invasion\n\
+        To filter only for directory name, use --find dir='value' or --find=dir='value'.\n\
+            Example: --find dir=war  or  --find=dir=war\n\
+        To find by using MP3 ID3 tags, use format --find 'key'='value' or --find='key'='value'.\n\
+        Possible 'key' are: \"id3\", \"title\", \"artist\", \"album\", \"genre\", \"comment\", \"year\", and \"track\".\n\
+            Example: --find artist=Koko  or  --find=artist=Koko\n\
+        If you specify tag \"id3\", it will search in all tags, eg:: title, album, etc.\n\
+        To enable case-insensitive, use following:\n\
+            declare -N or --make-case-insensitive option\n\
+            or declare after option --find:\n\
+            declare --find ignorecase=true\n\
 ";
 constexpr auto EXCLFIND=\
 "-I, --exclude-find 'keyword'\n\
-                 Filter to exclude files with filename contains find keyword.\n\
-                 You can specifying this multiple times.\n\
-                   Example: -I love; I and; I home\n\
-                 To filter only for directory name, use --exclude-find dir='value' or --exclude-find=dir='value'.\n\
-                   Example: --exclude-find dir=war  or  --exclude-find=dir=war\n\
-                 To find by using MP3 ID3 tags, use format --exclude-find 'key'='value' or --exclude-find='key'='value'.\n\
-                 Possible 'key' are: \"title\", \"artist\", \"album\", \"genre\", \"comment\", \"year\", and \"track\".\n\
-                   Example: --exclude-find year=2007  or  --exclude-find=year=2007\n\
-                 To enable case-insensitive, use -N or --make-case-insensitive option.\n\
+        Filter to exclude files with filename contains find keyword.\n\
+        You can specifying this multiple times.\n\
+            Example: -I love; I and; I home\n\
+        To filter only for directory name, use --exclude-find dir='value' or --exclude-find=dir='value'.\n\
+            Example: --exclude-find dir=war  or  --exclude-find=dir=war\n\
+        To find by using MP3 ID3 tags, use format --exclude-find 'key'='value' or --exclude-find='key'='value'.\n\
+        Possible 'key' are: \"id3\", \"title\", \"artist\", \"album\", \"genre\", \"comment\", \"year\", and \"track\".\n\
+            Example: --exclude-find year=2007  or  --exclude-find=year=2007\n\
+        If you specify tag \"id3\", it will search in all tags, eg:: title, album, etc.\n\
+        To enable case-insensitive, use following:\n\
+            declare -N or --make-case-insensitive option\n\
+            or declare after option --exclude-find:\n\
+            declare --exclude-find ignorecase=true\n\
 ";
 constexpr auto REGEXSYNTAX=\
-"-X, --regex-syntax [type]\n\
-                 Specify regular expression syntax to use.\n\
-                 Available value are: 'ecma'(Default), 'awk', 'grep', 'egrep', 'basic', 'extended'.\n\
-                 'basic' use the basic POSIX regex grammar and\n\
-                 'extended' use the extended POSIX regex grammar.\n\
+"-X, --regex-syntax [ecma | awk | grep | egrep | basic | extended]\n\
+        Specify regular expression syntax to use.\n\
+        Available value are: 'ecma'(Default), 'awk', 'grep', 'egrep', 'basic', 'extended'.\n\
+            'basic' use the basic POSIX regex grammar and\n\
+            'extended' use the extended POSIX regex grammar.\n\
 ";
 constexpr auto REGEX=\
 "-r, --regex 'syntax'\n\
-                 Filter only files with filename match regular expression.\n\
-                 You can specifying this multiple times.\n\
+        Filter only files with filename match regular expression.\n\
+        You can specifying this multiple times.\n\
 ";
 constexpr auto EXCLREGEX=\
 "-R, --exclude-regex 'syntax'\n\
-                 Filter to exclude files with filename match regular expression.\n\
-                 You can specifying this multiple times.\n\
+        Filter to exclude files with filename match regular expression.\n\
+        You can specifying this multiple times.\n\
 ";
 constexpr auto EXT=\
 "-e, --ext \"'extension', 'extension', ...\"\n\
-                 Filter only files that match specific extensions, separated by comma.\n\
-                   Example: --ext \"pdf, docx\" or --ext=pdf,docx\n\
-                 To process all files use *, example: --ext=* \n\
+        Filter only files that match specific extensions, separated by comma.\n\
+            Example: --ext \"pdf, docx\" or --ext=pdf,docx\n\
+        To process all files use *, example: --ext=* \n\
 ";
 constexpr auto EXCLEXT=\
 "-E, --exclude-ext \"'extension', 'extension' ...\"\n\
-                 Filter to exclude files that match specific extensions, separated by comma.\n\
+        Filter to exclude files that match specific extensions, separated by comma.\n\
 ";
 constexpr auto SIZE=\
 "-s, --size < | > 'size'\n\
-           'min size'..'maz size'\n\
-           'min size'-'max size'\n\
-                 Filter only files that size match, in \"KB\", \"MB\" (default), or \"GB\".\n\
-                 You can specifying this multiple times for 'Range' only based size.\n\
-                   Example: --size<750\n\
-                     OR by specify the unit\n\
-                      --size>1.2gb\n\
-                     OR using range with '-' OR '..'\n\
-                      --size 750 - 1.2gb; size=30..200.2; size 2gb .. 4gb\n\
+            'min size'..'maz size'\n\
+            'min size'-'max size'\n\
+        Filter only files that size match, in \"KB\", \"MB\" (default), or \"GB\".\n\
+        You can specifying this multiple times for 'Range' only based size.\n\
+            Example: --size<750\n\
+                OR by specify the unit\n\
+                    --size>1.2gb\n\
+                OR using range with '-' OR '..'\n\
+                    --size 750 - 1.2gb; size=30..200.2; size 2gb .. 4gb\n\
 ";
 constexpr auto EXCLSIZE=\
 "-S, --exclude-size < | > 'size'\n\
-                  'min size'..'maz size'\n\
-                  'min size'-'max size'\n\
-                 Filter to exclude files that size match, in \"KB\", \"MB\" (default), or \"GB\".\n\
-                 You can specifying this multiple times for 'Range' only based size.\n\
+                    'min size'..'maz size'\n\
+                    'min size'-'max size'\n\
+        Filter to exclude files that size match, in \"KB\", \"MB\" (default), or \"GB\".\n\
+        You can specifying this multiple times for 'Range' only based size.\n\
 ";
 constexpr auto DATE=\
 "-z, --date = | < | > 'date and/or time'\n\
-             'min' .. 'max'\n\
-             'min' - 'max'\n\
-                 Filter only files that was created or accessed or modified or changed at specified date[s] and/or time[s].\n\
-                 If you need only specific type of date, then use --created, --accessed, --modified, or --changed respectively.\n\
-                 For more information about 'date and/or time' possible values, see below.\n\
-                 You can specifying this multiple times, for both single value or range values.\n\
-                   Example, to filter all files that has created/accessed/modified/changed with minutes from 20 to 35 for any date time and from 47 to 56 for year 2021:\n\
-                      --date=0:20-0:35 --date=\"0:47 2021\" - \"0:56 2021\"\n\
-                     OR\n\
-                      --date=0:20..0:35:date=0:47/2022..0:56/2022\n\
+            'min' .. 'max'\n\
+            'min' - 'max'\n\
+        Filter only files that was created or accessed or modified or changed at specified date[s] and/or time[s].\n\
+        If you need only specific type of date, then use --created, --accessed, --modified, or --changed respectively.\n\
+        For more information about 'date and/or time' possible values, see below.\n\
+        You can specifying this multiple times, for both single value or range values.\n\
+            Example, to filter all files that has created/accessed/modified/changed with minutes from 20 to 35 for any date time and from 47 to 56 for year 2021:\n\
+                    --date=0:20-0:35 --date=\"0:47 2021\" - \"0:56 2021\"\n\
+                OR\n\
+                    --date=0:20..0:35:date=0:47/2022..0:56/2022\n\
 ";
 constexpr auto EXCLDATE=\
 "-Z, --exclude-date = | < | > 'date and/or time'\n\
-                   'min' .. 'max'\n\
-                   'min' - 'max'\n\
-                 Filter to exclude only files that was created or accessed or modified or changed at specified date[s] and/or time[s].\n\
-                 If you need only specific type of date, then use --exclude-created, --exclude-accessed, --exclude-modified, or --exclude-changed respectively.\n\
-                 For more information about 'date and/or time' possible values, see below.\n\
-                 You can specifying this multiple times, for both single value or range values.\n\
+                    'min' .. 'max'\n\
+                    'min' - 'max'\n\
+        Filter to exclude only files that was created or accessed or modified or changed at specified date[s] and/or time[s].\n\
+        If you need only specific type of date, then use --exclude-created, --exclude-accessed, --exclude-modified, or --exclude-changed respectively.\n\
+        For more information about 'date and/or time' possible values, see below.\n\
+        You can specifying this multiple times, for both single value or range values.\n\
 ";
 constexpr auto CREATED=\
 "-t, --created = | < | > 'date and/or time'\n\
-              'min' .. 'max'\n\
-              'min' - 'max'\n\
-                 Filter only files that was created on specified date[s] and/or time[s].\n\
-                 For more information about 'date and/or time' possible values, see below.\n\
-                 You can specifying this multiple times, for both single value or range values.\n\
+               'min' .. 'max'\n\
+               'min' - 'max'\n\
+        Filter only files that was created on specified date[s] and/or time[s].\n\
+        For more information about 'date and/or time' possible values, see below.\n\
+        You can specifying this multiple times, for both single value or range values.\n\
 ";
 constexpr auto EXCLCREATED=\
 "-T, --exclude-created = | < | > 'date and/or time'\n\
-                      'min' .. 'max'\n\
-                      'min' - 'max'\n\
-                 Filter to exclude only files that was created on specified date[s] and/or time[s].\n\
-                 For more information about 'date and/or time' possible values, see below.\n\
-                 You can specifying this multiple times, for both single value or range values.\n\
+                       'min' .. 'max'\n\
+                       'min' - 'max'\n\
+        Filter to exclude only files that was created on specified date[s] and/or time[s].\n\
+        For more information about 'date and/or time' possible values, see below.\n\
+        You can specifying this multiple times, for both single value or range values.\n\
 ";
 constexpr auto ACCESSED=\
 "-a, --accessed = | < | > 'date and/or time'\n\
-               'min' .. 'max'\n\
-               'min' - 'max'\n\
-                 Filter only files that was accessed on specified date[s] and/or time[s].\n\
-                 You can specifying this multiple times, for both single value or range values.\n\
-                 For more information about 'date and/or time' possible values, see below.\n\
+                'min' .. 'max'\n\
+                'min' - 'max'\n\
+        Filter only files that was accessed on specified date[s] and/or time[s].\n\
+        You can specifying this multiple times, for both single value or range values.\n\
+        For more information about 'date and/or time' possible values, see below.\n\
 ";
 constexpr auto EXCLACCESSED=\
 "-A, --exclude-accessed = | < | > 'date and/or time'\n\
-                       'min' .. 'max'\n\
-                       'min' - 'max'\n\
-                 Filter to exclude only files that was accessed on specified date[s] and/or time[s].\n\
-                 For more information about 'date and/or time' possible values, see below.\n\
-                 You can specifying this multiple times, for both single value or range values.\n\
+                        'min' .. 'max'\n\
+                        'min' - 'max'\n\
+        Filter to exclude only files that was accessed on specified date[s] and/or time[s].\n\
+        For more information about 'date and/or time' possible values, see below.\n\
+        You can specifying this multiple times, for both single value or range values.\n\
 ";
 constexpr auto MODIFIED=\
 "-m, --modified = | < | > 'date and/or time'\n\
-              'min' .. 'max'\n\
-              'min' - 'max'\n\
-                 Filter only files that was modified on specified date[s] and/or time[s].\n\
-                 For more information about 'date and/or time' possible values, see below.\n\
-                 You can specifying this multiple times, for both single value or range values.\n\
+                'min' .. 'max'\n\
+                'min' - 'max'\n\
+        Filter only files that was modified on specified date[s] and/or time[s].\n\
+        For more information about 'date and/or time' possible values, see below.\n\
+        You can specifying this multiple times, for both single value or range values.\n\
 ";
 constexpr auto EXCLMODIFIED=\
 "-M, --exclude-modified = | < | > 'date and/or time'\n\
-                      'min' .. 'max'\n\
-                      'min' - 'max'\n\
-                 Filter to exclude only files that was modified on specified date[s] and/or time[s].\n\
-                 For more information about 'date and/or time' possible values, see below.\n\
-                 You can specifying this multiple times, for both single value or range values.\n\
+                        'min' .. 'max'\n\
+                        'min' - 'max'\n\
+        Filter to exclude only files that was modified on specified date[s] and/or time[s].\n\
+        For more information about 'date and/or time' possible values, see below.\n\
+        You can specifying this multiple times, for both single value or range values.\n\
 ";
 constexpr auto CHANGED=\
 "-g, --changed = | < | > 'date and/or time'\n\
-              'min' .. 'max'\n\
-              'min' - 'max'\n\
-                 Filter only files that was changed on specified date[s] and/or time[s].\n\
-                 For more information about 'date and/or time' possible values, see below.\n\
-                 You can specifying this multiple times, for both single value or range values.\n\
+               'min' .. 'max'\n\
+               'min' - 'max'\n\
+        Filter only files that was changed on specified date[s] and/or time[s].\n\
+        For more information about 'date and/or time' possible values, see below.\n\
+        You can specifying this multiple times, for both single value or range values.\n\
 ";
 constexpr auto EXCLCHANGED=\
 "-G, --exclude-changed = | < | > 'date and/or time'\n\
-                      'min' .. 'max'\n\
-                      'min' - 'max'\n\
-                 Filter to exclude only files that was changed on specified date[s] and/or time[s].\n\
-                 For more information about 'date and/or time' possible values, see below.\n\
-                 You can specifying this multiple times, for both single value or range values.\n\
+                       'min' .. 'max'\n\
+                       'min' - 'max'\n\
+        Filter to exclude only files that was changed on specified date[s] and/or time[s].\n\
+        For more information about 'date and/or time' possible values, see below.\n\
+        You can specifying this multiple times, for both single value or range values.\n\
 ";
 constexpr auto FIXFILENAME=\
 "-f, --out-filename 'filename'\n\
-                 Override output playlist filename.\n\
+        Override output playlist filename.\n\
 ";
 constexpr auto NOOUTPUTFILE=\
 "-F, --no-ouput-file [yes | no]\n\
-                 Choose to create playlist file or no. Default 'yes' if option was declared or if was build as library.\n\
+        Choose to create playlist file or no. Default 'yes' if option was declared or if was build as library.\n\
 ";
 constexpr auto HELP_REST=\
 "\n\
@@ -309,33 +338,34 @@ constexpr auto HELP_DATE_REST=\
 "Posible value for 'date and/or time' are: 'Year', 'Month Name' (mnemonic or full), 'Month Number', 'Day', 'WeekDay Name' (mnemonic or full), 'Hour' (if AM/PM defined then it is 12 hours, otherwise 24 hours), 'Minute', 'Second', AM or PM.\n\
 Example:\n\
   Filter only files created in 2009:\n\
-     --created=2009\n\
+	 --created=2009\n\
   Filter only files created on Friday:\n\
-    --created friday  OR  --created==friday\n\
+	--created friday  OR  --created==friday\n\
   Filter only files created in 2009 with weekday is Sunday:\n\
-     --created=\"Sunday 2009\"  OR  --created=sun/2009\n\
+	 --created=\"Sunday 2009\"  OR  --created=sun/2009\n\
   Filter only files created from November 2019 thru January 2021:\n\
-     --created \"nov 2019\" .. \"jan 2021\"\n\
+	 --created \"nov 2019\" .. \"jan 2021\"\n\
   Filter only files created at January - March 1980 and May - June 2000 and after 2022:\n\
-     --created=jan/1980..march/1980:created 2000/may - jun/2000 --created>2022\n\
+	 --created=jan/1980..march/1980:created 2000/may - jun/2000 --created>2022\n\
   Filter only files created after March 22 1990 20:44:\n\
-     --created>\"3/22/2019 20:44\"  OR  --created \"20:44 22/jan/2019\"\n\
+	 --created>\"3/22/2019 20:44\"  OR  --created \"20:44 22/jan/2019\"\n\
 It's up to you how to arrange date and/or time, At least you should use common time format (eg: 23:5:30). Here the possible arrangement you can use: \n\
 Common normal: \"Monday Jan 15 2022 7:00 PM\"\n\
                \"Mon, 15/january/2022 7:0:0 pm\"\n\
                \"Monday 1/15/2022 19:0\"\n\
 Equal and Acceptable: \"15 pm mon 7:0 2022/jan\"\n\
 If you want to test 'date and/or time' use --debug=date 'date and/or time', for the example:\n\
-     --debug=date \"pm 3:33\"\n\
-     or --debug=date wed\n\
+	 --debug=date \"pm 3:33\"\n\
+	 or --debug=date wed\n\
 It will showing internal tvplaylist date time recognizer, with format \"Weekday Year/Month/Day Hour:Minute:Second\".\n\
 ";
 
 
-constexpr auto OPTS = { &OPT_VERSION, &OPT_HELP, &OPT_VERBOSE, &OPT_BENCHMARK, & OPT_OVERWRITE,
+constexpr auto OPTS = { &OPT_VERSION, &OPT_HELP, &OPT_ARRANGEMENT,
+	&OPT_VERBOSE, &OPT_BENCHMARK, & OPT_OVERWRITE,
 	&OPT_SKIPSUBTITLE, &OPT_OUTDIR, &OPT_EXECUTION, &OPT_FIXFILENAME,
 	&OPT_NOOUTPUTFILE, &OPT_SIZE, &OPT_EXCLSIZE, &OPT_EXT, &OPT_EXCLEXT,
-    &OPT_CASEINSENSITIVE, &OPT_FIND,
+	&OPT_CASEINSENSITIVE, &OPT_FIND,
 	&OPT_EXCLFIND, &OPT_REGEXSYNTAX, &OPT_REGEX, &OPT_EXCLREGEX, &OPT_EXCLHIDDEN,
 	
 	&OPT_DATE, &OPT_EXCLDATE,
@@ -344,11 +374,12 @@ constexpr auto OPTS = { &OPT_VERSION, &OPT_HELP, &OPT_VERBOSE, &OPT_BENCHMARK, &
 	&OPT_DEBUG
 };
 
-constexpr const char* const* HELPS[] = { &VERSION, &HELP, &VERBOSE, &BENCHMARK, & OVERWRITE,
-    &SKIPSUBTITLE, &OUTDIR, &EXECUTION, &FIXFILENAME,
-    &NOOUTPUTFILE, &SIZE, &EXCLSIZE, &EXT, &EXCLEXT,
-    &CASEINSENSITIVE, &FIND,
-    &EXCLFIND, &REGEXSYNTAX, &REGEX, &EXCLREGEX, &EXCLHIDDEN,
+constexpr const char* const* HELPS[] = { &VERSION, &HELP, &ARRANGEMENT,
+	&VERBOSE, &BENCHMARK, & OVERWRITE,
+	&SKIPSUBTITLE, &OUTDIR, &EXECUTION, &FIXFILENAME,
+	&NOOUTPUTFILE, &SIZE, &EXCLSIZE, &EXT, &EXCLEXT,
+	&CASEINSENSITIVE, &FIND,
+	&EXCLFIND, &REGEXSYNTAX, &REGEX, &EXCLREGEX, &EXCLHIDDEN,
 	
 	&DATE, &EXCLDATE,
 	&CREATED, &MODIFIED, &ACCESSED, &CHANGED,
@@ -437,7 +468,7 @@ func trim(const std::string& s) -> std::string
 }
 
 func isEqual(const std::string_view& source,
-             const std::initializer_list<const std::string_view>& list) {
+			 const std::initializer_list<const std::string_view>& list) {
 	for (auto& s : list) {
 		if (source == s)
 			return true;
@@ -688,6 +719,51 @@ struct Date
 		return s;
 	}
 private:
+	static constexpr auto WEEKDAYS = {
+	/*en_US.UTF-8:*/ "sun", "mon", "tue", "wed", "thu", "fri", "sat",
+	/*id_ID       */ "min", "sen", "sel", "rab", "kam", "jum", "sab",
+	/*de_DE.UTF-8:*/ "so", "mo", "di", "mi", "do", "fr", "sa",
+	/*fr_FR.UTF-8:*/ "dim", "lun", "mar", "mer", "jeu", "ven", "sam",
+	/*sv_SE.UTF-8:*/ "sön", "mån", "tis", "ons", "tor", "fre", "lör",
+	/*es_ES.UTF-8:*/ "dom", "lun", "mar", "mié", "jue", "vie", "sáb",
+	/*ru_RU.UTF-8:*/ "вс", "пн", "вт", "ср", "чт", "пт", "сб",
+	/*ja_JP.UTF-8:*/ "日", "月", "火", "水", "木", "金", "土",
+	/*zh_CN.UTF-8:*/ "日", "一", "二", "三", "四", "五", "六",
+	/*id_ID.UTF-8:*/ "日", "一", "二", "三", "四", "五", "六",
+
+
+	/*en_US.UTF-8:*/ "sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday",
+	/*id_ID       */ "minggu", "senin", "selasa", "rabu", "kamis", "jumat", "sabtu",
+	/*de_DE.UTF-8:*/ "sonntag", "montag", "dienstag", "mittwoch", "donnerstag", "freitag", "samstag",
+	/*fr_FR.UTF-8:*/ "dimanche", "lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi",
+	/*sv_SE.UTF-8:*/ "söndag", "måndag", "tisdag", "onsdag", "torsdag", "fredag", "lördag",
+	/*es_ES.UTF-8:*/ "domingo", "lunes", "martes", "miércoles", "jueves", "viernes", "sábado",
+	/*ru_RU.UTF-8:*/ "воскресенье", "понедельник", "вторник", "среда", "четверг", "пятница", "суббота",
+	/*ja_JP.UTF-8:*/ "日曜日", "月曜日", "火曜日", "水曜日", "木曜日", "金曜日", "土曜日",
+	/*zh_CN.UTF-8:*/ "星期日", "星期一", "星期二", "星期三", "星期四", "星期五", "星期六",
+	/*id_ID.UTF-8:*/ "星期日", "星期一", "星期二", "星期三", "星期四", "星期五", "星期六",
+	};
+	
+	static constexpr auto MONTHS = {
+	/*en_US.UTF-8:*/ "jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec",
+	/*id_ID       */ "jan", "feb", "mar", "apr", "mei", "jun", "jul", "agu", "sep", "okt", "nov", "des",
+	/*de_DE.UTF-8:*/ "jan", "feb", "mär", "apr", "mai", "jun", "jul", "aug", "sep", "okt", "nov", "dez",
+	/*fr_FR.UTF-8:*/ "jan", "fév", "mar", "avr", "mai", "jui", "jul", "aoû", "sep", "oct", "nov", "déc",
+	/*sv_SE.UTF-8:*/ "jan", "feb", "mar", "apr", "maj", "jun", "jul", "aug", "sep", "okt", "nov", "dec",
+	/*es_ES.UTF-8:*/ "ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic",
+	/*ru_RU.UTF-8:*/ "янв", "фев", "мар", "апр", "май", "июн", "июл", "авг", "сен", "окт", "ноя", "дек",
+
+	/*en_US.UTF-8:*/ "january", "february", "march", "april", "may", "june", "july", "august", "september", "october", "november", "december",
+	/*id_ID       */ "januari", "februari", "maret", "april", "mei", "juni", "juli", "agustus", "september", "oktober", "november", "desember",
+	/*de_DE.UTF-8:*/ "januar", "februar", "märz", "april", "mai", "juni", "juli", "august", "september", "oktober", "november", "dezember",
+	/*fr_FR.UTF-8:*/ "janvier", "février", "mars", "avril", "mai", "juin", "juillet", "août", "septembre", "octobre", "novembre", "décembre",
+	/*sv_SE.UTF-8:*/ "januari", "februari", "mars", "april", "maj", "juni", "juli", "augusti", "september", "oktober", "november", "december",
+	/*es_ES.UTF-8:*/ "enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre",
+	/*ru_RU.UTF-8:*/ "января", "февраля", "марта", "апреля", "мая", "июня", "июля", "августа", "сентября", "октября", "ноября", "декабря",
+	/*ja_JP.UTF-8:*/ "1月", "2月", "3月", "4月", "5月", "6月", "7月", "8月", "9月", "10月", "11月", "12月",
+	/*zh_CN.UTF-8:*/ "一月", "二月", "三月", "四月", "五月", "六月", "七月", "八月", "九月", "十月", "十一月", "十二月",
+	};
+	
 	func getWeekDayName(unsigned short index, const char* const locale = nullptr)
 		const -> std::string
 	{
@@ -896,30 +972,7 @@ public:
 			s[0] = std::tolower(s[0]);
 			
 			if (weekDay == -1) {
-				for (auto i{ 0 }; auto& m : {
-					/*en_US.UTF-8:*/ "sun", "mon", "tue", "wed", "thu", "fri", "sat",
-					/*id_ID       */ "min", "sen", "sel", "rab", "kam", "jum", "sab",
-					/*de_DE.UTF-8:*/ "so", "mo", "di", "mi", "do", "fr", "sa",
-					/*fr_FR.UTF-8:*/ "dim", "lun", "mar", "mer", "jeu", "ven", "sam",
-					/*sv_SE.UTF-8:*/ "sön", "mån", "tis", "ons", "tor", "fre", "lör",
-					/*es_ES.UTF-8:*/ "dom", "lun", "mar", "mié", "jue", "vie", "sáb",
-					/*ru_RU.UTF-8:*/ "вс", "пн", "вт", "ср", "чт", "пт", "сб",
-					/*ja_JP.UTF-8:*/ "日", "月", "火", "水", "木", "金", "土",
-					/*zh_CN.UTF-8:*/ "日", "一", "二", "三", "四", "五", "六",
-					/*id_ID.UTF-8:*/ "日", "一", "二", "三", "四", "五", "六",
-
-					
-					/*en_US.UTF-8:*/ "sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday",
-					/*id_ID       */ "minggu", "senin", "selasa", "rabu", "kamis", "jumat", "sabtu",
-					/*de_DE.UTF-8:*/ "sonntag", "montag", "dienstag", "mittwoch", "donnerstag", "freitag", "samstag",
-					/*fr_FR.UTF-8:*/ "dimanche", "lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi",
-					/*sv_SE.UTF-8:*/ "söndag", "måndag", "tisdag", "onsdag", "torsdag", "fredag", "lördag",
-					/*es_ES.UTF-8:*/ "domingo", "lunes", "martes", "miércoles", "jueves", "viernes", "sábado",
-					/*ru_RU.UTF-8:*/ "воскресенье", "понедельник", "вторник", "среда", "четверг", "пятница", "суббота",
-					/*ja_JP.UTF-8:*/ "日曜日", "月曜日", "火曜日", "水曜日", "木曜日", "金曜日", "土曜日",
-					/*zh_CN.UTF-8:*/ "星期日", "星期一", "星期二", "星期三", "星期四", "星期五", "星期六",
-					/*id_ID.UTF-8:*/ "星期日", "星期一", "星期二", "星期三", "星期四", "星期五", "星期六",
-				}) {
+				for (auto i{ 0 }; auto& m : WEEKDAYS) {
 					if (s == m)
 					{
 						weekDay = (i % 7) + 1;
@@ -936,25 +989,7 @@ public:
 			}
 			
 			for (auto i{ 0 };
-				auto& m : {
-				/*en_US.UTF-8:*/ "jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec",
-				/*id_ID       */ "jan", "feb", "mar", "apr", "mei", "jun", "jul", "agu", "sep", "okt", "nov", "des",
-				/*de_DE.UTF-8:*/ "jan", "feb", "mär", "apr", "mai", "jun", "jul", "aug", "sep", "okt", "nov", "dez",
-				/*fr_FR.UTF-8:*/ "jan", "fév", "mar", "avr", "mai", "jui", "jul", "aoû", "sep", "oct", "nov", "déc",
-				/*sv_SE.UTF-8:*/ "jan", "feb", "mar", "apr", "maj", "jun", "jul", "aug", "sep", "okt", "nov", "dec",
-				/*es_ES.UTF-8:*/ "ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic",
-				/*ru_RU.UTF-8:*/ "янв", "фев", "мар", "апр", "май", "июн", "июл", "авг", "сен", "окт", "ноя", "дек",
-				
-				/*en_US.UTF-8:*/ "january", "february", "march", "april", "may", "june", "july", "august", "september", "october", "november", "december",
-				/*id_ID       */ "januari", "februari", "maret", "april", "mei", "juni", "juli", "agustus", "september", "oktober", "november", "desember",
-				/*de_DE.UTF-8:*/ "januar", "februar", "märz", "april", "mai", "juni", "juli", "august", "september", "oktober", "november", "dezember",
-				/*fr_FR.UTF-8:*/ "janvier", "février", "mars", "avril", "mai", "juin", "juillet", "août", "septembre", "octobre", "novembre", "décembre",
-				/*sv_SE.UTF-8:*/ "januari", "februari", "mars", "april", "maj", "juni", "juli", "augusti", "september", "oktober", "november", "december",
-				/*es_ES.UTF-8:*/ "enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre",
-				/*ru_RU.UTF-8:*/ "января", "февраля", "марта", "апреля", "мая", "июня", "июля", "августа", "сентября", "октября", "ноября", "декабря",
-				/*ja_JP.UTF-8:*/ "1月", "2月", "3月", "4月", "5月", "6月", "7月", "8月", "9月", "10月", "11月", "12月",
-				/*zh_CN.UTF-8:*/ "一月", "二月", "三月", "四月", "五月", "六月", "七月", "八月", "九月", "十月", "十一月", "十二月",
-			}) {
+				auto& m : MONTHS) {
 				if (s == m)
 				{
 					found = (i % 12) + 1;
@@ -1164,7 +1199,7 @@ struct ID3
 		"user_defined_url_link_frame"			// WXXX
 	};
 	
-	static constexpr auto GENRES = {
+	static constexpr const char* GENRES[] = {
 		"Blues", "Classic rock", "Country", "Dance", "Disco", "Funk", "Grunge",
 		"Hip-Hop", "Jazz", "Metal", "New Age", "Oldies", "Other", "Pop",
 		"Rhythm and Blues", "Rap", "Reggae", "Rock", "Techno", "Industrial",
@@ -1199,40 +1234,57 @@ struct ID3
 		"G-Funk", "Dubstep", "Garage Rock", "Psybient",
 	};
 
-							
-	friend bool operator % (const ID3& l, const std::string& keyword) {
-		std::string val;
-		std::string selectedTag;
-		for (auto& tag : TAGS)
-		{
-			const auto sz { std::strlen(tag) };
-			
-			if (const auto c{ keyword[sz] };
-				
-				keyword.size() > sz + 1
-				and keyword.starts_with(tag)
-				and (c == '=' or c == '<' or c == '>'))
-				{
-					selectedTag = tag;
-					val = keyword.substr(sz + (c == '=' ? 1 : 0));
-					if (l.isCaseInsensitive)
-						val = tolower(val);
-					break;
-				}
+	
+	func parseInput(const std::string& keyword) const
+		-> std::shared_ptr<std::pair<std::string, std::string>>
+	{
+		auto pos { keyword.find('=') };
+		auto found{ pos > 2 and pos != std::string::npos };
+		
+		if (found) {
+			auto selectedTag { keyword.substr(0, pos) };
+			found = setTags.find(selectedTag) != setTags.end();
+			if (found) {
+				std::string val { keyword.substr(pos + 1) };
+				return std::make_shared<std::pair<std::string,
+					std::string>>(std::make_pair(selectedTag, val));
+			}
 		}
 		
-		if (selectedTag == "id3") {
-			for (const auto& tag : l.tags)
-				if (tag.second.find(val) != std::string::npos)
-					return true;
-		} else
-			return l.tags.at(selectedTag).find(val) != std::string::npos;
+		return nullptr;
+	}
+	
+	func getValue(const std::string& tag) const -> std::string
+	{
+		auto found { setTags.find(tag) };
+		if (found != setTags.end())
+			return *found;
+		else
+			return "";
+	}
+
+	friend bool operator % (const ID3& l, const std::string& keyword) {
+		auto keyVal { l.parseInput(keyword) };
+		if (keyVal) {
+			if (l.isCaseInsensitive)
+				keyVal->second = tolower(keyVal->second);
+			
+			if (keyVal->first == "id3") {
+				for (auto& tag : l.tags)
+					if (tag.second.find(keyVal->second) != std::string::npos)
+						return true;
+			} else
+				return l.tags.at(keyVal->first).find(keyVal->second) != std::string::npos;
+		}
 		
 		return false;
 	}
+	
 private:
 	const char* path;
 	bool isCaseInsensitive;
+	
+	std::unordered_set<std::string> setTags;
 	
 	static unsigned int btoi(const char* bytes, int size, int offset)
 	{
@@ -1383,7 +1435,11 @@ private:
 		#endif
 	};
 	
-	
+	func initSet() {
+		if (setTags.empty())
+			for (auto& tag : TAGS)
+				setTags.emplace(tag);
+	}
 public:
 	
 	func write(const char* a_path = nullptr) const {
@@ -1450,10 +1506,12 @@ public:
 		
 		return s;
 	}
-	ID3() {}
-	ID3(const char* const path, bool case_insensitive = false):
-		path{path}, isCaseInsensitive{case_insensitive}
+	ID3() { initSet(); }
+	ID3(const char* const path, bool case_insensitive = false)
 	{
+		initSet();
+		this->path = path;
+		isCaseInsensitive = case_insensitive;
 		std::ifstream file;
 		file.open(path, std::ios::in | std::ios::ate | std::ios::binary);
 		if (not file.good()) {
@@ -1462,6 +1520,7 @@ public:
 		}
 		
 		file.seekg(0);
+
 		if (char s_tag[V2::SZ_HEADER];
 			file.read(s_tag, V2::SZ_HEADER)
 			and 0 == std::strncmp(s_tag, "ID3", 3))
@@ -1562,7 +1621,14 @@ public:
 						else if (isEqual(frame.id, "TCOM"))
 							tags.emplace(std::make_pair("composer", frame.data));
 						else if (isEqual(frame.id, "TCON"))
-							tags.emplace(std::make_pair("genre", frame.data));
+						{
+							int index;
+							if (auto [p, ec] = std::from_chars(
+								frame.data.c_str(),
+								frame.data.c_str()+frame.data.size(), index);
+								ec == std::errc())
+								tags.emplace(std::make_pair("genre", GENRES[index]));
+						}
 						else if (isEqual(frame.id, "TCOP"))
 							tags.emplace(std::make_pair("copyright_message", frame.data));
 						else if (isEqual(frame.id, "TDEN") and isv24)
@@ -1706,7 +1772,9 @@ public:
 			#if 0
 			std::cout << string() << '\n';
 			#endif
-		} else {
+		}
+		else
+		{
 			func get{[&](int size, bool isGenre = false) -> std::string {
 				char buffer[size + 1];
 				buffer[size] = '\0';
@@ -1727,7 +1795,8 @@ public:
 				
 				return std::string(buffer);
 			}};
-			
+		
+			file.seekg(0, std::ios::end);
 			const int end = int(file.tellg());
 			file.seekg(end - 128);
 			if (get(3) == "TAG")
@@ -1740,7 +1809,12 @@ public:
 				tags.emplace(std::make_pair("comment", get(28)));
 				get(/*Zero Track*/ 1);
 				tags.emplace(std::make_pair("track", get(1)));
-				tags.emplace(std::make_pair("genre", get(1, true)));
+				auto genre { get(1, true) };
+				int index;
+				if (auto [p, ec] = std::from_chars(genre.c_str(),
+								genre.c_str()+genre.size(), index);
+					ec == std::errc())
+					tags.emplace(std::make_pair("genre", GENRES[index]));
 				
 				file.seekg(0, std::ios::end);
 				file.seekg(end - (128 + 227));
@@ -1757,7 +1831,7 @@ public:
 				}
 			}
 		}
-		
+			
 		file.close();
 	}
 };
@@ -1912,7 +1986,7 @@ func isValidFile(const fs::path& path) -> bool
 			if (std::regex_search(filename, regex))
 				return false;
 	
-	std::string  filename;
+	std::string  filename; // MARK: Find statement
 	auto ismp3 { false };
 	auto isCaseInsensitive { false };
 	ID3 id3;
@@ -1927,7 +2001,7 @@ func isValidFile(const fs::path& path) -> bool
 			id3 = ID3(tmp.string().c_str(), isCaseInsensitive);
 	}
 	
-	if (bool found{ false }; not state[OPT_FIND].empty() and not listFind.empty()) {
+	if (bool found{ false }; not listFind.empty()) {
 		for (auto& keyword : listFind)
 		{
 			auto handled { keyword[0] == char(1) };
@@ -2066,7 +2140,7 @@ func ascending(const fs::path& a, const fs::path& b)
 func sortFiles(std::vector<fs::path>* const selectFiles)
 {
 	if (selectFiles->size() > 1) {
-		std::map<std::string, std::shared_ptr<std::vector<fs::path>>> selectFilesDirs;
+		std::unordered_map<std::string, std::shared_ptr<std::vector<fs::path>>> selectFilesDirs;
 		std::sort(selectFiles->begin(), selectFiles->end());
 		
 		for (auto& f : *selectFiles) {
@@ -2244,8 +2318,8 @@ func isContainsSeasonDirs(const fs::path& path) -> bool {
 }
 
 /// Use std::set, just because it guarantee unique items and find-able.
-std::set<fs::path> regularDirs 	= {};
-std::set<fs::path> seasonDirs	= {};
+std::unordered_set<std::string> regularDirs 	= {};
+std::unordered_set<std::string> seasonDirs	= {};
 std::vector<fs::path> selectFiles  = {};
 
 inline
@@ -2260,7 +2334,7 @@ func isValid(const fs::path& path) -> bool
 	);
 }
 
-func insertTo(std::set<fs::path>* const set, const fs::path& path)
+func insertTo(std::unordered_set<std::string>* const set, const fs::path& path)
 {
 	if (isValid(path))
 		set->emplace(path);
@@ -2272,7 +2346,7 @@ func insertTo(std::vector<fs::path>* const vector, const fs::path& path)
 		vector->emplace_back(path);
 }
 
-func checkForSeasonDir(const fs::path& path) -> void {	
+func checkForSeasonDir(const fs::path& path) -> void {
 	if (not path.empty()) {
 		auto hasDir{false};
 		
@@ -2283,7 +2357,7 @@ func checkForSeasonDir(const fs::path& path) -> void {
 		auto pullFromBufferNum{ [&bufferNum, &isNum]() {
 			isNum = false;
 			for (auto& child : bufferNum) {
-				insertTo(&regularDirs, child);
+				insertTo(&regularDirs, child.string());
 				checkForSeasonDir(child);
 			}
 		}};
@@ -2322,17 +2396,28 @@ func checkForSeasonDir(const fs::path& path) -> void {
 					}
 				}
 			}
-			insertTo(&regularDirs, child.path());
+			insertTo(&regularDirs, child.path().string());
 			checkForSeasonDir(child.path());
 			pullFromBufferNum();
 		}
 		
 		if (isNum and hasDir) {
-			regularDirs.erase(path);
-			insertTo(&seasonDirs, path);
+			regularDirs.erase(path.string());
+			insertTo(&seasonDirs, path.string());
 		} else
-			insertTo(&regularDirs, path);
+			insertTo(&regularDirs, path.string());
 	}
+}
+
+func getDirs(const fs::path& path) -> void
+{
+	insertTo(&regularDirs, path.string());
+		  
+	std::vector<fs::directory_entry> list;
+	listDir(path, &list, false);
+	for (auto& de : list)
+		if (de.is_directory())
+			getDirs(de.path());
 }
 
 func getBytes(const std::string& s) -> uintmax_t
@@ -2563,8 +2648,9 @@ int main(const int argc, char *argv[]) {
 	state[OPT_EXCLSIZEOPGT] = '\0';
 	state[OPT_EXCLSIZE] 	= "0";
 
-	state[OPT_EXECUTION]= OPT_ASYNC;
+	state[OPT_EXECUTION]= OPT_EXECUTION_ASYNC;
 	state[OPT_REGEXSYNTAX] = "ecma";
+	state[OPT_ARRANGEMENT] = OPT_ARRANGEMENT_DEFAULT;
 	
 	std::vector<std::string> args;
 	expandArgs(argc, argv,
@@ -2575,7 +2661,7 @@ int main(const int argc, char *argv[]) {
 			   #endif
 			   , &args);
 	
-	std::set<std::string_view> invalidArgs;
+	std::unordered_set<std::string_view> invalidArgs;
 	auto getRegexSyntaxType{[](const std::string& s)
 		-> std::regex_constants::syntax_option_type {
 		if (s == "basic") return std::regex_constants::syntax_option_type::basic;
@@ -2587,18 +2673,30 @@ int main(const int argc, char *argv[]) {
 	}};
 	
 	for (int i{0}; i<args.size(); ++i) {
-		if (auto isMatch{ [&](const char* with,
-							  char mnemonic,
+		if (auto isMatch{ [&](const char* const with,
+							  const char mnemonic,
 							  bool writeBoolean=false,
-							  const char* withOther=nullptr) {
-			auto result { (args[i].length() > 3
-					and args[i][0] == '-'
-					and args[i][1] == '-'
-					and (tolower(args[i].substr(2)) == with
-						 or (withOther and tolower(args[i].substr(2)) == withOther)))
-				or (args[i].length() == 2
-					and args[i][0] == '-'
-					and args[i][1] == mnemonic) };
+							  const std::initializer_list<const char*>& others = {}) {
+			auto result { false };
+			if (args[i].length() > 3
+				and args[i][0] == '-'
+				and args[i][1] == '-')
+			{
+				auto lower { tolower(args[i].substr(2)) };
+				result = lower == with;
+				
+				if (not result)
+					for (auto& other : others)
+						if (lower == other)
+						{
+							result = true;
+							break;
+						}
+			} else if (args[i].length() == 2
+					   and args[i][0] == '-')
+			{
+				result = args[i][1] == mnemonic;
+			}
 			if (result) {
 				if (args[i].length() == 2) { // convert mnemonic to full
 					args[i] = "--";
@@ -2608,7 +2706,7 @@ int main(const int argc, char *argv[]) {
 					state[with] = "true";
 			}
 			return result;
-		} }; isMatch(OPT_HELP, 'h') or isMatch(OPT_VERSION, 'v'))
+		} }; isMatch(OPT_HELP, 'h') or isMatch(OPT_VERSION, 'v')) // MARK: Option Matching
 			{
 				printHelp(i + 1 < args.size()
 						  ? (args[i + 1][0] == '-' and args[i + 1][1] == '-'
@@ -2682,18 +2780,32 @@ int main(const int argc, char *argv[]) {
 						i--;
 				}
 			}
-			else if (isMatch(OPT_CASEINSENSITIVE, 'N', true)
-                     or isMatch("case-insensitive", 'N')
-                     or isMatch("caseinsensitive", 'N')
-                     or isMatch("ignore-case", 'N')
-                     or isMatch("ignorecase", 'N'))
+			else if (isMatch(OPT_ARRANGEMENT, 'w')) {
+				if (i + 1 < args.size()
+					   and (args[i + 1] == OPT_ARRANGEMENT_DEFAULT
+						 or args[i + 1] == OPT_ARRANGEMENT_UNORDERED
+						 or args[i + 1] == OPT_ARRANGEMENT_PERTITLE
+						 or args[i + 1] == OPT_ARRANGEMENT_ASCENDING))
+				{
+					i++;
+					state[OPT_ARRANGEMENT] = args[i];
+				} else
+					std::cout << "Expecting arrangement type. Please see --help "<< args[i].substr(2) << "\n";
+			}
+			else if (isMatch(OPT_CASEINSENSITIVE, 'N', true,
+							 {	"case-insensitive", "caseinsensitive",
+								"ignore-case", "ignorecase"}))
 			{
-                state[OPT_CASEINSENSITIVE] = "true";
-                
-				for (auto& k : listFindDir) k = tolower(k);
-				for (auto& k : listExclFindDir) k = tolower(k);
-				for (auto& k : listFind) k = tolower(k);
-				for (auto& k : listExclFind) k = tolower(k);
+				if (i + 1 < args.size() and (args[i + 1] == "true"
+											 or args[i + 1] == "false"))
+					state[OPT_CASEINSENSITIVE] = args[++i];
+				
+MAKE_CASEINSENSITIVE:if (state[OPT_CASEINSENSITIVE] == "true") {
+					for (auto& k : listFindDir) k = tolower(k);
+					for (auto& k : listExclFindDir) k = tolower(k);
+					for (auto& k : listFind) k = tolower(k);
+					for (auto& k : listExclFind) k = tolower(k);
+				}
 			}
 			else if (isMatch(OPT_FIND, 			'i')
 					 or isMatch(OPT_EXCLFIND, 	'I')) {
@@ -2702,7 +2814,32 @@ int main(const int argc, char *argv[]) {
 					const auto opt { args[i].substr(2) };
 					const auto isExclude { opt == OPT_EXCLFIND };
 					i++;
-					if (args[i].starts_with("dir="))
+					std::string keyword, value;
+					
+					for (auto& key : {"dir", OPT_CASEINSENSITIVE,
+						"case-insensitive", "caseinsensitive",
+						"ignore-case", "ignorecase"})
+					{
+						const auto sz { std::strlen(key) };
+										
+						if (const auto c{ args[i][sz] };
+							
+							args[i].size() > sz + 1
+							and args[i].starts_with(key)
+							and c == '=' )
+							if (   isEqual(key, "dir")
+								or isEqual(key, OPT_CASEINSENSITIVE)
+								or isEqual(key, "case-insensitive")
+								or isEqual(key, "caseinsensitive")
+								or isEqual(key, "ignore-case")
+								or isEqual(key, "ignorecase"))
+							{
+								keyword = key;
+								value = args[i].substr(sz + (c == '=' ? 1 : 0));
+								break;
+							}
+					}
+					if (keyword == "dir")
 					{
 						auto value { args[i].substr(4) };
 						if (state[OPT_CASEINSENSITIVE] == "true")
@@ -2711,11 +2848,15 @@ int main(const int argc, char *argv[]) {
 							.emplace_back(value);
 						args[i].insert(0, 1, char(1));
 					}
+					else if (not keyword.empty()) {
+						state[OPT_CASEINSENSITIVE] = value;
+						goto MAKE_CASEINSENSITIVE;
+					}
 					(isExclude ? listExclFind : listFind).emplace_back(state[OPT_CASEINSENSITIVE] == "true" ? tolower(args[i]) : args[i]);
 					state[opt] = "1";
 				} else
 					std::cout << "Expecting keyword after \""
-					<< args[i] << "\" option.\n";
+					<< args[i] << "\" option. Please see --help "<< args[i].substr(2) << "\n";
 			}
 			else if (isMatch(OPT_REGEXSYNTAX, 	'X')) {
 				if (i + 1 < args.size())
@@ -2727,7 +2868,7 @@ int main(const int argc, char *argv[]) {
 						}
 
 				std::cout << "Expecting regular expression syntax after \""
-					<< args[i] << "\" option.\n";
+					<< args[i] << "\" option. Please see --help "<< args[i].substr(2) << "\n";
 			}
 			else if (isMatch(OPT_REGEX, 		'r')
 					 or isMatch(OPT_EXCLREGEX, 	'R')) {
@@ -2741,7 +2882,7 @@ int main(const int argc, char *argv[]) {
 					i++;
 				} else
 					std::cout << "Expecting regular expression after \""
-					<< args[i] << "\" option.\n";
+					<< args[i] << "\" option. Please see --help "<< args[i].substr(2) << "\n";
 			}
 			else if (isMatch(OPT_DATE, 				'z')
 					 or isMatch(OPT_EXCLDATE, 		'Z')
@@ -2896,7 +3037,7 @@ int main(const int argc, char *argv[]) {
 					}
 				}
 DATE_NEEDED:	std::cout << "Expecting date and/or time after \""
-				<< args[i] << "\" option.\n";
+				<< args[i] << "\" option. Please see --help "<< args[i].substr(2) << "\n";
 			}
 			else if (isMatch(OPT_OVERWRITE, 	'O', true));
 			else if (isMatch(OPT_BENCHMARK, 	'b', true));
@@ -2912,13 +3053,13 @@ DATE_NEEDED:	std::cout << "Expecting date and/or time after \""
 			else if (isMatch(OPT_EXECUTION, 	'c')) {
 				if (i + 1 < args.size()) {
 					i++;
-					if (args[i] == OPT_ASYNC or args[i] == OPT_THREAD)
+					if (args[i] == OPT_EXECUTION_ASYNC or args[i] == OPT_EXECUTION_THREAD)
 						state[OPT_EXECUTION] = args[i];
 					else
 						state[OPT_EXECUTION] = "Linear";
 				} else
 					std::cout << "Expecting 'thread', 'async', or 'none' after \""
-					<< args[i] << "\" option.\n";
+					<< args[i] << "\" option. Please see --help "<< args[i].substr(2) << "\n";
 			} else if (isMatch(OPT_EXT, 	'e')
 					   or isMatch(OPT_EXCLEXT, 'E')) {
 				if (i + 1 < args.size()) {
@@ -2926,9 +3067,9 @@ DATE_NEEDED:	std::cout << "Expecting date and/or time after \""
 					state[args[i - 1].substr(2)] = args[i] == "*.*" ? "*" : args[i];
 				} else
 					std::cout << "Expecting extension after \""
-					<< args[i] << "\" option (eg: \"mp4, mkv\").\n";
+					<< args[i] << "\" option (eg: \"mp4, mkv\"). Please see --help "<< args[i].substr(2) << "\n";
 			}
-			else if (isMatch(OPT_FIXFILENAME, 	'f', false, "fix-filename")) {
+			else if (isMatch(OPT_FIXFILENAME, 	'f', false, {"fix-filename"})) {
 				if (i + 1 < args.size()) {
 					i++;
 					state[OPT_FIXFILENAME] = args[i];
@@ -2939,7 +3080,7 @@ DATE_NEEDED:	std::cout << "Expecting date and/or time after \""
 					}
 				} else
 					std::cout << "Expecting file name after \""
-					<< args[i] << "\" option (eg: \"my_playlist.m3u8\").\n";
+					<< args[i] << "\" option (eg: \"my_playlist.m3u8\"). Please see --help "<< args[i].substr(2) << "\n";
 			}
 			else if (isMatch(OPT_OUTDIR, 		'd')) {
 				if (i + 1 < args.size()) {
@@ -2950,7 +3091,7 @@ DATE_NEEDED:	std::cout << "Expecting date and/or time after \""
 						state[OPT_OUTDIR] += fs::path::preferred_separator;
 				} else
 					std::cout << "Expecting directory after \""
-					<< args[i] << "\" option (eg: \"Downloads/\").\n";
+					<< args[i] << "\" option (eg: \"Downloads/\"). Please see --help "<< args[i].substr(2) << "\n";
 			}
 			else if (isMatch(OPT_SIZE, 			's')
 					 or isMatch(OPT_EXCLSIZE, 	'S')) {
@@ -3053,7 +3194,7 @@ DATE_NEEDED:	std::cout << "Expecting date and/or time after \""
 				}
 				else
 SIZE_NEEDED:		std::cout << "Expecting operator '<' or '>' followed\
-by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..to'\n";
+by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..to' Please see --help "<< OPT_SIZE << "\n";
 		} else if (fs::is_directory(args[i]))
 			insertTo(&bufferDirs, std::move(fs::path(args[i])));
 		else if (fs::is_regular_file(std::move(fs::path(args[i])))) {
@@ -3106,7 +3247,7 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 
 	while (bufferDirs.size() == 1) {
 		state[OPT_OUTDIR] = fs::absolute(bufferDirs[0]).string();
-		insertTo(&regularDirs, std::move(bufferDirs[0]));/// Assume single input dir is regularDir
+		insertTo(&regularDirs, std::move(bufferDirs[0]).string());/// Assume single input dir is regularDir
 		if (isContainsSeasonDirs(fs::path(state[OPT_OUTDIR]))) {
 			break;
 		}
@@ -3148,7 +3289,7 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 		or state[OPT_VERBOSE] == "info" or state[OPT_BENCHMARK] == "true"
 		or state[OPT_DEBUG] == "true" or state[OPT_DEBUG] == "args")
 	#endif
-	{
+	{ // MARK: Options Summary
 		constexpr auto WIDTH{ 20 };
 		if (state[OPT_DEBUG] == "true" or state[OPT_DEBUG] == "args") {
 			std::cout << "Original Arguments: ";
@@ -3160,8 +3301,8 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 				std::cout << '"' << args[i] << '"' << (i+1>=args.size() ? "" : ", ");
 			std::cout << '\n';
 		}
-#define PRINT_OPT(x)	(x.empty() ? "false" : x)
-#define LABEL(x)	x << std::setw(unsigned(WIDTH - std::strlen(x))) << ": "
+	#define PRINT_OPT(x)	(x.empty() ? "false" : x)
+	#define LABEL(x)	x << std::setw(unsigned(WIDTH - std::strlen(x))) << ": "
 	std::cout
 		<< LABEL(OPT_EXECUTION) << state[OPT_EXECUTION] << '\n'
 		<< LABEL(OPT_VERBOSE) << PRINT_OPT(state[OPT_VERBOSE]) << '\n'
@@ -3171,6 +3312,7 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 		<< LABEL(OPT_FIXFILENAME) << state[OPT_FIXFILENAME] << '\n'
 		<< LABEL("Current Directory") << fs::current_path().string() << '\n'
 		<< LABEL(OPT_OUTDIR) << state[OPT_OUTDIR] << '\n'
+		<< LABEL(OPT_EXCLHIDDEN) << PRINT_OPT(state[OPT_EXCLHIDDEN]) << '\n'
 		<< LABEL(OPT_SKIPSUBTITLE) << PRINT_OPT(state[OPT_SKIPSUBTITLE]) << '\n';
 	{
 		std::cout << LABEL(OPT_EXT) << state[OPT_EXT];
@@ -3179,8 +3321,10 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 				std::cout << DEFAULT_EXT[i] << (i < DEFAULT_EXT.size() - 1 ? ", " : "");
 		std::cout << '\n';
 	}
-    std::cout << LABEL("case-insensitive") << PRINT_OPT(state[OPT_CASEINSENSITIVE]) << '\n';
-#undef PRINT_OPT
+	std::cout << LABEL("case-insensitive") << PRINT_OPT(state[OPT_CASEINSENSITIVE]) << '\n';
+	
+	#undef PRINT_OPT
+			
 	for (auto& S : {OPT_FIND, OPT_EXCLFIND}) {
 		std::cout << LABEL(S);
 		for (auto i{0}; i<(S == OPT_FIND ? listFind : listExclFind).size(); ++i)
@@ -3200,7 +3344,7 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 
 	for (auto& S : {OPT_SIZE, OPT_EXCLSIZE}) {
 		std::cout << LABEL(S);
-		if (S == OPT_SIZE or (state[OPT_SIZEOPGT][0] != '\0' or state[OPT_EXCLSIZEOPGT][0] != '\0'))
+		if (state[OPT_SIZEOPGT][0] != '\0' or state[OPT_EXCLSIZEOPGT][0] != '\0')
 			std::cout << ((S == OPT_SIZE ? listSize : listExclSize).empty()
 					or state[S == OPT_SIZE ? OPT_SIZEOPGT
 							  : OPT_EXCLSIZEOPGT][0] != '\0'
@@ -3249,26 +3393,24 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 			std::cout  << (i < (inputDirsCount + selectFiles.size()) - 1 ? ", " : "");
 		}
 	std::cout << "\n\n";
-#undef LABEL
+	#undef LABEL
 	} // END Info
 					   
 	if (not invalidArgs.empty())
 		return RETURN_VALUE
 
-	{///Clean up dir=??? in listFind and listExclFind
-		std::vector<std::string> tmp;
-		for (auto i{0}; i<listFind.size(); ++i)
-			if (listFind[i][0] != char(1))
-				tmp.emplace_back(std::move(listFind[i]));
-		listFind = std::move(tmp);
-		
-		tmp.clear();
-		for (auto i{0}; i<listExclFind.size(); ++i)
-			if (listExclFind[i][0] != char(1))
-				tmp.emplace_back(std::move(listExclFind[i]));
-		listExclFind = std::move(tmp);
+	{///Clean up <key=val> dir=??? in listFind and listExclFind
+		auto cleanUp{[](std::vector<std::string>* list) -> void {
+			std::vector<std::string> tmp;
+			for (auto i{0}; i<list->size(); ++i)
+				if (list->at(i)[0] != char(1))
+					tmp.emplace_back(std::move(list->at(i)));
+			*list = std::move(tmp);
+		}};
+		cleanUp(&listFind);
+		cleanUp(&listExclFind);
 	}
-                       
+					   
 	if (state[OPT_OUTDIR].empty()) {
 		if (selectFiles.empty())
 			state[OPT_OUTDIR] = fs::current_path().string();
@@ -3280,19 +3422,28 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 
 	std::vector<std::thread> threads;
 	std::vector<std::future<void>> asyncs;
-	for (auto& child : bufferDirs)
-		if (state[OPT_EXECUTION] == OPT_THREAD)
-			threads.emplace_back(checkForSeasonDir, std::move(child));
-		else if (state[OPT_EXECUTION] == OPT_ASYNC)
-			asyncs.emplace_back(std::async(std::launch::async, checkForSeasonDir, std::move(child)));
+	
+	for (bool isByPass {state[OPT_ARRANGEMENT] == OPT_ARRANGEMENT_ASCENDING};
+		 auto& child : bufferDirs)
+		if (state[OPT_EXECUTION] == OPT_EXECUTION_THREAD)
+			threads.emplace_back(
+				isByPass ? getDirs : checkForSeasonDir, std::move(child));
+		else if (state[OPT_EXECUTION] == OPT_EXECUTION_ASYNC)
+			asyncs.emplace_back(std::async(std::launch::async,
+				(isByPass ?  getDirs : checkForSeasonDir), std::move(child)));
 		else
-			checkForSeasonDir(std::move(child));
+		{
+			if (isByPass)
+				getDirs(std::move(child));
+			else
+				checkForSeasonDir(std::move(child));
+		}
 
-	if (state[OPT_EXECUTION] == OPT_THREAD) {
+	if (state[OPT_EXECUTION] == OPT_EXECUTION_THREAD) {
 		for (auto& t : threads)
 			t.join();
 		threads.clear();
-	} else if (state[OPT_EXECUTION] == OPT_ASYNC) {
+	} else if (state[OPT_EXECUTION] == OPT_EXECUTION_ASYNC) {
 		for (auto& a : asyncs)
 			a.wait();
 		asyncs.clear();
@@ -3304,14 +3455,25 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 	
 	const auto maxDirSize{std::max(regularDirSize, seasonDirSize)};
 
-	/// Convert std::set to classic array, to enable call by index subscript.
-	fs::path regularDirs[regularDirSize];
-	std::move(::regularDirs.begin(), ::regularDirs.end(), regularDirs);
-
-	fs::path seasonDirs[seasonDirSize];
-	std::move(::seasonDirs.begin(), ::seasonDirs.end(), seasonDirs);
-
-	sortFiles(&selectFiles);
+	/// Convert std::set to vector, to enable call by index subscript.
+	std::vector<std::string> regularDirs;
+	for (auto&& d : ::regularDirs) regularDirs.emplace_back(std::move(d));
+	std::vector<std::string> seasonDirs;
+	for (auto&& d : ::seasonDirs) seasonDirs.emplace_back(std::move(d));
+					   
+	if (state[OPT_ARRANGEMENT] == OPT_ARRANGEMENT_DEFAULT) {
+		std::sort(regularDirs.begin(), regularDirs.end());
+		std::sort(seasonDirs.begin(), seasonDirs.end());
+			
+		sortFiles(&selectFiles);
+			
+	}
+	else if (state[OPT_ARRANGEMENT] == OPT_ARRANGEMENT_PERTITLE
+			 or state[OPT_ARRANGEMENT] == OPT_ARRANGEMENT_ASCENDING)
+	{
+		for (auto&& d : seasonDirs) regularDirs.emplace_back(std::move(d));
+		seasonDirs.clear();
+	}
 
 	#ifndef DEBUG
 	if (state[OPT_BENCHMARK] == "true" or state[OPT_DEBUG] == "true")
@@ -3339,7 +3501,7 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 		}
 	
 	
-	std::map<std::string, std::shared_ptr<std::vector<fs::path>>> records;
+	std::unordered_map<std::string, std::shared_ptr<std::vector<fs::path>>> records;
 	
 	std::ofstream outputFile;
 	fs::path outputName;
@@ -3358,6 +3520,8 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 	
 	unsigned long indexFile{0};
 	unsigned long playlistCount{0};
+	
+	// TODO: Capable to create .M3U .PLS or .XSPF file
 	
 	auto putIntoPlaylist{ [&](const fs::path& file) {
 		auto putIt{ [&](const fs::path& file) {
@@ -3440,7 +3604,7 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 				if (filter(f))
 					bufferFiles.emplace_back(f);
 			
-			putToRecord(true);			
+			putToRecord(true);
 			
 		} catch (fs::filesystem_error& e) {
 			#ifndef DEBUG
@@ -3449,34 +3613,74 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 				std::cout << e.what() << '\n';
 		}
 	}};
-
+					   
+	auto switchExecution{[&](const fs::path& dir, bool recursive) {
+		if (not dir.empty() and isDirNameValid(dir)) {
+			if (state[OPT_EXECUTION] == OPT_EXECUTION_THREAD)
+				threads.emplace_back([&, dir]() {
+					filterChildFiles(dir, recursive);
+				});
+			else if (state[OPT_EXECUTION] == OPT_EXECUTION_ASYNC)
+				asyncs.emplace_back(std::async(std::launch::async, [&, dir]() {
+					filterChildFiles(dir, recursive);
+				}));
+			else
+				filterChildFiles(dir, recursive);
+		}
+	}};
+					   
 	start = std::chrono::system_clock::now();
-	for (auto i{0}; i<maxDirSize; ++i)
-		for (auto& x : {1, 2})
-			if (i < (x == 1 ? regularDirSize : seasonDirSize) )
-				if (auto dir { (x == 1 ? regularDirs[i] : seasonDirs[i]).string() };
-					not dir.empty() and isDirNameValid(dir)) {
-					if (state[OPT_EXECUTION] == OPT_THREAD)
-						threads.emplace_back([&, dir]() {
-							filterChildFiles(dir, x == 2);
-						});
-					else if (state[OPT_EXECUTION] == OPT_ASYNC)
-						asyncs.emplace_back(std::async(std::launch::async, [&, dir]() {
-							filterChildFiles(dir, x == 2);
-						}));
-					else
-						filterChildFiles(dir, x == 2);
-				}
 	
-	if (state[OPT_EXECUTION] == OPT_THREAD) {
+	if (state[OPT_ARRANGEMENT] == OPT_ARRANGEMENT_PERTITLE
+		or state[OPT_ARRANGEMENT] == OPT_ARRANGEMENT_ASCENDING)
+	{
+		for (auto& dir : regularDirs)
+			switchExecution(fs::path(dir), true);
+	}
+	else
+	{
+		for (auto i{0}; i<maxDirSize; ++i)
+			for (auto& x : {1, 2})
+				if (i < (x == 1 ? regularDirSize : seasonDirSize) )
+					switchExecution(fs::path(x == 1
+											 ? regularDirs[i]
+											 : seasonDirs[i]), x == 2);
+	}
+					   
+	if (state[OPT_EXECUTION] == OPT_EXECUTION_THREAD) {
 		for (auto& t : threads)
 			t.join();
-	} else if (state[OPT_EXECUTION] == OPT_ASYNC) {
+	} else if (state[OPT_EXECUTION] == OPT_EXECUTION_ASYNC) {
 		for (auto& a : asyncs)
 			a.wait();
 	}
 
+	if (state[OPT_ARRANGEMENT] == OPT_ARRANGEMENT_PERTITLE
+		or state[OPT_ARRANGEMENT] == OPT_ARRANGEMENT_ASCENDING)
+	{
+		playlistCount += selectFiles.size();
+			
+		for (auto& dir : regularDirs) {
+			if (dir.empty()) continue;
+			if (const auto found { records[dir] }; found)
+				for (auto& f : *found)
+				{
+					playlistCount++;
+					if (state[OPT_ARRANGEMENT] == OPT_ARRANGEMENT_ASCENDING)
+						selectFiles.emplace_back(std::move(f));
+					else
+						putIntoPlaylist(std::move(f));
+				}
+		}
 	
+		if (state[OPT_ARRANGEMENT] == OPT_ARRANGEMENT_PERTITLE)
+			sortFiles(&selectFiles);
+		else
+			std::sort(selectFiles.begin(), selectFiles.end(), ascending);
+		for (auto& f : selectFiles)
+			putIntoPlaylist(std::move(f));
+	}
+	else
 	while (true) {
 		auto finish{true};
 		std::vector<fs::path> bufferSort;
@@ -3493,7 +3697,7 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 					dir.empty())
 					continue;
 
-				else if (auto found { records[dir.string()] }; found)
+				else if (auto found { records[dir] }; found)
 					if (indexFile < found->size()) {
 						finish = false;
 

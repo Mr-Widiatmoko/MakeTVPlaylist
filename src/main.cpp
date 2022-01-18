@@ -128,6 +128,10 @@ constexpr auto EXCLHIDDEN=\
 ";
 constexpr auto CASEINSENSITIVE=\
 "-N, --make-case-insensitive\n\
+     --case-insensitive\n\
+     --caseinsensitive\n\
+     --ignore-case\n\
+     --ignorecase\n\
                  Make --find and --exclude-find case-insensitive.\n\
 ";
 constexpr auto FIND=\

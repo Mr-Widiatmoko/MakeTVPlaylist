@@ -178,19 +178,25 @@ constexpr auto EXCLFIND=\
 ";
 constexpr auto REGEXSYNTAX=\
 "-X, --regex-syntax [ecma | awk | grep | egrep | basic | extended]\n\
-        Specify regular expression syntax to use.\n\
+        Specify regular expression syntax type to use.\n\
         Available value are: 'ecma'(Default), 'awk', 'grep', 'egrep', 'basic', 'extended'.\n\
             'basic' use the basic POSIX regex grammar and\n\
             'extended' use the extended POSIX regex grammar.\n\
+        You can also specifying this inside --regex or --exclude-regex, for example\n\
+            --regex type=basic  or  --exclude-regex type=extended\n\
 ";
 constexpr auto REGEX=\
 "-r, --regex 'syntax'\n\
         Filter only files with filename match regular expression.\n\
+        To set regex syntax type, pass type=[ecma | awk | grep | egrep | basic | extended]\n\
+            Example: --regex type=grep  or  --regex=type=grep\n\
         You can specifying this multiple times.\n\
 ";
 constexpr auto EXCLREGEX=\
 "-R, --exclude-regex 'syntax'\n\
         Filter to exclude files with filename match regular expression.\n\
+        To set regex syntax type, pass type=[ecma | awk | grep | egrep | basic | extended]\n\
+            Example: --regex type=grep  or  --regex=type=grep\n\
         You can specifying this multiple times.\n\
 ";
 constexpr auto EXT=\
@@ -2336,14 +2342,20 @@ func isValid(const fs::path& path) -> bool
 
 func insertTo(std::unordered_set<std::string>* const set, const fs::path& path)
 {
-	if (isValid(path))
+	if (auto isFound { isValid(path) }; isFound) {
 		set->emplace(path);
+		return isFound;
+	} else
+		return isFound;
 }
 
 func insertTo(std::vector<fs::path>* const vector, const fs::path& path)
 {
-	if (isValid(path))
+	if (auto isFound { isValid(path) }; isFound) {
 		vector->emplace_back(path);
+		return isFound;
+	} else
+		return isFound;
 }
 
 func checkForSeasonDir(const fs::path& path) -> void {
@@ -2411,13 +2423,13 @@ func checkForSeasonDir(const fs::path& path) -> void {
 
 func getDirs(const fs::path& path) -> void
 {
-	insertTo(&regularDirs, path.string());
-		  
-	std::vector<fs::directory_entry> list;
-	listDir(path, &list, false);
-	for (auto& de : list)
-		if (de.is_directory())
-			getDirs(de.path());
+	if (insertTo(&regularDirs, path.string())) {
+		std::vector<fs::directory_entry> list;
+		listDir(path, &list, false);
+		for (auto& de : list)
+			if (de.is_directory())
+				getDirs(de.path());
+	}
 }
 
 func getBytes(const std::string& s) -> uintmax_t
@@ -2634,10 +2646,12 @@ func timeLapse(std::chrono::system_clock::time_point& start,
 
 #if MAKE_LIB
 #define RETURN_VALUE	;
+#define ARGS_START_INDEX	0
 void process(int argc, char *argv[], int *outc, char *outs[], unsigned long *maxLength) {
 	state[OPT_NOOUTPUTFILE] = "true";
 #else
 #define RETURN_VALUE	EXIT_SUCCESS;
+#define ARGS_START_INDEX	1
 int main(const int argc, char *argv[]) {
 #endif
 
@@ -2653,24 +2667,9 @@ int main(const int argc, char *argv[]) {
 	state[OPT_ARRANGEMENT] = OPT_ARRANGEMENT_DEFAULT;
 	
 	std::vector<std::string> args;
-	expandArgs(argc, argv,
-			   #if MAKE_LIB
-			   0
-			   #else
-			   1
-			   #endif
-			   , &args);
+	expandArgs(argc, argv, ARGS_START_INDEX, &args);
 	
 	std::unordered_set<std::string_view> invalidArgs;
-	auto getRegexSyntaxType{[](const std::string& s)
-		-> std::regex_constants::syntax_option_type {
-		if (s == "basic") return std::regex_constants::syntax_option_type::basic;
-		if (s == "extended") return std::regex_constants::syntax_option_type::extended;
-		if (s == "awk") return std::regex_constants::syntax_option_type::awk;
-		if (s == "grep") return std::regex_constants::syntax_option_type::grep;
-		if (s == "egrep") return std::regex_constants::syntax_option_type::egrep;
-		else return std::regex_constants::syntax_option_type::ECMAScript;
-	}};
 	
 	for (int i{0}; i<args.size(); ++i) {
 		if (auto isMatch{ [&](const char* const with,
@@ -2864,7 +2863,8 @@ MAKE_CASEINSENSITIVE:if (state[OPT_CASEINSENSITIVE] == "true") {
 						 auto& s : {"ecma", "basic", "extended", "awk", "grep", "egrep"})
 						if (s == arg) {
 							state[OPT_REGEXSYNTAX] = s;
-							i++;continue;
+							i++;
+							break;
 						}
 
 				std::cout << "Expecting regular expression syntax after \""
@@ -2872,14 +2872,42 @@ MAKE_CASEINSENSITIVE:if (state[OPT_CASEINSENSITIVE] == "true") {
 			}
 			else if (isMatch(OPT_REGEX, 		'r')
 					 or isMatch(OPT_EXCLREGEX, 	'R')) {
-				if (i + 1 < args.size())
+				if (auto found{ false }; i + 1 < args.size())
 				{
-					const auto opt {args[i].substr(2)};
-					(opt == OPT_REGEX ? listRegex : listExclRegex)
-						.emplace_back(std::regex(args[i + 1],
-									getRegexSyntaxType(state[OPT_REGEXSYNTAX])));
-					state[opt] = "1";
-					i++;
+					// TODO: enable to parse type=???
+					
+					if (auto pos { args[i + 1].find('=') };
+						pos != std::string::npos)
+					{
+						if (args[i + 1].substr(0, pos) == "type") {
+							auto value { args[i + 1].substr(pos + 1) };
+							for (auto& keyword : {"ecma", "basic", "extended", "awk", "grep", "egrep"})
+								if (keyword == value) {
+									state[OPT_REGEXSYNTAX] = keyword;
+									i++;
+									found = true;
+									break;
+								}
+						}
+					}
+					
+					if (not found) {
+						auto getRegexSyntaxType{[](const std::string& s)
+							-> std::regex_constants::syntax_option_type {
+							if (s == "basic") return std::regex_constants::syntax_option_type::basic;
+							if (s == "extended") return std::regex_constants::syntax_option_type::extended;
+							if (s == "awk") return std::regex_constants::syntax_option_type::awk;
+							if (s == "grep") return std::regex_constants::syntax_option_type::grep;
+							if (s == "egrep") return std::regex_constants::syntax_option_type::egrep;
+							else return std::regex_constants::syntax_option_type::ECMAScript;
+						}};
+						const auto opt {args[i].substr(2)};
+						(opt == OPT_REGEX ? listRegex : listExclRegex)
+							.emplace_back(std::regex(args[i + 1],
+										getRegexSyntaxType(state[OPT_REGEXSYNTAX])));
+						state[opt] = "1";
+						i++;
+					}
 				} else
 					std::cout << "Expecting regular expression after \""
 					<< args[i] << "\" option. Please see --help "<< args[i].substr(2) << "\n";

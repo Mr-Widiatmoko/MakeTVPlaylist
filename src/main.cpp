@@ -45,10 +45,12 @@ constexpr auto OPT_EXECUTION		{"execution"};				// c
 constexpr auto OPT_EXECUTION_THREAD			{"thread"};
 constexpr auto OPT_EXECUTION_ASYNC			{"async"};
 constexpr auto OPT_EXCLHIDDEN		{"exclude-hidden"};			// n
+[[deprecated]] [[maybe_unused]]
 constexpr auto OPT_REGEXSYNTAX		{"regex-syntax"};			// X
 constexpr auto OPT_CASEINSENSITIVE	{"make-case-insensitive"};	// N
 
-constexpr auto OPT_PLAYLIST_TYPE 	{"playlist-type"};			// W
+constexpr auto OPT_SEARCH			{"search"};
+
 constexpr auto OPT_FIXFILENAME 		{"out-filename"};			// f
 constexpr auto OPT_NOOUTPUTFILE 	{"no-output-file"};			// F
 
@@ -86,8 +88,8 @@ constexpr auto VERSION=\
 All Rights Reserved. License and Warranty\n";
 
 constexpr auto HELP=\
-"Create playlist file '.m3u8' from vary directories and files, \
-then arranged one episode per title \
+"Create playlist file '.m3u8' (by default) from vary directories and files, \
+then arranged one episode per title (by default) \
 for all input titles.\nHosted in https://github.com/Mr-Widiatmoko/MakeTVPlaylist\n\n\
 Usage:\n    tvplaylist [Option or Dir or File] ...\n\n\
 If no argument was specified, the current directory will be use.\n\n\
@@ -114,7 +116,14 @@ constexpr auto ARRANGEMENT=\
         unordered : One file per Title, Title sorted unordered.\n\
         per-title : All files sorted ascending grouped per Title/Directory.\n\
         ascending : All files sorted ascending by filenames, regardless directory name order.\n\
-"; //TODO: HELP ARRANGEMENT
+";
+constexpr auto SEARCH=\
+"--search 'keywords'\n\
+        tvplaylist search engine.\n\
+        Equal to --no-output-file:verbose:arrangement=ascending:ignore-case\n\
+        Example:\n\
+            --search \"ext=* medalion or title=medalion exclude=horse\"\n\
+";
 constexpr auto OVERWRITE=\
 "-O, --overwrite\n\
         Overwrite output playlist file.\n\
@@ -135,6 +144,7 @@ constexpr auto EXCLHIDDEN=\
 "-n, --exclude-hidden\n\
         Exclude hidden folders or files (not for Windows).\n\
 ";
+[[deprecated("Recognized in --find or --exlude-find.")]] [[maybe_unused]]
 constexpr auto CASEINSENSITIVE=\
 "-N, --make-case-insensitive\n\
      --case-insensitive\n\
@@ -149,33 +159,34 @@ constexpr auto FIND=\
         Filter only files with filename contains find keyword.\n\
         You can specifying this multiple times.\n\
             Example: --find=war:find=invasion\n\
-        To filter only for directory name, use --find dir='value' or --find=dir='value'.\n\
+        To filter only for directory name, pass dir='value'.\n\
             Example: --find dir=war  or  --find=dir=war\n\
-        To find by using MP3 ID3 tags, use format --find 'key'='value' or --find='key'='value'.\n\
+        To filter files extension, pass ext='ext-comma-delimited'\n\
+            Example: --find ext=mp3,mp4,mkv  or --find ext=*\n\
+        To find by using MP3 ID3 tags, pass 'key'='value'.\n\
         Possible 'key' are: \"id3\", \"title\", \"artist\", \"album\", \"genre\", \"comment\", \"year\", and \"track\".\n\
             Example: --find artist=Koko  or  --find=artist=Koko\n\
         If you specify tag \"id3\", it will search in all tags, eg:: title, album, etc.\n\
-        To enable case-insensitive, use following:\n\
-            declare -N or --make-case-insensitive option\n\
-            or declare after option --find:\n\
-            declare --find ignorecase=true\n\
+        To enable case-insensitive, pass ignore-case=true:\n\
+            Example: --find ignore-case=true\n\
 ";
 constexpr auto EXCLFIND=\
 "-I, --exclude-find 'keyword'\n\
         Filter to exclude files with filename contains find keyword.\n\
         You can specifying this multiple times.\n\
             Example: -I love; I and; I home\n\
-        To filter only for directory name, use --exclude-find dir='value' or --exclude-find=dir='value'.\n\
+        To filter only for directory name, pass dir='value'.\n\
             Example: --exclude-find dir=war  or  --exclude-find=dir=war\n\
-        To find by using MP3 ID3 tags, use format --exclude-find 'key'='value' or --exclude-find='key'='value'.\n\
+        To filter files extension, pass ext='ext-comma-delimited'\n\
+            Example: --exclude-find ext=mp3,mp4,mkv  or --exclude-find ext=*\n\
+        To find by using MP3 ID3 tags, pass 'key'='value'.\n\
         Possible 'key' are: \"id3\", \"title\", \"artist\", \"album\", \"genre\", \"comment\", \"year\", and \"track\".\n\
             Example: --exclude-find year=2007  or  --exclude-find=year=2007\n\
         If you specify tag \"id3\", it will search in all tags, eg:: title, album, etc.\n\
-        To enable case-insensitive, use following:\n\
-            declare -N or --make-case-insensitive option\n\
-            or declare after option --exclude-find:\n\
-            declare --exclude-find ignorecase=true\n\
+        To enable case-insensitive, pass ignore-case=true:\n\
+            Example --exclude-find ignore-case=true\n\
 ";
+[[deprecated("Recognized in --regex or --exlude-regex.")]] [[maybe_unused]]
 constexpr auto REGEXSYNTAX=\
 "-X, --regex-syntax [ecma | awk | grep | egrep | basic | extended]\n\
         Specify regular expression syntax type to use.\n\
@@ -316,7 +327,9 @@ constexpr auto EXCLCHANGED=\
 ";
 constexpr auto FIXFILENAME=\
 "-f, --out-filename 'filename'\n\
-        Override output playlist filename.\n\
+        Override output playlist filename, by default it will crreate \".m3u8\" playlist.\n\
+        To create \".pls\" or \".xspf\" or \".wpl\" playlist, pass it as extension filename.\n\
+        For example: --out-filename=my_playlist.xspf.\n\
 ";
 constexpr auto NOOUTPUTFILE=\
 "-F, --no-ouput-file [yes | no]\n\
@@ -368,11 +381,10 @@ It will showing internal tvplaylist date time recognizer, with format \"Weekday 
 
 
 constexpr auto OPTS = { &OPT_VERSION, &OPT_HELP, &OPT_ARRANGEMENT,
-	&OPT_VERBOSE, &OPT_BENCHMARK, & OPT_OVERWRITE,
+	&OPT_SEARCH, &OPT_VERBOSE, &OPT_BENCHMARK, & OPT_OVERWRITE,
 	&OPT_SKIPSUBTITLE, &OPT_OUTDIR, &OPT_EXECUTION, &OPT_FIXFILENAME,
 	&OPT_NOOUTPUTFILE, &OPT_SIZE, &OPT_EXCLSIZE, &OPT_EXT, &OPT_EXCLEXT,
-	&OPT_CASEINSENSITIVE, &OPT_FIND,
-	&OPT_EXCLFIND, &OPT_REGEXSYNTAX, &OPT_REGEX, &OPT_EXCLREGEX, &OPT_EXCLHIDDEN,
+	&OPT_FIND, &OPT_EXCLFIND, &OPT_REGEX, &OPT_EXCLREGEX, &OPT_EXCLHIDDEN,
 	
 	&OPT_DATE, &OPT_EXCLDATE,
 	&OPT_DCREATED, &OPT_DMODIFIED, &OPT_DACCESSED, &OPT_DCHANGED,
@@ -381,11 +393,10 @@ constexpr auto OPTS = { &OPT_VERSION, &OPT_HELP, &OPT_ARRANGEMENT,
 };
 
 constexpr const char* const* HELPS[] = { &VERSION, &HELP, &ARRANGEMENT,
-	&VERBOSE, &BENCHMARK, & OVERWRITE,
+	&SEARCH, &VERBOSE, &BENCHMARK, & OVERWRITE,
 	&SKIPSUBTITLE, &OUTDIR, &EXECUTION, &FIXFILENAME,
 	&NOOUTPUTFILE, &SIZE, &EXCLSIZE, &EXT, &EXCLEXT,
-	&CASEINSENSITIVE, &FIND,
-	&EXCLFIND, &REGEXSYNTAX, &REGEX, &EXCLREGEX, &EXCLHIDDEN,
+	&FIND, &EXCLFIND, &REGEX, &EXCLREGEX, &EXCLHIDDEN,
 	
 	&DATE, &EXCLDATE,
 	&CREATED, &MODIFIED, &ACCESSED, &CHANGED,
@@ -2671,6 +2682,50 @@ int main(const int argc, char *argv[]) {
 	
 	std::unordered_set<std::string_view> invalidArgs;
 	
+	auto parseKeyValue{[](std::string* const s, bool isExclude) {
+		std::string keyword, value;
+		
+		for (auto& key : {"dir", OPT_EXT, OPT_EXCLEXT,
+			OPT_CASEINSENSITIVE, OPT_EXCLHIDDEN,
+			"case-insensitive", "caseinsensitive",
+			"ignore-case", "ignorecase"})
+		{
+			const auto sz { std::strlen(key) };
+							
+			if (const auto c{ s->at(sz) };
+				
+				s->size() > sz + 2 /// 2 means '=' + at least a char
+				and s->starts_with(key)
+				and c == '=' )
+				{
+					keyword = key;
+					value = s->substr(sz + (c == '=' ? 1 : 0));
+					break;
+				}
+		}
+		if (keyword == "dir")
+		{
+			if (state[OPT_CASEINSENSITIVE] == "true")
+				value = tolower(value);
+			(isExclude ? listExclFindDir : listFindDir).emplace_back(value);
+			s->insert(0, 1, char(1));
+		}
+		else if (   keyword == OPT_EXCLHIDDEN
+				 or keyword == OPT_EXT
+				 or keyword == OPT_EXCLEXT) {
+			state[keyword] = value;
+		}
+		else if (not keyword.empty()) {
+			state[OPT_CASEINSENSITIVE] = value;
+			if (tolower(value) == "true") {
+				for (auto& k : listFindDir) k = tolower(k);
+				for (auto& k : listExclFindDir) k = tolower(k);
+				for (auto& k : listFind) k = tolower(k);
+				for (auto& k : listExclFind) k = tolower(k);
+			}
+		}
+	}};
+	
 	for (int i{0}; i<args.size(); ++i) {
 		if (auto isMatch{ [&](const char* const with,
 							  const char mnemonic,
@@ -2691,7 +2746,8 @@ int main(const int argc, char *argv[]) {
 							result = true;
 							break;
 						}
-			} else if (args[i].length() == 2
+			} else if (mnemonic != '\0'
+					   and args[i].length() == 2
 					   and args[i][0] == '-')
 			{
 				result = args[i][1] == mnemonic;
@@ -2799,12 +2855,55 @@ int main(const int argc, char *argv[]) {
 											 or args[i + 1] == "false"))
 					state[OPT_CASEINSENSITIVE] = args[++i];
 				
-MAKE_CASEINSENSITIVE:if (state[OPT_CASEINSENSITIVE] == "true") {
+				if (state[OPT_CASEINSENSITIVE] == "true") {
 					for (auto& k : listFindDir) k = tolower(k);
 					for (auto& k : listExclFindDir) k = tolower(k);
 					for (auto& k : listFind) k = tolower(k);
 					for (auto& k : listExclFind) k = tolower(k);
 				}
+			}
+			else if (isMatch(OPT_SEARCH, '\0')) {
+				if (i + 1 < args.size()) {
+					state[OPT_NOOUTPUTFILE] = "true";
+					state[OPT_VERBOSE] = "true";
+					state[OPT_ARRANGEMENT] = OPT_ARRANGEMENT_ASCENDING;
+					state[OPT_CASEINSENSITIVE] = "true";
+					
+					i++;
+					// TODO: Parse args[i] into multiple --find
+					auto index{ 0 };
+					auto last{ 0 };
+					auto push{[&]() {
+						auto keyVal { args[i].substr(last, index) };
+						if (keyVal != "or" and keyVal != "and") {
+							parseKeyValue(&keyVal, false);
+							
+							if (keyVal.starts_with("exclude=")) {
+								auto value { keyVal.substr(9) };
+								if (value.find('=') != std::string::npos)
+									parseKeyValue(&value, true);
+								listExclFind.emplace_back(value);
+							} else
+								listFind.emplace_back(keyVal);
+						}
+					}};
+					while (index < args[i].size()) {
+						if (std::isspace(args[i][index])) {
+							if (last != -1 and index - last > 0) {
+								push();
+								last = -1;
+							}
+							continue;
+						}
+						if (last == -1)
+							last = index;
+					}
+					if (last != -1)
+						push();
+					
+					std::cout << "Under construction!";
+				} else
+					std::cout << "Expecting search keyword!\n";
 			}
 			else if (isMatch(OPT_FIND, 			'i')
 					 or isMatch(OPT_EXCLFIND, 	'I')) {
@@ -2813,44 +2912,8 @@ MAKE_CASEINSENSITIVE:if (state[OPT_CASEINSENSITIVE] == "true") {
 					const auto opt { args[i].substr(2) };
 					const auto isExclude { opt == OPT_EXCLFIND };
 					i++;
-					std::string keyword, value;
 					
-					for (auto& key : {"dir", OPT_CASEINSENSITIVE,
-						"case-insensitive", "caseinsensitive",
-						"ignore-case", "ignorecase"})
-					{
-						const auto sz { std::strlen(key) };
-										
-						if (const auto c{ args[i][sz] };
-							
-							args[i].size() > sz + 1
-							and args[i].starts_with(key)
-							and c == '=' )
-							if (   isEqual(key, "dir")
-								or isEqual(key, OPT_CASEINSENSITIVE)
-								or isEqual(key, "case-insensitive")
-								or isEqual(key, "caseinsensitive")
-								or isEqual(key, "ignore-case")
-								or isEqual(key, "ignorecase"))
-							{
-								keyword = key;
-								value = args[i].substr(sz + (c == '=' ? 1 : 0));
-								break;
-							}
-					}
-					if (keyword == "dir")
-					{
-						auto value { args[i].substr(4) };
-						if (state[OPT_CASEINSENSITIVE] == "true")
-							value = tolower(value);
-						(isExclude ? listExclFindDir : listFindDir)
-							.emplace_back(value);
-						args[i].insert(0, 1, char(1));
-					}
-					else if (not keyword.empty()) {
-						state[OPT_CASEINSENSITIVE] = value;
-						goto MAKE_CASEINSENSITIVE;
-					}
+					parseKeyValue(&args[i], isExclude);
 					(isExclude ? listExclFind : listFind).emplace_back(state[OPT_CASEINSENSITIVE] == "true" ? tolower(args[i]) : args[i]);
 					state[opt] = "1";
 				} else
@@ -3548,9 +3611,40 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 	
 	unsigned long indexFile{0};
 	unsigned long playlistCount{0};
-	
+	std::string outExt;
 	// TODO: Capable to create .M3U .PLS or .XSPF file
+	if (state[OPT_NOOUTPUTFILE] != "true") {
+		outExt = tolower(outputName.extension().string());
+		
+		if (outExt == ".pls") {
+			outputFile << "[playlist]\n";
+		}
+		else if (outExt == ".m3u") {
+			outputFile << "#EXTM3U\n";
+		}
+		else if (outExt == ".xspf") {
+			outputFile << "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"\
+			"\t<playlist version=\"1\" xmlns=\"http://xspf.org/ns/0/\">\n"\
+			"\t\t<trackList>\n";
+		}
+		else if (outExt == ".wpl")
+		{
+			outputFile << "<?wpl version=\"1.0\"?>\n"\
+				"<smil>\n"\
+				"\t<head>\n"\
+				"\t\t<meta name=\"Generator\" content=\"tvplaylist -- 1.1\"/>\n"\
+				"\t\t<title>" << outputName.filename().string() << "</title>\n"\
+				"\t</head>\n"\
+				"\t<body>\n"\
+				"\t\t<seq>\n";
+		}
+	}
 	
+	#if defined(_WIN32) || defined(_WIN64)
+	#define OS_NAME	"Windows"
+	#else
+	#define OS_NAME	"Linux"
+	#endif
 	auto putIntoPlaylist{ [&](const fs::path& file) {
 		auto putIt{ [&](const fs::path& file) {
 			playlistCount++;
@@ -3566,8 +3660,35 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 				if (outs)
 					std::strcpy(outs[playlistCount - 1], fs::absolute(file).string().c_str());
 				#endif
-			} else
-				outputFile << fs::absolute(file).string() << '\n';
+			}
+			else {
+				std::string suffix;
+				if (outExt == ".pls") {
+					outputFile << "File" << playlistCount << '=';
+					
+					#if defined(__APPLE__)
+					#define SPECIFIC_OS_NAME "macOS"
+					#else
+					#define SPECIFIC_OS_NAME IS_NAME
+					#endif
+					suffix = "Title" + std::to_string( playlistCount)
+						+ "=absolute path on " + SPECIFIC_OS_NAME;
+				}
+				else if (outExt == ".xspf") {
+					outputFile << "\t\t<track>\n\t\t\t<title>"\
+								OS_NAME\
+								" Path</title>\n"\
+								"\t\t\t<location>file://";
+					suffix = "</location>\n\t\t</track>";
+					
+				}
+				else if (outExt == ".wpl") {
+					outputFile << "<media src=\"";
+					suffix = "\" />";
+				}
+				outputFile 	<< fs::absolute(file).string()
+							<< suffix << '\n';
+			}
 			#ifndef DEBUG
 			if (state[OPT_VERBOSE] == "true" or state[OPT_DEBUG] == "true")
 			#endif
@@ -3751,6 +3872,17 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 		timeLapse(start, groupNumber(std::to_string(playlistCount)) + " valid files took ");
 					   
 	if (state[OPT_NOOUTPUTFILE] != "true") {
+		if (outExt == ".pls") {
+			outputFile << "\nNumberOfEntries=" << playlistCount
+				<< "\nVersion=2\n";
+		}
+		else if (outExt == ".xspf") {
+			outputFile << "\t</trackList>\n<playlist>\n";
+		}
+		else if (outExt == ".wpl") {
+			outputFile << "\t\t</seq>\n\t</body>\n<smil>\n";
+		}
+			
 		if (outputFile.is_open())
 			outputFile.close();
 			

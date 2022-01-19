@@ -1,11 +1,11 @@
 #  Make TV Playlist
-As the name suggests, this is a small utility to create playlist from various serial TV Title that ordered one episode per Title. To be clear see the screen shot, and learn from it.
+As the name suggests, this is a small utility to create playlist from various serial TV Title that ordered one episode per Title (by default). To be clear see the screen shot, and learn from it.
 
 ![Select root folder](https://raw.githubusercontent.com/Mr-Widiatmoko/MakeTVPlaylist/master/README/ScreenShot1.png "Screen shot of TVPlaylist selecting the root of videos folder")
 ![Select from multiple folders and files](https://raw.githubusercontent.com/Mr-Widiatmoko/MakeTVPlaylist/master/README/ScreenShot2.png "Screen shot of TVPlaylist selecting from various folders and files")
 
 ## Overview:
-This is a utility to create playlist file with extension .m3u8 that contains sequence per episode per Title of multiple Title TV program or just videos. To do that, you have two option:
+This is a utility to create playlist file with extension .m3u8 (by default) that contains sequence per episode per Title (by default) of multiple Title TV program or Folder. To do that, you have two option:
 1. By selecting folders or files, then Right-Click choose "Quick Actions" -> "Make TV Playlist". Then "MPV" (by default, if you have one) or your default video player will be automatically used to play the playlist file. After the player quit, the playlist file will be removed. If you need to save the playlist, use your player to save playlist as ..., or you can use [tvplaylist](https://github.com/Mr-Widiatmoko/MakeTVPlaylist/Release/tvplaylist) to do so (see below). This workflow implemented using zsh script, so the performace to create playlist is very, very, very ... slugish. To upgrade performace for more than 1000%, yes thats right MORE THAN 1000%, you need to download [tvplaylist](https://github.com/Mr-Widiatmoko/MakeTVPlaylist/Release/tvplaylist)(for macOS Intel!, other platform need to compile, see Installation) and put it into "HOME" or "Downloads" or "/usr/local/bin/" by copy or by alias. For example, to move file on "/usr/local/bin/" you can type:
 	
 		mv tvplaylist /usr/local/bin/

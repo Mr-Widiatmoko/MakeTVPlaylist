@@ -156,6 +156,7 @@ constexpr auto CASEINSENSITIVE=\
 ";
 constexpr auto FIND=\
 "-i, --find 'keyword'\n\
+-I, --exclude-find 'keyword'\n\
         Filter only files with filename contains find keyword.\n\
         You can specifying this multiple times.\n\
             Example: --find=war:find=invasion\n\
@@ -170,22 +171,6 @@ constexpr auto FIND=\
         To enable case-insensitive, pass ignore-case=true:\n\
             Example: --find ignore-case=true\n\
 ";
-constexpr auto EXCLFIND=\
-"-I, --exclude-find 'keyword'\n\
-        Filter to exclude files with filename contains find keyword.\n\
-        You can specifying this multiple times.\n\
-            Example: -I love; I and; I home\n\
-        To filter only for directory name, pass dir='value'.\n\
-            Example: --exclude-find dir=war  or  --exclude-find=dir=war\n\
-        To filter files extension, pass ext='ext-comma-delimited'\n\
-            Example: --exclude-find ext=mp3,mp4,mkv  or --exclude-find ext=*\n\
-        To find by using MP3 ID3 tags, pass 'key'='value'.\n\
-        Possible 'key' are: \"id3\", \"title\", \"artist\", \"album\", \"genre\", \"comment\", \"year\", and \"track\".\n\
-            Example: --exclude-find year=2007  or  --exclude-find=year=2007\n\
-        If you specify tag \"id3\", it will search in all tags, eg:: title, album, etc.\n\
-        To enable case-insensitive, pass ignore-case=true:\n\
-            Example --exclude-find ignore-case=true\n\
-";
 [[deprecated("Recognized in --regex or --exlude-regex.")]] [[maybe_unused]]
 constexpr auto REGEXSYNTAX=\
 "-X, --regex-syntax [ecma | awk | grep | egrep | basic | extended]\n\
@@ -198,32 +183,26 @@ constexpr auto REGEXSYNTAX=\
 ";
 constexpr auto REGEX=\
 "-r, --regex 'syntax'\n\
+-R, --exclude-regex 'syntax'\n\
         Filter only files with filename match regular expression.\n\
-        To set regex syntax type, pass type=[ecma | awk | grep | egrep | basic | extended]\n\
-            Example: --regex type=grep  or  --regex=type=grep\n\
-        You can specifying this multiple times.\n\
-";
-constexpr auto EXCLREGEX=\
-"-R, --exclude-regex 'syntax'\n\
-        Filter to exclude files with filename match regular expression.\n\
         To set regex syntax type, pass type=[ecma | awk | grep | egrep | basic | extended]\n\
             Example: --regex type=grep  or  --regex=type=grep\n\
         You can specifying this multiple times.\n\
 ";
 constexpr auto EXT=\
 "-e, --ext \"'extension', 'extension', ...\"\n\
+-E, --exclude-ext \"'extension', 'extension' ...\"\n\
         Filter only files that match specific extensions, separated by comma.\n\
             Example: --ext \"pdf, docx\" or --ext=pdf,docx\n\
         To process all files use *, example: --ext=* \n\
-";
-constexpr auto EXCLEXT=\
-"-E, --exclude-ext \"'extension', 'extension' ...\"\n\
-        Filter to exclude files that match specific extensions, separated by comma.\n\
 ";
 constexpr auto SIZE=\
 "-s, --size < | > 'size'\n\
             'min size'..'maz size'\n\
             'min size'-'max size'\n\
+-S, --exclude-size < | > 'size'\n\
+                   'min size'..'maz size'\n\
+                   'min size'-'max size'\n\
         Filter only files that size match, in \"KB\", \"MB\" (default), or \"GB\".\n\
         You can specifying this multiple times for 'Range' only based size.\n\
             Example: --size<750\n\
@@ -232,19 +211,15 @@ constexpr auto SIZE=\
                 OR using range with '-' OR '..'\n\
                     --size 750 - 1.2gb; size=30..200.2; size 2gb .. 4gb\n\
 ";
-constexpr auto EXCLSIZE=\
-"-S, --exclude-size < | > 'size'\n\
-                    'min size'..'maz size'\n\
-                    'min size'-'max size'\n\
-        Filter to exclude files that size match, in \"KB\", \"MB\" (default), or \"GB\".\n\
-        You can specifying this multiple times for 'Range' only based size.\n\
-";
 constexpr auto DATE=\
 "-z, --date = | < | > 'date and/or time'\n\
             'min' .. 'max'\n\
             'min' - 'max'\n\
+-Z, --exclude-date = | < | > 'date and/or time'\n\
+                   'min' .. 'max'\n\
+                   'min' - 'max'\n\
         Filter only files that was created or accessed or modified or changed at specified date[s] and/or time[s].\n\
-        If you need only specific type of date, then use --created, --accessed, --modified, or --changed respectively.\n\
+        If you need only specific type of date, then use --[exclude-]created, --[exclude-]accessed, --[exclude-]modified, or --[exclude-]changed respectively.\n\
         For more information about 'date and/or time' possible values, see below.\n\
         You can specifying this multiple times, for both single value or range values.\n\
             Example, to filter all files that has created/accessed/modified/changed with minutes from 20 to 35 for any date time and from 47 to 56 for year 2021:\n\
@@ -252,28 +227,14 @@ constexpr auto DATE=\
                 OR\n\
                     --date=0:20..0:35:date=0:47/2022..0:56/2022\n\
 ";
-constexpr auto EXCLDATE=\
-"-Z, --exclude-date = | < | > 'date and/or time'\n\
-                    'min' .. 'max'\n\
-                    'min' - 'max'\n\
-        Filter to exclude only files that was created or accessed or modified or changed at specified date[s] and/or time[s].\n\
-        If you need only specific type of date, then use --exclude-created, --exclude-accessed, --exclude-modified, or --exclude-changed respectively.\n\
-        For more information about 'date and/or time' possible values, see below.\n\
-        You can specifying this multiple times, for both single value or range values.\n\
-";
 constexpr auto CREATED=\
 "-t, --created = | < | > 'date and/or time'\n\
                'min' .. 'max'\n\
                'min' - 'max'\n\
+-T, --exclude-created = | < | > 'date and/or time'\n\
+                      'min' .. 'max'\n\
+                      'min' - 'max'\n\
         Filter only files that was created on specified date[s] and/or time[s].\n\
-        For more information about 'date and/or time' possible values, see below.\n\
-        You can specifying this multiple times, for both single value or range values.\n\
-";
-constexpr auto EXCLCREATED=\
-"-T, --exclude-created = | < | > 'date and/or time'\n\
-                       'min' .. 'max'\n\
-                       'min' - 'max'\n\
-        Filter to exclude only files that was created on specified date[s] and/or time[s].\n\
         For more information about 'date and/or time' possible values, see below.\n\
         You can specifying this multiple times, for both single value or range values.\n\
 ";
@@ -281,31 +242,21 @@ constexpr auto ACCESSED=\
 "-a, --accessed = | < | > 'date and/or time'\n\
                 'min' .. 'max'\n\
                 'min' - 'max'\n\
-        Filter only files that was accessed on specified date[s] and/or time[s].\n\
-        You can specifying this multiple times, for both single value or range values.\n\
-        For more information about 'date and/or time' possible values, see below.\n\
-";
-constexpr auto EXCLACCESSED=\
-"-A, --exclude-accessed = | < | > 'date and/or time'\n\
+-A, --exclude-accessed = | < | > 'date and/or time'\n\
                         'min' .. 'max'\n\
                         'min' - 'max'\n\
-        Filter to exclude only files that was accessed on specified date[s] and/or time[s].\n\
-        For more information about 'date and/or time' possible values, see below.\n\
+       Filter only files that was accessed on specified date[s] and/or time[s].\n\
         You can specifying this multiple times, for both single value or range values.\n\
+        For more information about 'date and/or time' possible values, see below.\n\
 ";
 constexpr auto MODIFIED=\
 "-m, --modified = | < | > 'date and/or time'\n\
                 'min' .. 'max'\n\
                 'min' - 'max'\n\
+-M, --exclude-modified = | < | > 'date and/or time'\n\
+                       'min' .. 'max'\n\
+                       'min' - 'max'\n\
         Filter only files that was modified on specified date[s] and/or time[s].\n\
-        For more information about 'date and/or time' possible values, see below.\n\
-        You can specifying this multiple times, for both single value or range values.\n\
-";
-constexpr auto EXCLMODIFIED=\
-"-M, --exclude-modified = | < | > 'date and/or time'\n\
-                        'min' .. 'max'\n\
-                        'min' - 'max'\n\
-        Filter to exclude only files that was modified on specified date[s] and/or time[s].\n\
         For more information about 'date and/or time' possible values, see below.\n\
         You can specifying this multiple times, for both single value or range values.\n\
 ";
@@ -313,15 +264,10 @@ constexpr auto CHANGED=\
 "-g, --changed = | < | > 'date and/or time'\n\
                'min' .. 'max'\n\
                'min' - 'max'\n\
-        Filter only files that was changed on specified date[s] and/or time[s].\n\
-        For more information about 'date and/or time' possible values, see below.\n\
-        You can specifying this multiple times, for both single value or range values.\n\
-";
-constexpr auto EXCLCHANGED=\
-"-G, --exclude-changed = | < | > 'date and/or time'\n\
+-G, --exclude-changed = | < | > 'date and/or time'\n\
                        'min' .. 'max'\n\
                        'min' - 'max'\n\
-        Filter to exclude only files that was changed on specified date[s] and/or time[s].\n\
+       Filter only files that was changed on specified date[s] and/or time[s].\n\
         For more information about 'date and/or time' possible values, see below.\n\
         You can specifying this multiple times, for both single value or range values.\n\
 ";
@@ -392,15 +338,25 @@ constexpr auto OPTS = { &OPT_VERSION, &OPT_HELP, &OPT_ARRANGEMENT,
 	&OPT_DEBUG
 };
 
+/// Conjunction with OPTS, to enable access OPTS[index] == HELPS[index]
 constexpr const char* const* HELPS[] = { &VERSION, &HELP, &ARRANGEMENT,
 	&SEARCH, &VERBOSE, &BENCHMARK, & OVERWRITE,
 	&SKIPSUBTITLE, &OUTDIR, &EXECUTION, &FIXFILENAME,
-	&NOOUTPUTFILE, &SIZE, &EXCLSIZE, &EXT, &EXCLEXT,
-	&FIND, &EXCLFIND, &REGEX, &EXCLREGEX, &EXCLHIDDEN,
+	&NOOUTPUTFILE, &SIZE, &SIZE, &EXT, &EXT,
+	&FIND, &FIND, &REGEX, &REGEX, &EXCLHIDDEN,
 	
-	&DATE, &EXCLDATE,
+	&DATE, &DATE,
 	&CREATED, &MODIFIED, &ACCESSED, &CHANGED,
-	&EXCLCREATED, &EXCLMODIFIED, &EXCLACCESSED, &EXCLCHANGED,
+	&CREATED, &MODIFIED, &ACCESSED, &CHANGED,
+	&HELP_REST, &HELP_DATE_REST
+};
+
+constexpr const char* const* ALL_HELPS[] = {
+	&VERSION, &HELP, &ARRANGEMENT, &SEARCH, &VERBOSE, &BENCHMARK, & OVERWRITE,
+	&SKIPSUBTITLE, &OUTDIR, &EXECUTION, &FIXFILENAME, &NOOUTPUTFILE, &EXCLHIDDEN,
+	
+	&SIZE, &EXT, &FIND, &REGEX, &DATE, &CREATED, &MODIFIED, &ACCESSED, &CHANGED,
+	
 	&HELP_REST, &HELP_DATE_REST
 };
 
@@ -559,7 +515,7 @@ func printHelp(const char* const arg = nullptr)
 			if (isEqual(arg, *opt)) {
 				if (isEqual(arg, OPT_HELP))
 				{
-					for (auto& help : HELPS)
+					for (auto& help : ALL_HELPS)
 						std::cout << *help;
 				} else {
 					std::cout << *HELPS[i];

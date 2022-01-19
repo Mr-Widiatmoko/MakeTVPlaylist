@@ -45,11 +45,10 @@ constexpr auto OPT_EXECUTION		{"execution"};				// c
 constexpr auto OPT_EXECUTION_THREAD			{"thread"};
 constexpr auto OPT_EXECUTION_ASYNC			{"async"};
 constexpr auto OPT_EXCLHIDDEN		{"exclude-hidden"};			// n
-[[deprecated]] [[maybe_unused]]
 constexpr auto OPT_REGEXSYNTAX		{"regex-syntax"};			// X
 constexpr auto OPT_CASEINSENSITIVE	{"make-case-insensitive"};	// N
 
-constexpr auto OPT_SEARCH			{"search"};
+constexpr auto OPT_SEARCH			{"search"};					// q
 
 constexpr auto OPT_FIXFILENAME 		{"out-filename"};			// f
 constexpr auto OPT_NOOUTPUTFILE 	{"no-output-file"};			// F
@@ -111,7 +110,7 @@ constexpr auto BENCHMARK=\
 ";
 constexpr auto ARRANGEMENT=\
 "-w, --arrangement [default | unordered | per-title | ascending] \n\
-        Specifying how playlist content was arrangged.\n\
+        Specifying how playlist content will be arranged.\n\
         default   : One file per Title, Title sorted ascending.\n\
         unordered : One file per Title, Title sorted unordered.\n\
         per-title : All files sorted ascending grouped per Title/Directory.\n\
@@ -121,8 +120,9 @@ constexpr auto SEARCH=\
 "--search 'keywords'\n\
         tvplaylist search engine.\n\
         Equal to --no-output-file:verbose:arrangement=ascending:ignore-case\n\
-        Example:\n\
+          Example:\n\
             --search \"ext=* medalion or title=medalion exclude=horse\"\n\
+        You can specifying this multiple times.\n\
 ";
 constexpr auto OVERWRITE=\
 "-O, --overwrite\n\
@@ -157,7 +157,7 @@ constexpr auto CASEINSENSITIVE=\
 constexpr auto FIND=\
 "-i, --find 'keyword'\n\
 -I, --exclude-find 'keyword'\n\
-        Filter only files with filename contains find keyword.\n\
+        Filter only files with (or exclude) filename contains find keyword.\n\
         You can specifying this multiple times.\n\
             Example: --find=war:find=invasion\n\
         To filter only for directory name, pass dir='value'.\n\
@@ -184,7 +184,7 @@ constexpr auto REGEXSYNTAX=\
 constexpr auto REGEX=\
 "-r, --regex 'syntax'\n\
 -R, --exclude-regex 'syntax'\n\
-        Filter only files with filename match regular expression.\n\
+        Filter only files with (or exclude) filename match regular expression.\n\
         To set regex syntax type, pass type=[ecma | awk | grep | egrep | basic | extended]\n\
             Example: --regex type=grep  or  --regex=type=grep\n\
         You can specifying this multiple times.\n\
@@ -192,7 +192,7 @@ constexpr auto REGEX=\
 constexpr auto EXT=\
 "-e, --ext \"'extension', 'extension', ...\"\n\
 -E, --exclude-ext \"'extension', 'extension' ...\"\n\
-        Filter only files that match specific extensions, separated by comma.\n\
+        Filter only (or exclude) files that match specific extensions, separated by comma.\n\
             Example: --ext \"pdf, docx\" or --ext=pdf,docx\n\
         To process all files use *, example: --ext=* \n\
 ";
@@ -203,7 +203,7 @@ constexpr auto SIZE=\
 -S, --exclude-size < | > 'size'\n\
                    'min size'..'maz size'\n\
                    'min size'-'max size'\n\
-        Filter only files that size match, in \"KB\", \"MB\" (default), or \"GB\".\n\
+        Filter only (or exclude) files that size match, in \"KB\", \"MB\" (default), or \"GB\".\n\
         You can specifying this multiple times for 'Range' only based size.\n\
             Example: --size<750\n\
                 OR by specify the unit\n\
@@ -218,7 +218,7 @@ constexpr auto DATE=\
 -Z, --exclude-date = | < | > 'date and/or time'\n\
                    'min' .. 'max'\n\
                    'min' - 'max'\n\
-        Filter only files that was created or accessed or modified or changed at specified date[s] and/or time[s].\n\
+        Filter only (or exclude) files that was created or accessed or modified or changed at specified date[s] and/or time[s].\n\
         If you need only specific type of date, then use --[exclude-]created, --[exclude-]accessed, --[exclude-]modified, or --[exclude-]changed respectively.\n\
         For more information about 'date and/or time' possible values, see below.\n\
         You can specifying this multiple times, for both single value or range values.\n\
@@ -234,7 +234,7 @@ constexpr auto CREATED=\
 -T, --exclude-created = | < | > 'date and/or time'\n\
                       'min' .. 'max'\n\
                       'min' - 'max'\n\
-        Filter only files that was created on specified date[s] and/or time[s].\n\
+        Filter only (or exclude) files that was created on specified date[s] and/or time[s].\n\
         For more information about 'date and/or time' possible values, see below.\n\
         You can specifying this multiple times, for both single value or range values.\n\
 ";
@@ -245,7 +245,7 @@ constexpr auto ACCESSED=\
 -A, --exclude-accessed = | < | > 'date and/or time'\n\
                         'min' .. 'max'\n\
                         'min' - 'max'\n\
-       Filter only files that was accessed on specified date[s] and/or time[s].\n\
+        Filter only (or exclude) files that was accessed on specified date[s] and/or time[s].\n\
         You can specifying this multiple times, for both single value or range values.\n\
         For more information about 'date and/or time' possible values, see below.\n\
 ";
@@ -256,7 +256,7 @@ constexpr auto MODIFIED=\
 -M, --exclude-modified = | < | > 'date and/or time'\n\
                        'min' .. 'max'\n\
                        'min' - 'max'\n\
-        Filter only files that was modified on specified date[s] and/or time[s].\n\
+        Filter only (or exclude) files that was modified on specified date[s] and/or time[s].\n\
         For more information about 'date and/or time' possible values, see below.\n\
         You can specifying this multiple times, for both single value or range values.\n\
 ";
@@ -267,7 +267,7 @@ constexpr auto CHANGED=\
 -G, --exclude-changed = | < | > 'date and/or time'\n\
                        'min' .. 'max'\n\
                        'min' - 'max'\n\
-       Filter only files that was changed on specified date[s] and/or time[s].\n\
+        Filter only (or exclude) files that was changed on specified date[s] and/or time[s].\n\
         For more information about 'date and/or time' possible values, see below.\n\
         You can specifying this multiple times, for both single value or range values.\n\
 ";
@@ -283,7 +283,7 @@ constexpr auto NOOUTPUTFILE=\
 ";
 constexpr auto HELP_REST=\
 "\n\
-Arguments can be surrounded by \"\" (eg. \"--F;V\") to enable using character ';' or anothers that belongs to Terminal or shell. To view how arguments was deduced you can pass option --debug=args.\n\
+Arguments can be surrounded by \"\" (eg. \"--verbose;benchmark\") to enable using character ';' or anothers that belongs to Terminal or shell. To view how arguments was deduced you can pass option --debug=args.\n\
 Options can be joined, and option assignment separator [SPACE] can be replaced with '=' \
 and options can be separated by ':' or ';' after assignment. For the example:\n\n\
   tvplaylist -hOVvc=async:xs<1.3gb:e=mp4,mkv:f=My-playlist.txt\n\n\
@@ -2818,7 +2818,7 @@ int main(const int argc, char *argv[]) {
 					for (auto& k : listExclFind) k = tolower(k);
 				}
 			}
-			else if (isMatch(OPT_SEARCH, '\0')) {
+			else if (isMatch(OPT_SEARCH, 'q')) {
 				if (i + 1 < args.size()) {
 					state[OPT_NOOUTPUTFILE] = "true";
 					state[OPT_VERBOSE] = "true";

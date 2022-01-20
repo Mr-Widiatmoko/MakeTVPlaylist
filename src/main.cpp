@@ -25,7 +25,7 @@
 #include <algorithm>
 #include <regex>
 #include <clocale>
-#include <sys/stat.h>
+#include <sys/stat.h> // TODO: I dont know in Windows, should change to use FileAttribute?
 #include <fstream>
 
 std::unordered_map<std::string, std::string> state;
@@ -579,7 +579,7 @@ func excludeExtension(const fs::path& path) -> std::string
 	return path.string().substr(0, path.string().size() - path.extension().string().size());
 }
 
-func parseCommaDelimited(const std::string&& literal, std::vector<std::string>* result)
+func parseExtCommaDelimited(const std::string&& literal, std::vector<std::string>* result)
 {
 	std::string buffer;
 	for (auto& c : literal) {
@@ -629,12 +629,13 @@ struct Date
 	
 	friend bool operator == (const Date& l, const Date& r) {
 		#define is_equal(x, y) (x != 0 and y != 0 ? x == y : true)
-		return is_equal(l.year, r.year)
+		return (is_equal(l.year, r.year)
 			and is_equal(l.month, r.month)
 			and is_equal(l.day, r.day)
 			and is_equal(l.hour, r.hour)
 			and is_equal(l.minute, r.minute)
-			and is_equal(l.second, r.second)
+			and is_equal(l.second, r.second))
+			or is_equal(l.weekday, r.weekday)
 			;
 		#undef is_equal
 	}
@@ -1077,7 +1078,9 @@ public:
 #define property
 struct ID3
 {
+	
 	property std::unordered_map<std::string_view, std::string> tags;
+	// TODO: There was tags that can be defined multiple times, and should be stored in new variable with type unordered_multimap.
 
 	static constexpr auto TAGS = {
 		"id3",
@@ -1839,12 +1842,12 @@ func isValidFile(const fs::path& path) -> bool
 
 	if (not state[OPT_EXCLEXT].empty() and state[OPT_EXCLEXT] not_eq "*")
 		if (not EXCLUDE_EXT_REPLACED) {
-			parseCommaDelimited(tolower(state[OPT_EXCLEXT]), &EXCLUDE_EXT);
+			parseExtCommaDelimited(tolower(state[OPT_EXCLEXT]), &EXCLUDE_EXT);
 			EXCLUDE_EXT_REPLACED = true;
 		}
 	if (not state[OPT_EXT].empty() and state[OPT_EXT] not_eq "*")
 		if (not DEFAULT_EXT_REPLACED) {
-			parseCommaDelimited(tolower(state[OPT_EXT]), &DEFAULT_EXT);
+			parseExtCommaDelimited(tolower(state[OPT_EXT]), &DEFAULT_EXT);
 			DEFAULT_EXT_REPLACED = true;
 		}
 	
@@ -2163,48 +2166,6 @@ func isDirNameValid(const fs::path& dir)
 	return false;
 }
 
-func recursiveDirectory(const char* const dir,
-						std::vector<std::string>* const out) -> void
-{
-	std::vector<fs::path> tmp;
-	try {
-		for (auto& d : fs::directory_iterator(dir))
-			if (d.is_directory())
-				tmp.emplace_back(d.path().string());
-	} catch (fs::filesystem_error& e) {
-		#ifndef DEBUG
-		if (state[OPT_VERBOSE] == "all")
-		#endif
-			std::cout << e.what() << '\n';
-	}
-	
-	if (tmp.size() > 1)
-		std::sort(tmp.begin(), tmp.end(), ascending);
-	
-	for (auto& d : tmp) {
-		out->emplace_back(d.string());
-		
-		try {
-			std::vector<fs::path> inner_tmp;
-			for (auto& inner : fs::recursive_directory_iterator(d))
-				if (inner.is_directory())
-					inner_tmp.emplace_back(inner.path().string());
-			
-			if (inner_tmp.size() > 1)
-				std::sort(inner_tmp.begin(), inner_tmp.end(), ascending);
-			
-			for (auto& inner : inner_tmp)
-				out->emplace_back(inner);
-			
-		} catch (fs::filesystem_error& e) {
-			#ifndef DEBUG
-			if (state[OPT_VERBOSE] == "all")
-			#endif
-				std::cout << e.what() << '\n';
-		}
-	}
-}
-
 
 func listDir(const fs::path& path, std::vector<fs::directory_entry>* const out,
 			bool sorted=true)
@@ -2228,9 +2189,9 @@ func listDir(const fs::path& path, std::vector<fs::directory_entry>* const out,
 				continue;
 			else if (child.is_symlink()) {
 				if (const auto ori { fs::read_symlink(child.path()) };
-					fs::exists(ori) and fs::is_directory(ori))
+					not ori.empty() and fs::exists(ori) and fs::is_directory(ori))
 					out->emplace_back(child);
-			} else if (child.is_directory())
+			} else if (not child.path().empty() and child.is_directory())
 					out->emplace_back(child);
 		}
 	} catch (fs::filesystem_error& e) {
@@ -2247,7 +2208,68 @@ func listDir(const fs::path& path, std::vector<fs::directory_entry>* const out,
 		});
 }
 
+template <template <class ...> class Container, class ... Args>
+func listDirRecursively(const fs::path& path,
+						Container<fs::path, Args...>* const out)
+	-> void
+{
+	if (not out or path.empty())
+		return;
+	
+	fs::path head = path;
+	std::fill_n(std::inserter(*out, out->end()), 1, std::move(path));
+	
+	/// Try to expand single dir and put into list
+	std::vector<fs::directory_entry> list;
+	std::vector<std::thread> threads;
+	std::vector<std::future<void>> asyncs;
+	
+	do {
+		do {
+			list.clear();
+			listDir(head, &list, false);
+			if (list.size() == 1)
+				std::fill_n(std::inserter(*out, out->end()), 1,
+							std::move(list[0].path()));
+			if (not list.empty())
+				head = list[0].path();
+		} while(list.size() == 1);
+		
+		if (list.empty())
+			break;
+		
+		/// If single dir was expanded, then expand each child dir
+		
+		for (auto& d : list)
+			if (state[OPT_EXECUTION] == OPT_EXECUTION_THREAD)
+				threads.emplace_back(listDir, d.path(), &list, false);
+			else if (state[OPT_EXECUTION] == OPT_EXECUTION_ASYNC)
+				asyncs.emplace_back(std::async(
+						std::launch::async, listDir, d.path(), &list, false));
+			else
+				listDir(d.path(), &list, false);
+		
+		
+		if (state[OPT_EXECUTION] == OPT_EXECUTION_THREAD) {
+			for (auto& t : threads)
+				t.join();
+			threads.clear();
+		}
+		else if (state[OPT_EXECUTION] == OPT_EXECUTION_ASYNC) {
+			for (auto& a : asyncs)
+				a.wait();
+			asyncs.clear();
+		}
+		
+		for (auto& d : list)
+			std::fill_n(std::inserter(*out, out->end()), 1, std::move(d.path()));
+	} while(list.size() > 0);
+}
+
 func isContainsSeasonDirs(const fs::path& path) -> bool {
+	if (path.empty())
+		return false;
+	
 	std::vector<fs::directory_entry> sortedDir;
 	listDir(path, &sortedDir);
 	
@@ -2287,10 +2309,9 @@ func isContainsSeasonDirs(const fs::path& path) -> bool {
 	return isNum and hasDirs;
 }
 
-/// Use std::set, just because it guarantee unique items and find-able.
-std::unordered_set<std::string> regularDirs 	= {};
-std::unordered_set<std::string> seasonDirs	= {};
-std::vector<fs::path> selectFiles  = {};
+std::vector<fs::path> regularDirs;
+std::vector<fs::path> seasonDirs;
+std::vector<fs::path> selectFiles;
 
 inline
 func isValid(const fs::path& path) -> bool
@@ -2304,22 +2325,14 @@ func isValid(const fs::path& path) -> bool
 	);
 }
 
-func insertTo(std::unordered_set<std::string>* const set, const fs::path& path)
+template <typename Container, typename T>
+func insertTo(Container* const out, const T& path)
 {
-	if (auto isFound { isValid(path) }; isFound) {
-		set->emplace(path);
-		return isFound;
-	} else
-		return isFound;
-}
+	auto isFound { isValid(path) };
+	if (isFound)
+		std::fill_n(std::inserter(*out, out->end()), 1, std::move(path));
 
-func insertTo(std::vector<fs::path>* const vector, const fs::path& path)
-{
-	if (auto isFound { isValid(path) }; isFound) {
-		vector->emplace_back(path);
-		return isFound;
-	} else
-		return isFound;
+	return isFound;
 }
 
 func checkForSeasonDir(const fs::path& path) -> void {
@@ -2333,7 +2346,7 @@ func checkForSeasonDir(const fs::path& path) -> void {
 		auto pullFromBufferNum{ [&bufferNum, &isNum]() {
 			isNum = false;
 			for (auto& child : bufferNum) {
-				insertTo(&regularDirs, child.string());
+				insertTo(&regularDirs, child);
 				checkForSeasonDir(child);
 			}
 		}};
@@ -2372,27 +2385,23 @@ func checkForSeasonDir(const fs::path& path) -> void {
 					}
 				}
 			}
-			insertTo(&regularDirs, child.path().string());
+			insertTo(&regularDirs, child.path());
 			checkForSeasonDir(child.path());
 			pullFromBufferNum();
 		}
 		
 		if (isNum and hasDir) {
-			regularDirs.erase(path.string());
-			insertTo(&seasonDirs, path.string());
+			for (auto it = regularDirs.begin(); it != regularDirs.end(); ) {
+				if (*it == path) {
+					it = regularDirs.erase(it);
+				} else {
+					++it;
+				}
+			}
+			
+			insertTo(&seasonDirs, path);
 		} else
-			insertTo(&regularDirs, path.string());
-	}
-}
-
-func getDirs(const fs::path& path) -> void
-{
-	if (insertTo(&regularDirs, path.string())) {
-		std::vector<fs::directory_entry> list;
-		listDir(path, &list, false);
-		for (auto& de : list)
-			if (de.is_directory())
-				getDirs(de.path());
+			insertTo(&regularDirs, path);
 	}
 }
 
@@ -2611,7 +2620,7 @@ func parseKeyValue(std::string* const s, bool isExclude) {
 		return;
 		
 	std::string keyword, value;
-	
+	bool isKeyValue { true };
 	for (auto& key : {"dir", OPT_EXT, OPT_EXCLEXT,
 		OPT_CASEINSENSITIVE, OPT_EXCLHIDDEN, OPT_SIZE, OPT_EXCLSIZE,
 		"case-insensitive", "caseinsensitive",
@@ -2641,7 +2650,9 @@ func parseKeyValue(std::string* const s, bool isExclude) {
 		if (pos != std::string::npos) {
 			auto lower { getBytes(value.substr(0, pos))};
 			auto upper { getBytes(value.substr(pos + next)) };
-			if (lower < upper) {
+			if (lower > upper)
+				isKeyValue = false;
+			else {
 				state[isExclude ? OPT_EXCLSIZEOPGT : OPT_SIZEOPGT] = '\0';
 				state[keyword] = std::to_string(lower);
 				
@@ -2653,18 +2664,26 @@ func parseKeyValue(std::string* const s, bool isExclude) {
 		else if (const auto havePrefix { value[0] == '<' or value[0] == '>'};
 				 havePrefix) {
 			if (auto number { getBytes(value.substr(havePrefix ? 1 : 0)) };
-				number >= 0) {
+				number < 0)
+				isKeyValue = false;
+			else {
 				state[isExclude ? OPT_EXCLSIZEOPGT : OPT_SIZEOPGT] =
 				state[keyword] = std::to_string(number);
 				(isExclude ? listExclSize : listSize).clear();
 			}
 		}
+		else
+			isKeyValue = false;
 	}
 	else if (keyword == "dir")
 	{
-		if (state[OPT_CASEINSENSITIVE] == "true")
-			value = tolower(value);
-		(isExclude ? listExclFindDir : listFindDir).emplace_back(value);
+		if (value.empty())
+			isKeyValue = false;
+		else {
+			if (state[OPT_CASEINSENSITIVE] == "true")
+				value = tolower(value);
+			(isExclude ? listExclFindDir : listFindDir).emplace_back(value);
+		}
 	}
 	else if (   keyword == OPT_EXCLHIDDEN
 			 or keyword == OPT_EXT
@@ -2675,15 +2694,108 @@ func parseKeyValue(std::string* const s, bool isExclude) {
 		OPT_DCREATED, OPT_DCHANGED, OPT_DACCESSED, OPT_DMODIFIED,
    OPT_DEXCLCREATED, OPT_DEXCLCHANGED, OPT_DEXCLMODIFIED, OPT_DEXCLACCESSED}))
    {
-	   std::cout << '"' << keyword << "\" is Under construction!.\n";
-	   
 	   const auto havePrefix { value[0] == '<' or value[0] == '>'};
-	   if (not havePrefix) {
+	   if (auto opGt{ value[0] };
+		   
+		   havePrefix or opGt == '=')
+	   {
+		   if (Date date(value);
+			   not date.isValid())
+			   isKeyValue = false;
+		   else {
+			   if (keyword == OPT_DATE) {
+				   listDCreated.emplace_back(std::make_pair(opGt, date));
+				   listDChanged.emplace_back(std::make_pair(opGt, date));
+				   listDModified.emplace_back(std::make_pair(opGt, date));
+				   listDAccessed.emplace_back(std::make_pair(opGt, date));
+				   state[OPT_DCREATED]  = "1";
+				   state[OPT_DMODIFIED] = "1";
+				   state[OPT_DACCESSED] = "1";
+				   state[OPT_DCHANGED]  = "1";
+			   } else if (keyword == OPT_EXCLDATE) {
+				   listDExclCreated.emplace_back(std::make_pair(opGt, date));
+				   listDExclChanged.emplace_back(std::make_pair(opGt, date));
+				   listDExclModified.emplace_back(std::make_pair(opGt, date));
+				   listDExclAccessed.emplace_back(std::make_pair(opGt, date));
+				   state[OPT_DEXCLCREATED]  = "1";
+				   state[OPT_DEXCLMODIFIED] = "1";
+				   state[OPT_DEXCLACCESSED] = "1";
+				   state[OPT_DEXCLCHANGED]  = "1";
+			   } else {
+				 (keyword == OPT_DCREATED ? listDCreated
+				: keyword == OPT_DCHANGED ? listDChanged
+				: keyword == OPT_DMODIFIED ? listDModified
+				: keyword == OPT_DACCESSED ? listDAccessed
+				: keyword == OPT_DEXCLCREATED ? listDExclCreated
+				: keyword == OPT_DEXCLCHANGED ? listDExclChanged
+				: keyword == OPT_DEXCLMODIFIED ? listDExclModified
+				: listDExclAccessed
+				).emplace_back(std::make_pair(opGt, date));
+
+				   state[keyword] = "1";
+			   }
+		   }
+	   }
+	   else {
 		   auto pos { value.find("..") };
 		   auto next { 2 };
 		   
-		   if (pos != std::string::npos) {
-			
+		   if (pos == std::string::npos) {
+			   next = 1;
+			   unsigned strip { 0 };
+			   pos = 0;
+			   for (auto m{ 0 }; m < value.size(); ++m)
+				   if (value[m] == '-') {
+					   strip++;
+					   pos = m;
+				   }
+			   if (strip != 1)
+				   pos = std::string::npos;
+		   }
+		   
+		   if (pos == std::string::npos)
+			   isKeyValue = false;
+		   else {
+			   if (Date lower(value.substr(0, pos));
+				   not lower.isValid())
+				   isKeyValue = false;
+			   else {
+				   if (Date upper(value.substr(pos + next));
+					   not upper.isValid() or lower > upper)
+					   isKeyValue = false;
+				   else {
+					   if (keyword == OPT_DATE) {
+						   listDCreatedR.emplace_back(std::make_pair(lower, upper));
+						   listDChangedR.emplace_back(std::make_pair(lower, upper));
+						   listDModifiedR.emplace_back(std::make_pair(lower, upper));
+						   listDAccessedR.emplace_back(std::make_pair(lower, upper));
+						   state[OPT_DCREATED]  = "1";
+						   state[OPT_DMODIFIED] = "1";
+						   state[OPT_DACCESSED] = "1";
+						   state[OPT_DCHANGED]  = "1";
+					   } else if (keyword == OPT_EXCLDATE) {
+						   listDExclCreatedR.emplace_back(std::make_pair(lower, upper));
+						   listDExclChangedR.emplace_back(std::make_pair(lower, upper));
+						   listDExclModifiedR.emplace_back(std::make_pair(lower, upper));
+						   listDExclAccessedR.emplace_back(std::make_pair(lower, upper));
+						   state[OPT_DEXCLCREATED]  = "1";
+						   state[OPT_DEXCLMODIFIED] = "1";
+						   state[OPT_DEXCLACCESSED] = "1";
+						   state[OPT_DEXCLCHANGED]  = "1";
+					   } else {
+							 (keyword == OPT_DCREATED ? listDCreatedR
+							: keyword == OPT_DCHANGED ? listDChangedR
+							: keyword == OPT_DMODIFIED ? listDModifiedR
+							: keyword == OPT_DACCESSED ? listDAccessedR
+							: keyword == OPT_DEXCLCREATED ? listDExclCreatedR
+							: keyword == OPT_DEXCLCHANGED ? listDExclChangedR
+							: keyword == OPT_DEXCLMODIFIED ? listDExclModifiedR
+							: listDExclAccessedR
+							).emplace_back(std::make_pair(lower, upper));
+						   state[keyword] = "1";
+					   }
+				   }
+			   }
 		   }
 	   }
    }
@@ -2697,7 +2809,7 @@ func parseKeyValue(std::string* const s, bool isExclude) {
 		}
 	}
 	
-	if (not keyword.empty())
+	if (isKeyValue and not keyword.empty())
 		s->insert(0, 1, char(1));
 }
 #undef func
@@ -2872,7 +2984,7 @@ int main(const int argc, char *argv[]) {
 					
 					i++;
 					
-					auto index{ 0 };
+					auto index{ -1 };
 					auto last{ 0 };
 					auto push{[&]() {
 						auto keyVal { args[i].substr(last, index) };
@@ -2891,7 +3003,7 @@ int main(const int argc, char *argv[]) {
 								listFind.emplace_back(keyVal);
 						}
 					}};
-					while (index < args[i].size()) {
+					while (++index < args[i].size()) {
 						if (std::isspace(args[i][index])) {
 							if (last != -1 and index - last > 0) {
 								push();
@@ -2901,7 +3013,6 @@ int main(const int argc, char *argv[]) {
 						}
 						if (last == -1)
 							last = index;
-						index++;
 					}
 					if (last != -1)
 						push();
@@ -3108,7 +3219,9 @@ int main(const int argc, char *argv[]) {
 							}
 					} else if (i + 1 < args.size()) {
 						auto pos = args[i + 1].find("..");
+						auto next { 2 };
 						if (pos == std::string::npos) {
+							next = 1;
 							unsigned strip { 0 };
 							pos = 0;
 							for (auto m{ 0 }; m < args[i + 1].size(); ++m)
@@ -3123,7 +3236,7 @@ int main(const int argc, char *argv[]) {
 						if (pos not_eq std::string::npos) {
 							if (Date lower(args[i + 1].substr(0, pos));
 								lower.isValid())
-								if (Date upper(args[i + 1].substr(pos));
+								if (Date upper(args[i + 1].substr(pos + next));
 									upper.isValid())
 								{
 									if (push(lower, upper)) {
@@ -3305,10 +3418,10 @@ SIZE_NEEDED:		std::cout << "Expecting operator '<' or '>' followed\
 by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..to'\
  Please see --help " << OPT_SIZE << "\n";
 		} else if (fs::is_directory(args[i]))
-			insertTo(&bufferDirs, std::move(fs::path(args[i])));
+			insertTo(&bufferDirs, fs::path(args[i]));
 		else if (fs::is_regular_file(std::move(fs::path(args[i])))) {
 			if (isValidFile(fs::absolute(args[i])))
-				insertTo(&selectFiles, std::move(fs::absolute(args[i])));
+				insertTo(&selectFiles, fs::absolute(args[i]));
 		} else
 			invalidArgs.emplace(args[i]);
 	}
@@ -3356,8 +3469,8 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 
 	while (bufferDirs.size() == 1) {
 		state[OPT_OUTDIR] = fs::absolute(bufferDirs[0]).string();
-		insertTo(&regularDirs, std::move(bufferDirs[0]).string());/// Assume single input dir is regularDir
-		if (isContainsSeasonDirs(fs::path(state[OPT_OUTDIR]))) {
+		insertTo(&regularDirs, bufferDirs[0]);/// Assume single input dir is regularDir
+		if (isContainsSeasonDirs(state[OPT_OUTDIR])) {
 			break;
 		}
 		bufferDirs.clear();
@@ -3365,7 +3478,7 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 		listDir(fs::path(state[OPT_OUTDIR]), &sortedDirs);
 				
 		for (auto& child : sortedDirs)
-			insertTo(&bufferDirs, std::move(child.path()));
+			insertTo(&bufferDirs, child.path());
 	}
 
 	if (auto dirOut{ inputDirsCount == 1
@@ -3413,6 +3526,7 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 	#define PRINT_OPT(x)	(x.empty() ? "false" : x)
 	#define LABEL(x)	x << std::setw(unsigned(WIDTH - std::strlen(x))) << ": "
 	std::cout
+		<< LABEL(OPT_ARRANGEMENT) << state[OPT_ARRANGEMENT] << '\n'
 		<< LABEL(OPT_EXECUTION) << state[OPT_EXECUTION] << '\n'
 		<< LABEL(OPT_VERBOSE) << PRINT_OPT(state[OPT_VERBOSE]) << '\n'
 		<< LABEL(OPT_BENCHMARK) << PRINT_OPT(state[OPT_BENCHMARK]) << '\n'
@@ -3534,18 +3648,28 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 	
 	for (bool isByPass {state[OPT_ARRANGEMENT] == OPT_ARRANGEMENT_ASCENDING};
 		 auto& child : bufferDirs)
-		if (state[OPT_EXECUTION] == OPT_EXECUTION_THREAD)
-			threads.emplace_back(
-				isByPass ? getDirs : checkForSeasonDir, std::move(child));
+		if (state[OPT_EXECUTION] == OPT_EXECUTION_THREAD) {
+			if (isByPass)
+				threads.emplace_back([&]() {
+					listDirRecursively(child, &regularDirs);
+				});
+			else
+				threads.emplace_back(checkForSeasonDir, child);
+		}
 		else if (state[OPT_EXECUTION] == OPT_EXECUTION_ASYNC)
-			asyncs.emplace_back(std::async(std::launch::async,
-				(isByPass ?  getDirs : checkForSeasonDir), std::move(child)));
+			if (isByPass)
+				asyncs.emplace_back(std::async(std::launch::async, [&]() {
+					listDirRecursively(child, &regularDirs);
+				}));
+			else
+				asyncs.emplace_back(std::async(std::launch::async,
+							checkForSeasonDir, child));
 		else
 		{
 			if (isByPass)
-				getDirs(std::move(child));
+				listDirRecursively(child, &regularDirs);
 			else
-				checkForSeasonDir(std::move(child));
+				checkForSeasonDir(child);
 		}
 
 	if (state[OPT_EXECUTION] == OPT_EXECUTION_THREAD) {
@@ -3558,33 +3682,24 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 		asyncs.clear();
 	}
 
-		
-	const auto regularDirSize{::regularDirs.size()};
-	const auto seasonDirSize{::seasonDirs.size()};
 	
-	const auto maxDirSize{std::max(regularDirSize, seasonDirSize)};
+	auto maxDirSize{std::max(regularDirs.size(), seasonDirs.size())};
 
 	const auto BY_PASS {
 			state[OPT_ARRANGEMENT] == OPT_ARRANGEMENT_PERTITLE
 			or state[OPT_ARRANGEMENT] == OPT_ARRANGEMENT_ASCENDING};
-					   
-	/// Convert std::set to vector, to enable call by index subscript.
-	std::vector<std::string> regularDirs;
-	for (auto&& d : ::regularDirs) regularDirs.emplace_back(std::move(d));
-	std::vector<std::string> seasonDirs;
-	for (auto&& d : ::seasonDirs) seasonDirs.emplace_back(std::move(d));
 					   
 	if (state[OPT_ARRANGEMENT] == OPT_ARRANGEMENT_DEFAULT) {
 		std::sort(regularDirs.begin(), regularDirs.end());
 		std::sort(seasonDirs.begin(), seasonDirs.end());
 			
 		sortFiles(&selectFiles);
-			
 	}
-	else if (BY_PASS)
-	{
-		for (auto&& d : seasonDirs) regularDirs.emplace_back(std::move(d));
+	else if (BY_PASS) {
+		for (auto& d : seasonDirs)
+			regularDirs.emplace_back(std::move(d));
 		seasonDirs.clear();
+		maxDirSize = regularDirs.size();
 	}
 
 	#ifndef DEBUG
@@ -3592,7 +3707,8 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 	#endif
 	{
 		if (inputDirsCount > 0)
-			timeLapse(start, groupNumber(std::to_string(regularDirSize + seasonDirSize))
+			timeLapse(start, groupNumber(
+						std::to_string(regularDirs.size() + seasonDirs.size()))
 					  + " valid input dirs"
 					  + (selectFiles.size() > 0
 						 ? " and " + groupNumber(std::to_string(selectFiles.size()))
@@ -3605,11 +3721,14 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 	#endif
 	for (auto i{0}; i<maxDirSize; ++i)
 		for (auto& select : {1, 2}) {
-			if ((select == 1 and i >= regularDirSize)
-				or (select == 2 and i >= seasonDirSize))
+			if ((select == 1 and i >= regularDirs.size())
+				or (select == 2 and i >= seasonDirs.size()))
 				continue;
-			std::cout << (select == 1 ? 'R' : 'S') << ':'
-				<< (select == 1 ? regularDirs[i] : seasonDirs[i]) << '\n';
+			std::cout
+				<< (i == 0 and select == 1 ? "BEGIN valid dirs-----\n" : "")
+				<< (select == 1 ? 'R' : 'S') << ':'
+				<< (select == 1 ? regularDirs[i] : seasonDirs[i])
+				<< (i + 1 == maxDirSize ? "\nEND valid dirs-----\n\n" : "\n");
 		}
 	
 	
@@ -3723,7 +3842,7 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 		}
 	}};
 	
-	auto filterChildFiles{ [&records](const std::string& dir, bool recurive=false) {
+	auto filterChildFiles{ [&records](const fs::path& dir, bool recurive=false) {
 		auto filter{ [](const fs::directory_entry& f) -> bool {
 			if (not fs::is_regular_file(f.path())
 				or not isValid(f.path()))
@@ -3741,27 +3860,28 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 			if (wantToSort and bufferFiles.size() > 1)
 				std::sort(bufferFiles.begin(), bufferFiles.end(), ascending);
 			
-			records.emplace(std::make_pair(std::move(dir),
+			records.emplace(std::make_pair(dir.string(),
 										   std::make_shared<std::vector<fs::path>>(std::move(bufferFiles))
 										   ));
 		}};
 		
 		try {
 			if (recurive) {
-				std::vector<std::string> dirs;
-				recursiveDirectory(dir.c_str(), &dirs);
+				std::vector<fs::path> dirs;
+				listDirRecursively(dir, &dirs);
+				std::sort(dirs.begin(), dirs.end());
 				
 				for (auto& d : dirs) {
 					std::vector<fs::path> tmp;
 					
-					for (auto& f : fs::recursive_directory_iterator(d))
+					for (auto& f : fs::directory_iterator(d))
 						if (filter(f))
-							tmp.emplace_back(f);
+							tmp.emplace_back(std::move(f));
 					
 					sortFiles(&tmp);
 					
 					for (auto& f : tmp)
-						bufferFiles.emplace_back(f);
+						bufferFiles.emplace_back(std::move(f));
 				}
 				
 				putToRecord(false);
@@ -3769,7 +3889,7 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 			
 			for (auto& f : fs::directory_iterator(dir))
 				if (filter(f))
-					bufferFiles.emplace_back(f);
+					bufferFiles.emplace_back(std::move(f));
 			
 			putToRecord(true);
 			
@@ -3786,11 +3906,8 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 	
 	for (auto i{0}; i<maxDirSize; ++i)
 		for (auto& x : {1, 2})
-			if (i < (x == 1 ? regularDirSize : seasonDirSize) )
-				if (auto dir { fs::path(x == 1
-								? regularDirs[i]
-								: seasonDirs[i]) };
-					
+			if (i < (x == 1 ? regularDirs.size() : seasonDirs.size()) )
+				if (auto dir { x == 1 ? regularDirs[i] : seasonDirs[i] };
 					not dir.empty() and isDirNameValid(dir)) {
 					if (state[OPT_EXECUTION] == OPT_EXECUTION_THREAD)
 						threads.emplace_back([&, dir]() {
@@ -3804,13 +3921,12 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 						filterChildFiles(dir, BY_PASS ? true : x == 2);
 				}
 					   
-	if (state[OPT_EXECUTION] == OPT_EXECUTION_THREAD) {
+	if (state[OPT_EXECUTION] == OPT_EXECUTION_THREAD)
 		for (auto& t : threads)
 			t.join();
-	} else if (state[OPT_EXECUTION] == OPT_EXECUTION_ASYNC) {
+	else if (state[OPT_EXECUTION] == OPT_EXECUTION_ASYNC)
 		for (auto& a : asyncs)
 			a.wait();
-	}
 
 	if (BY_PASS)
 	{
@@ -3845,8 +3961,8 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 				for (auto& indexPass : {1, 2})
 					///pass 1 for regularDirs, pass 2 for seasonDirs
 				{
-					if ((indexPass == 1 and i >= regularDirSize)
-						or (indexPass == 2 and i >= seasonDirSize))
+					if ((indexPass == 1 and i >= regularDirs.size())
+						or (indexPass == 2 and i >= seasonDirs.size()))
 						continue;
 					
 					if (const auto dir{indexPass == 1 ? regularDirs[i] : seasonDirs[i]};

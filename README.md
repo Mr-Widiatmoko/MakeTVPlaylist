@@ -34,7 +34,7 @@ But, if you need blasting super speed for processing, you may want to download  
 
 Thats it, and "Make TV Playlist" will automatically call "tvplaylist" for processing.
 
-To build "tvplaylist" on macOS Apple Silicon, Windows, Linux, or another platforms, first you must have modern C++ compiler and cmake installed. Inside "MakeTVPlaylist" folder (or folder containing CMakeLists.txt) copy below and paste on the Terminal:
+To build "tvplaylist" on macOS Apple Silicon, Windows, Linux, or another platforms, first you must have modern C++ compiler (and/or cmake) installed. Inside "MakeTVPlaylist" folder (or folder containing CMakeLists.txt) copy below and paste on the Terminal:
 
 	mkdir Release
 	cd Release

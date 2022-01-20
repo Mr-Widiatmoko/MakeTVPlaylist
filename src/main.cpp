@@ -2354,41 +2354,43 @@ func checkForSeasonDir(const fs::path& path) -> void {
 		std::vector<fs::directory_entry> sortedDir;
 		listDir(path, &sortedDir);
 		
-		if (sortedDir.size() > 1)
-		for (auto& child : sortedDir) {
-			hasDir = true;
+		if (sortedDir.size() == 1)
+			checkForSeasonDir(sortedDir[0].path());
+		else if (sortedDir.size() > 1)
+			for (auto& child : sortedDir) {
+				hasDir = true;
 
-			if (isNum) {
-				std::vector<MAXNUM> iNames;
-				containInts(child.path().filename().string(), &iNames);
-				if (not iNames.empty()) {
-					if (isContainsSeasonDirs(child.path())) {
-						isNum = false;
-					} else {
-					if (lastNum.empty()) {
-						lastNum = std::move(iNames);
-						bufferNum.emplace_back(child.path());
-						continue;
-					} else if (lastNum.size() == iNames.size()) {
-						bool hasIncreased{false};
-						for (auto xi{0}; xi < lastNum.size(); ++xi)
-							if (lastNum[xi] < iNames[xi]) {
-								hasIncreased = true;
-								break;
-							}
-						
-						if (hasIncreased) {
+				if (isNum) {
+					std::vector<MAXNUM> iNames;
+					containInts(child.path().filename().string(), &iNames);
+					if (not iNames.empty()) {
+						if (isContainsSeasonDirs(child.path())) {
+							isNum = false;
+						} else {
+						if (lastNum.empty()) {
+							lastNum = std::move(iNames);
 							bufferNum.emplace_back(child.path());
 							continue;
+						} else if (lastNum.size() == iNames.size()) {
+							bool hasIncreased{false};
+							for (auto xi{0}; xi < lastNum.size(); ++xi)
+								if (lastNum[xi] < iNames[xi]) {
+									hasIncreased = true;
+									break;
+								}
+							
+							if (hasIncreased) {
+								bufferNum.emplace_back(child.path());
+								continue;
+							}
+						}
 						}
 					}
-					}
 				}
+				insertTo(&regularDirs, child.path());
+				checkForSeasonDir(child.path());
+				pullFromBufferNum();
 			}
-			insertTo(&regularDirs, child.path());
-			checkForSeasonDir(child.path());
-			pullFromBufferNum();
-		}
 		
 		if (isNum and hasDir) {
 			for (auto it = regularDirs.begin(); it != regularDirs.end(); ) {
@@ -3695,12 +3697,6 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 			
 		sortFiles(&selectFiles);
 	}
-	else if (BY_PASS) {
-		for (auto& d : seasonDirs)
-			regularDirs.emplace_back(std::move(d));
-		seasonDirs.clear();
-		maxDirSize = regularDirs.size();
-	}
 
 	#ifndef DEBUG
 	if (state[OPT_BENCHMARK] == "true" or state[OPT_DEBUG] == "true")
@@ -3911,14 +3907,14 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 					not dir.empty() and isDirNameValid(dir)) {
 					if (state[OPT_EXECUTION] == OPT_EXECUTION_THREAD)
 						threads.emplace_back([&, dir]() {
-							filterChildFiles(dir, BY_PASS ? true : x == 2);
+							filterChildFiles(dir, x == 2);
 						});
 					else if (state[OPT_EXECUTION] == OPT_EXECUTION_ASYNC)
 						asyncs.emplace_back(std::async(std::launch::async, [&, dir]() {
-							filterChildFiles(dir, BY_PASS ? true : x == 2);
+							filterChildFiles(dir, x == 2);
 						}));
 					else
-						filterChildFiles(dir, BY_PASS ? true : x == 2);
+						filterChildFiles(dir, x == 2);
 				}
 					   
 	if (state[OPT_EXECUTION] == OPT_EXECUTION_THREAD)
@@ -3930,10 +3926,20 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 
 	if (BY_PASS)
 	{
+		for (auto& d : seasonDirs)
+			regularDirs.emplace_back(std::move(d));
+		seasonDirs.clear();
+		
+		maxDirSize = regularDirs.size();
+		
+		std::sort(regularDirs.begin(), regularDirs.end());
+
+			
 		playlistCount += selectFiles.size();
 			
 		for (auto& dir : regularDirs) {
-			if (dir.empty()) continue;
+			if (dir.empty())
+				continue;
 			if (const auto found { records[dir] }; found)
 				for (auto& f : *found)
 				{

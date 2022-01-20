@@ -1959,38 +1959,34 @@ func isValidFile(const fs::path& path) -> bool
 			if (std::regex_search(filename, regex))
 				return false;
 	
-	std::string  filename; // MARK: Find statement
-	auto ismp3 { false };
-	auto isCaseInsensitive { false };
-	ID3 id3;
-	if (not state[OPT_FIND].empty() or not state[OPT_EXCLFIND].empty())
+	if (not listFind.empty() or not listExclFind.empty()) // MARK: Find statement
 	{
-		ismp3 = tmp.extension().string() == ".mp3";
-		filename = excludeExtension(tmp.filename());
-		isCaseInsensitive = state[OPT_CASEINSENSITIVE] == "true";
+		auto ismp3 { tmp.extension().string() == ".mp3" };
+		auto filename { excludeExtension(tmp.filename()) };
+		auto isCaseInsensitive { state[OPT_CASEINSENSITIVE] == "true" };
 		if (isCaseInsensitive)
 			filename = tolower(filename);
+		ID3 id3;
 		if (ismp3)
 			id3 = ID3(tmp.string().c_str(), isCaseInsensitive);
-	}
 	
-	if (bool found{ false }; not listFind.empty()) {
-		for (auto& keyword : listFind)
+		if (bool found{ false }; not listFind.empty())
 		{
-			auto handled { keyword[0] == char(1) };
-			if (not handled and ismp3 and (handled = true))
-				found = id3 % keyword;
-			
-			if (not handled and filename.find(keyword) != std::string::npos) {
-				found = true;
-				break;
+			for (auto& keyword : listFind)
+			{
+				auto handled { keyword[0] == char(1) };
+				if (not handled and ismp3 and (handled = true))
+					found = id3 % keyword;
+				
+				if (not handled and filename.find(keyword) != std::string::npos) {
+					found = true;
+					break;
+				}
 			}
+			if (not found)
+				return false;
 		}
-		if (not found)
-			return false;
-	}
 
-	if (not state[OPT_EXCLFIND].empty()) {
 		for (auto& keyword : listExclFind)
 		{
 			auto handled { keyword[0] == char(1) };
@@ -2004,6 +2000,7 @@ func isValidFile(const fs::path& path) -> bool
 				return false;
 		}
 	}
+
 
 	if (bool found{ false };
 		not listSize.empty()
@@ -2609,6 +2606,100 @@ func timeLapse(std::chrono::system_clock::time_point& start,
 		start = std::chrono::system_clock::now();
 }
 
+func parseKeyValue(std::string* const s, bool isExclude) {
+	if (not s or s->empty())
+		return;
+		
+	std::string keyword, value;
+	
+	for (auto& key : {"dir", OPT_EXT, OPT_EXCLEXT,
+		OPT_CASEINSENSITIVE, OPT_EXCLHIDDEN, OPT_SIZE, OPT_EXCLSIZE,
+		"case-insensitive", "caseinsensitive",
+		"ignore-case", "ignorecase"})
+	{
+		const auto sz { std::strlen(key) };
+		
+		if (s->size() > sz + 2)
+			if (const auto c{ s->at(sz) };
+				
+				s->starts_with(key) and (c == '=' or c == '<' or c == '>'))
+			{
+				keyword = key;
+				value = s->substr(sz + (c == '=' ? 1 : 0));
+				break;
+			}
+	}
+	if (	keyword == OPT_SIZE
+			 or keyword == OPT_EXCLSIZE)
+	{
+		auto pos { value.find("..") };
+		auto next { 2 };
+		if (pos == std::string::npos) {
+			pos =value.find('-');
+			next = 1;
+		}
+		if (pos != std::string::npos) {
+			auto lower { getBytes(value.substr(0, pos))};
+			auto upper { getBytes(value.substr(pos + next)) };
+			if (lower < upper) {
+				state[isExclude ? OPT_EXCLSIZEOPGT : OPT_SIZEOPGT] = '\0';
+				state[keyword] = std::to_string(lower);
+				
+				(isExclude ? listExclSize : listSize).emplace_back(std::make_pair(
+							   lower,
+							   upper));
+			}
+		}
+		else if (const auto havePrefix { value[0] == '<' or value[0] == '>'};
+				 havePrefix) {
+			if (auto number { getBytes(value.substr(havePrefix ? 1 : 0)) };
+				number >= 0) {
+				state[isExclude ? OPT_EXCLSIZEOPGT : OPT_SIZEOPGT] =
+				state[keyword] = std::to_string(number);
+				(isExclude ? listExclSize : listSize).clear();
+			}
+		}
+	}
+	else if (keyword == "dir")
+	{
+		if (state[OPT_CASEINSENSITIVE] == "true")
+			value = tolower(value);
+		(isExclude ? listExclFindDir : listFindDir).emplace_back(value);
+	}
+	else if (   keyword == OPT_EXCLHIDDEN
+			 or keyword == OPT_EXT
+			 or keyword == OPT_EXCLEXT) {
+		state[keyword] = value;
+	}
+	else if (isEqual(keyword, {OPT_DATE, OPT_EXCLDATE,
+		OPT_DCREATED, OPT_DCHANGED, OPT_DACCESSED, OPT_DMODIFIED,
+   OPT_DEXCLCREATED, OPT_DEXCLCHANGED, OPT_DEXCLMODIFIED, OPT_DEXCLACCESSED}))
+   {
+	   std::cout << '"' << keyword << "\" is Under construction!.\n";
+	   
+	   const auto havePrefix { value[0] == '<' or value[0] == '>'};
+	   if (not havePrefix) {
+		   auto pos { value.find("..") };
+		   auto next { 2 };
+		   
+		   if (pos != std::string::npos) {
+			
+		   }
+	   }
+   }
+   else if (not keyword.empty()) {
+		state[OPT_CASEINSENSITIVE] = value;
+		if (tolower(value) == "true") {
+			for (auto& k : listFindDir) k = tolower(k);
+			for (auto& k : listExclFindDir) k = tolower(k);
+			for (auto& k : listFind) k = tolower(k);
+			for (auto& k : listExclFind) k = tolower(k);
+		}
+	}
+	
+	if (not keyword.empty())
+		s->insert(0, 1, char(1));
+}
 #undef func
 
 #if MAKE_LIB
@@ -2637,51 +2728,7 @@ int main(const int argc, char *argv[]) {
 	expandArgs(argc, argv, ARGS_START_INDEX, &args);
 	
 	std::unordered_set<std::string_view> invalidArgs;
-	
-	auto parseKeyValue{[](std::string* const s, bool isExclude) {
-		std::string keyword, value;
-		
-		for (auto& key : {"dir", OPT_EXT, OPT_EXCLEXT,
-			OPT_CASEINSENSITIVE, OPT_EXCLHIDDEN,
-			"case-insensitive", "caseinsensitive",
-			"ignore-case", "ignorecase"})
-		{
-			const auto sz { std::strlen(key) };
-							
-			if (const auto c{ s->at(sz) };
-				
-				s->size() > sz + 2 /// 2 means '=' + at least a char
-				and s->starts_with(key)
-				and c == '=' )
-				{
-					keyword = key;
-					value = s->substr(sz + (c == '=' ? 1 : 0));
-					break;
-				}
-		}
-		if (keyword == "dir")
-		{
-			if (state[OPT_CASEINSENSITIVE] == "true")
-				value = tolower(value);
-			(isExclude ? listExclFindDir : listFindDir).emplace_back(value);
-			s->insert(0, 1, char(1));
-		}
-		else if (   keyword == OPT_EXCLHIDDEN
-				 or keyword == OPT_EXT
-				 or keyword == OPT_EXCLEXT) {
-			state[keyword] = value;
-		}
-		else if (not keyword.empty()) {
-			state[OPT_CASEINSENSITIVE] = value;
-			if (tolower(value) == "true") {
-				for (auto& k : listFindDir) k = tolower(k);
-				for (auto& k : listExclFindDir) k = tolower(k);
-				for (auto& k : listFind) k = tolower(k);
-				for (auto& k : listExclFind) k = tolower(k);
-			}
-		}
-	}};
-	
+
 	for (int i{0}; i<args.size(); ++i) {
 		if (auto isMatch{ [&](const char* const with,
 							  const char mnemonic,
@@ -2767,12 +2814,9 @@ int main(const int argc, char *argv[]) {
 					{
 						i++;
 						Date date((args[i]));
-//						int sz = int(args[i].size()) + 2 + 2;
-//						std::string fill;
-//						for (auto h { 0 }; h<sz; ++h) fill += ' ';
 						std::cout << '\"' << args[i] << '\"'
-						<< "  -> \"" << date.string() << "\" " << (date.isValid() ? "✅" : "❌") << '\n';
-//						std::cout <<  fill << "[strftime(%c)] -> \"" << date.string("%c") <<"\"\n";
+						<< "  -> \"" << date.string() << "\" "
+						<< (date.isValid() ? "✅" : "❌") << '\n';
 						return RETURN_VALUE
 
 					}
@@ -2801,7 +2845,8 @@ int main(const int argc, char *argv[]) {
 					i++;
 					state[OPT_ARRANGEMENT] = args[i];
 				} else
-					std::cout << "Expecting arrangement type. Please see --help "<< args[i].substr(2) << "\n";
+					std::cout << "Expecting arrangement type. Please see --help "
+					<< args[i].substr(2) << "\n";
 			}
 			else if (isMatch(OPT_CASEINSENSITIVE, 'N', true,
 							 {	"case-insensitive", "caseinsensitive",
@@ -2826,20 +2871,23 @@ int main(const int argc, char *argv[]) {
 					state[OPT_CASEINSENSITIVE] = "true";
 					
 					i++;
-					// TODO: Parse args[i] into multiple --find
+					
 					auto index{ 0 };
 					auto last{ 0 };
 					auto push{[&]() {
 						auto keyVal { args[i].substr(last, index) };
 						if (keyVal != "or" and keyVal != "and") {
-							parseKeyValue(&keyVal, false);
+							parseKeyValue(&keyVal, keyVal.starts_with("exclude-"));
 							
-							if (keyVal.starts_with("exclude=")) {
-								auto value { keyVal.substr(9) };
+							if (constexpr auto EXCL {"exclude="};
+								keyVal.starts_with(EXCL))
+							{
+								auto value { keyVal.substr(std::strlen(EXCL)) };
 								if (value.find('=') != std::string::npos)
 									parseKeyValue(&value, true);
-								listExclFind.emplace_back(value);
-							} else
+								if (not value.empty())
+									listExclFind.emplace_back(value);
+							} else if (not keyVal.empty())
 								listFind.emplace_back(keyVal);
 						}
 					}};
@@ -2853,11 +2901,10 @@ int main(const int argc, char *argv[]) {
 						}
 						if (last == -1)
 							last = index;
+						index++;
 					}
 					if (last != -1)
 						push();
-					
-					std::cout << "Under construction!";
 				} else
 					std::cout << "Expecting search keyword!\n";
 			}
@@ -2870,24 +2917,31 @@ int main(const int argc, char *argv[]) {
 					i++;
 					
 					parseKeyValue(&args[i], isExclude);
-					(isExclude ? listExclFind : listFind).emplace_back(state[OPT_CASEINSENSITIVE] == "true" ? tolower(args[i]) : args[i]);
+					(isExclude ? listExclFind : listFind)
+						.emplace_back(state[OPT_CASEINSENSITIVE] == "true"
+									  ? tolower(args[i]) : args[i]);
 					state[opt] = "1";
 				} else
 					std::cout << "Expecting keyword after \""
-					<< args[i] << "\" option. Please see --help "<< args[i].substr(2) << "\n";
+					<< args[i] << "\" option. Please see --help "
+					<< args[i].substr(2) << "\n";
 			}
 			else if (isMatch(OPT_REGEXSYNTAX, 	'X')) {
-				if (i + 1 < args.size())
+				if (auto found{ false }; i + 1 < args.size()) {
 					for (auto arg { tolower(args[i + 1]) };
 						 auto& s : {"ecma", "basic", "extended", "awk", "grep", "egrep"})
 						if (s == arg) {
 							state[OPT_REGEXSYNTAX] = s;
 							i++;
+							found = true;
 							break;
 						}
-
+					if (found)
+						continue;
+				}
 				std::cout << "Expecting regular expression syntax after \""
-					<< args[i] << "\" option. Please see --help "<< args[i].substr(2) << "\n";
+							<< args[i] << "\" option. Please see --help "
+							<< args[i].substr(2) << "\n";
 			}
 			else if (isMatch(OPT_REGEX, 		'r')
 					 or isMatch(OPT_EXCLREGEX, 	'R')) {
@@ -2900,7 +2954,8 @@ int main(const int argc, char *argv[]) {
 					{
 						if (args[i + 1].substr(0, pos) == "type") {
 							auto value { args[i + 1].substr(pos + 1) };
-							for (auto& keyword : {"ecma", "basic", "extended", "awk", "grep", "egrep"})
+							for (auto& keyword : {"ecma", "basic", "extended",
+													"awk", "grep", "egrep"})
 								if (keyword == value) {
 									state[OPT_REGEXSYNTAX] = keyword;
 									i++;
@@ -2929,7 +2984,8 @@ int main(const int argc, char *argv[]) {
 					}
 				} else
 					std::cout << "Expecting regular expression after \""
-					<< args[i] << "\" option. Please see --help "<< args[i].substr(2) << "\n";
+								<< args[i] << "\" option. Please see --help "
+								<< args[i].substr(2) << "\n";
 			}
 			else if (isMatch(OPT_DATE, 				'z')
 					 or isMatch(OPT_EXCLDATE, 		'Z')
@@ -3084,7 +3140,8 @@ int main(const int argc, char *argv[]) {
 					}
 				}
 DATE_NEEDED:	std::cout << "Expecting date and/or time after \""
-				<< args[i] << "\" option. Please see --help "<< args[i].substr(2) << "\n";
+							<< args[i] << "\" option. Please see --help "
+							<< args[i].substr(2) << "\n";
 			}
 			else if (isMatch(OPT_OVERWRITE, 	'O', true));
 			else if (isMatch(OPT_BENCHMARK, 	'b', true));
@@ -3106,7 +3163,8 @@ DATE_NEEDED:	std::cout << "Expecting date and/or time after \""
 						state[OPT_EXECUTION] = "Linear";
 				} else
 					std::cout << "Expecting 'thread', 'async', or 'none' after \""
-					<< args[i] << "\" option. Please see --help "<< args[i].substr(2) << "\n";
+					<< args[i] << "\" option. Please see --help "
+					<< args[i].substr(2) << "\n";
 			} else if (isMatch(OPT_EXT, 	'e')
 					   or isMatch(OPT_EXCLEXT, 'E')) {
 				if (i + 1 < args.size()) {
@@ -3114,7 +3172,8 @@ DATE_NEEDED:	std::cout << "Expecting date and/or time after \""
 					state[args[i - 1].substr(2)] = args[i] == "*.*" ? "*" : args[i];
 				} else
 					std::cout << "Expecting extension after \""
-					<< args[i] << "\" option (eg: \"mp4, mkv\"). Please see --help "<< args[i].substr(2) << "\n";
+					<< args[i] << "\" option (eg: \"mp4, mkv\"). Please see --help "
+					<< args[i].substr(2) << "\n";
 			}
 			else if (isMatch(OPT_FIXFILENAME, 	'f', false, {"fix-filename"})) {
 				if (i + 1 < args.size()) {
@@ -3127,7 +3186,8 @@ DATE_NEEDED:	std::cout << "Expecting date and/or time after \""
 					}
 				} else
 					std::cout << "Expecting file name after \""
-					<< args[i] << "\" option (eg: \"my_playlist.m3u8\"). Please see --help "<< args[i].substr(2) << "\n";
+					<< args[i] << "\" option (eg: \"my_playlist.m3u8\"). Please see --help "
+					<< args[i].substr(2) << "\n";
 			}
 			else if (isMatch(OPT_OUTDIR, 		'd')) {
 				if (i + 1 < args.size()) {
@@ -3138,7 +3198,8 @@ DATE_NEEDED:	std::cout << "Expecting date and/or time after \""
 						state[OPT_OUTDIR] += fs::path::preferred_separator;
 				} else
 					std::cout << "Expecting directory after \""
-					<< args[i] << "\" option (eg: \"Downloads/\"). Please see --help "<< args[i].substr(2) << "\n";
+					<< args[i] << "\" option (eg: \"Downloads/\"). Please see --help "
+					<< args[i].substr(2) << "\n";
 			}
 			else if (isMatch(OPT_SIZE, 			's')
 					 or isMatch(OPT_EXCLSIZE, 	'S')) {
@@ -3241,7 +3302,8 @@ DATE_NEEDED:	std::cout << "Expecting date and/or time after \""
 				}
 				else
 SIZE_NEEDED:		std::cout << "Expecting operator '<' or '>' followed\
-by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..to' Please see --help "<< OPT_SIZE << "\n";
+by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..to'\
+ Please see --help " << OPT_SIZE << "\n";
 		} else if (fs::is_directory(args[i]))
 			insertTo(&bufferDirs, std::move(fs::path(args[i])));
 		else if (fs::is_regular_file(std::move(fs::path(args[i])))) {
@@ -3502,6 +3564,10 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 	
 	const auto maxDirSize{std::max(regularDirSize, seasonDirSize)};
 
+	const auto BY_PASS {
+			state[OPT_ARRANGEMENT] == OPT_ARRANGEMENT_PERTITLE
+			or state[OPT_ARRANGEMENT] == OPT_ARRANGEMENT_ASCENDING};
+					   
 	/// Convert std::set to vector, to enable call by index subscript.
 	std::vector<std::string> regularDirs;
 	for (auto&& d : ::regularDirs) regularDirs.emplace_back(std::move(d));
@@ -3515,8 +3581,7 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 		sortFiles(&selectFiles);
 			
 	}
-	else if (state[OPT_ARRANGEMENT] == OPT_ARRANGEMENT_PERTITLE
-			 or state[OPT_ARRANGEMENT] == OPT_ARRANGEMENT_ASCENDING)
+	else if (BY_PASS)
 	{
 		for (auto&& d : seasonDirs) regularDirs.emplace_back(std::move(d));
 		seasonDirs.clear();
@@ -3568,7 +3633,6 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 	unsigned long indexFile{0};
 	unsigned long playlistCount{0};
 	std::string outExt;
-	// TODO: Capable to create .M3U .PLS or .XSPF file
 	if (state[OPT_NOOUTPUTFILE] != "true") {
 		outExt = tolower(outputName.extension().string());
 		
@@ -3580,8 +3644,8 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 		}
 		else if (outExt == ".xspf") {
 			outputFile << "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"\
-			"\t<playlist version=\"1\" xmlns=\"http://xspf.org/ns/0/\">\n"\
-			"\t\t<trackList>\n";
+			"<playlist version=\"1\" xmlns=\"http://xspf.org/ns/0/\">\n"\
+			"\t<trackList>\n";
 		}
 		else if (outExt == ".wpl")
 		{
@@ -3596,11 +3660,6 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 		}
 	}
 	
-	#if defined(_WIN32) || defined(_WIN64)
-	#define OS_NAME	"Windows"
-	#else
-	#define OS_NAME	"Linux"
-	#endif
 	auto putIntoPlaylist{ [&](const fs::path& file) {
 		auto putIt{ [&](const fs::path& file) {
 			playlistCount++;
@@ -3618,17 +3677,19 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 				#endif
 			}
 			else {
+				#if defined(_WIN32) || defined(_WIN64)
+				#define OS_NAME	"Windows"
+				#elif defined(__APPLE__)
+				#define OS_NAME	"macOS"
+				#else
+				#define OS_NAME	"Linux"
+				#endif
+
 				std::string suffix;
 				if (outExt == ".pls") {
 					outputFile << "File" << playlistCount << '=';
-					
-					#if defined(__APPLE__)
-					#define SPECIFIC_OS_NAME "macOS"
-					#else
-					#define SPECIFIC_OS_NAME IS_NAME
-					#endif
-					suffix = "Title" + std::to_string( playlistCount)
-						+ "=absolute path on " + SPECIFIC_OS_NAME;
+					suffix = "\nTitle" + std::to_string( playlistCount)
+						+ "=absolute path on " + OS_NAME;
 				}
 				else if (outExt == ".xspf") {
 					outputFile << "\t\t<track>\n\t\t\t<title>"\
@@ -3639,11 +3700,12 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 					
 				}
 				else if (outExt == ".wpl") {
-					outputFile << "<media src=\"";
-					suffix = "\" />";
+					outputFile << "\t\t\t<media src=\"";
+					suffix = "\"/>";
 				}
 				outputFile 	<< fs::absolute(file).string()
 							<< suffix << '\n';
+				#undef OS_NAME
 			}
 			#ifndef DEBUG
 			if (state[OPT_VERBOSE] == "true" or state[OPT_DEBUG] == "true")
@@ -3719,38 +3781,28 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 		}
 	}};
 					   
-	auto switchExecution{[&](const fs::path& dir, bool recursive) {
-		if (not dir.empty() and isDirNameValid(dir)) {
-			if (state[OPT_EXECUTION] == OPT_EXECUTION_THREAD)
-				threads.emplace_back([&, dir]() {
-					filterChildFiles(dir, recursive);
-				});
-			else if (state[OPT_EXECUTION] == OPT_EXECUTION_ASYNC)
-				asyncs.emplace_back(std::async(std::launch::async, [&, dir]() {
-					filterChildFiles(dir, recursive);
-				}));
-			else
-				filterChildFiles(dir, recursive);
-		}
-	}};
 					   
 	start = std::chrono::system_clock::now();
 	
-	if (state[OPT_ARRANGEMENT] == OPT_ARRANGEMENT_PERTITLE
-		or state[OPT_ARRANGEMENT] == OPT_ARRANGEMENT_ASCENDING)
-	{
-		for (auto& dir : regularDirs)
-			switchExecution(fs::path(dir), true);
-	}
-	else
-	{
-		for (auto i{0}; i<maxDirSize; ++i)
-			for (auto& x : {1, 2})
-				if (i < (x == 1 ? regularDirSize : seasonDirSize) )
-					switchExecution(fs::path(x == 1
-											 ? regularDirs[i]
-											 : seasonDirs[i]), x == 2);
-	}
+	for (auto i{0}; i<maxDirSize; ++i)
+		for (auto& x : {1, 2})
+			if (i < (x == 1 ? regularDirSize : seasonDirSize) )
+				if (auto dir { fs::path(x == 1
+								? regularDirs[i]
+								: seasonDirs[i]) };
+					
+					not dir.empty() and isDirNameValid(dir)) {
+					if (state[OPT_EXECUTION] == OPT_EXECUTION_THREAD)
+						threads.emplace_back([&, dir]() {
+							filterChildFiles(dir, BY_PASS ? true : x == 2);
+						});
+					else if (state[OPT_EXECUTION] == OPT_EXECUTION_ASYNC)
+						asyncs.emplace_back(std::async(std::launch::async, [&, dir]() {
+							filterChildFiles(dir, BY_PASS ? true : x == 2);
+						}));
+					else
+						filterChildFiles(dir, BY_PASS ? true : x == 2);
+				}
 					   
 	if (state[OPT_EXECUTION] == OPT_EXECUTION_THREAD) {
 		for (auto& t : threads)
@@ -3760,8 +3812,7 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 			a.wait();
 	}
 
-	if (state[OPT_ARRANGEMENT] == OPT_ARRANGEMENT_PERTITLE
-		or state[OPT_ARRANGEMENT] == OPT_ARRANGEMENT_ASCENDING)
+	if (BY_PASS)
 	{
 		playlistCount += selectFiles.size();
 			
@@ -3785,41 +3836,42 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 		for (auto& f : selectFiles)
 			putIntoPlaylist(std::move(f));
 	}
-	else
-	while (true) {
-		auto finish{true};
+	else {
 		std::vector<fs::path> bufferSort;
-		
-		for (auto i{0}; i < maxDirSize; ++i)
-			for (auto& indexPass : {1, 2})
-				///pass 1 for regularDirs, pass 2 for seasonDirs
-			{
-				if ((indexPass == 1 and i >= regularDirSize)
-					or (indexPass == 2 and i >= seasonDirSize))
-					continue;
-				
-				if (const auto dir{indexPass == 1 ? regularDirs[i] : seasonDirs[i]};
-					dir.empty())
-					continue;
+		while (true) {
+			auto finish{true};
+			bufferSort.clear();
+			for (auto i{0}; i < maxDirSize; ++i)
+				for (auto& indexPass : {1, 2})
+					///pass 1 for regularDirs, pass 2 for seasonDirs
+				{
+					if ((indexPass == 1 and i >= regularDirSize)
+						or (indexPass == 2 and i >= seasonDirSize))
+						continue;
+					
+					if (const auto dir{indexPass == 1 ? regularDirs[i] : seasonDirs[i]};
+						dir.empty())
+						continue;
 
-				else if (auto found { records[dir] }; found)
-					if (indexFile < found->size()) {
-						finish = false;
+					else if (auto found { records[dir] }; found)
+						if (indexFile < found->size()) {
+							finish = false;
 
-						bufferSort.emplace_back((*found)[indexFile]);
-					}
-			} //end pass loop
-		
-		if (indexFile < selectFiles.size())
-			bufferSort.emplace_back(std::move(selectFiles[indexFile]));
-		
-		indexFile += 1;
-		//if (bufferSort.size() > 1) std::sort(bufferSort.begin(), bufferSort.end());
-		for (auto& ok : bufferSort)
-			putIntoPlaylist(std::move(ok));
-		
-		if (finish and indexFile >= selectFiles.size())
-			break;
+							bufferSort.emplace_back((*found)[indexFile]);
+						}
+				} //end pass loop
+			
+			if (indexFile < selectFiles.size())
+				bufferSort.emplace_back(std::move(selectFiles[indexFile]));
+			
+			indexFile += 1;
+			//if (bufferSort.size() > 1) std::sort(bufferSort.begin(), bufferSort.end());
+			for (auto& ok : bufferSort)
+				putIntoPlaylist(std::move(ok));
+			
+			if (finish and indexFile >= selectFiles.size())
+				break;
+		}
 	}
 	
 	#ifndef DEBUG

@@ -3199,12 +3199,51 @@ int main(const int argc, char *argv[]) {
 					const auto opt { args[i].substr(2) };
 					const auto isExclude { opt == OPT_EXCLFIND };
 					i++;
-					
+					#if 0
 					parseKeyValue(&args[i], isExclude);
 					(isExclude ? listExclFind : listFind)
 						.emplace_back(state[OPT_CASEINSENSITIVE] == "true"
 									  ? tolower(args[i]) : args[i]);
 					state[opt] = "1";
+					#else
+					auto index{ -1 };
+					auto last{ 0 };
+					auto push{[&]() {
+						auto keyVal { args[i].substr(last, index) };
+						
+						parseKeyValue(&keyVal, keyVal.starts_with("exclude-"));
+						
+						if (constexpr auto EXCL {"exclude="};
+							keyVal.starts_with(EXCL))
+						{
+							auto value { keyVal.substr(std::strlen(EXCL)) };
+							if (value.find('=') != std::string::npos)
+								parseKeyValue(&value, true);
+							if (not value.empty()) {
+								(isExclude ? listExclFind : listFind)
+									.emplace_back(value);
+								state[opt] = "1";
+							}
+						} else if (not keyVal.empty()) {
+							(isExclude ? listExclFind : listFind)
+								.emplace_back(keyVal);
+							state[opt] = "1";
+						}
+					}};
+					while (++index < args[i].size()) {
+						if (std::isspace(args[i][index])) {
+							if (last != -1 and index - last > 0) {
+								push();
+								last = -1;
+							}
+							continue;
+						}
+						if (last == -1)
+							last = index;
+					}
+					if (last != -1)
+						push();
+					#endif
 				} else
 					std::cout << "Expecting keyword after \""
 					<< args[i] << "\" option. Please see --help "

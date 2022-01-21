@@ -137,8 +137,8 @@ constexpr auto OUTDIR=\
         Override output directory for playlist file.\n\
 ";
 constexpr auto EXECUTION=\
-"-c, --execution 'using'\n\
-        Specify execution, using 'thread', 'async' is default, or 'linear' to execute.\n\
+"-c, --execution [thread | async | linear]\n\
+        Specify execution, \"async\" is selected by default.\n\
 ";
 constexpr auto EXCLHIDDEN=\
 "-n, --exclude-hidden\n\

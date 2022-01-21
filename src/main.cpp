@@ -35,6 +35,7 @@ constexpr auto OPT_ARRANGEMENT_DEFAULT		{"default"};
 constexpr auto OPT_ARRANGEMENT_UNORDERED	{"unordered"};
 constexpr auto OPT_ARRANGEMENT_ASCENDING	{"ascending"};
 constexpr auto OPT_ARRANGEMENT_PERTITLE		{"per-title"};
+constexpr auto OPT_ARRANGEMENT_SHUFFLE		{"shuffle"};
 constexpr auto OPT_HELP 			{"help"};					// h
 constexpr auto OPT_VERSION 			{"version"};				// v
 constexpr auto OPT_VERBOSE 			{"verbose"};				// V
@@ -126,12 +127,13 @@ constexpr auto BENCHMARK=\
         Benchmarking execution.\n\
 ";
 constexpr auto ARRANGEMENT=\
-"-w, --arrangement [default | unordered | per-title | ascending] \n\
+"-w, --arrangement [default | unordered | per-title | ascending | shuffle] \n\
         Specifying how playlist content will be arranged.\n\
         default   : One file per Title, Title sorted ascending.\n\
         unordered : One file per Title, Title sorted unordered.\n\
         per-title : All files sorted ascending grouped per Title/Directory.\n\
         ascending : All files sorted ascending by filenames, regardless directory name order.\n\
+        shuffle   : Shuffle all files.\n\
 ";
 constexpr auto SEARCH=\
 "--search 'keywords'\n\
@@ -308,7 +310,7 @@ Thats it, -h -O -V -v -c are joined, and -c has assignment operator '=' instead 
  using separator [SPACE]. \
 Also -x -s are joined, and -x is continuing with ':' after option assignment \
 '=async' and -s has remove [SPACE] separator for operator '<' and value '1.3gb'.\n\n\
-Redefinition of option means, it will use the last option, except for options 'regex', 'exclude-regex', 'find', 'exclude-find', 'size', 'exclude-size', 'date', 'exclude-date', 'created', 'exclude-created', 'modified', 'exclude-modified', 'changed', 'exclude-changed', 'accessed', 'exclude-accessed'. For the example, \
+Redefinition of option means, it will use the last option, except for options that marked to be enable to specified multiple times. For the example, \
 this example will not use 'thread' execution at all':\n\n\
   tvplaylist -c=thread /usr/local/videos -c=none /Users/Shared/Videos\n\n\
 Note, you cannot join mnemonic option with full option, for the example:\n\n\
@@ -3125,7 +3127,8 @@ int main(const int argc, char *argv[]) {
 					   and (args[i + 1] == OPT_ARRANGEMENT_DEFAULT
 						 or args[i + 1] == OPT_ARRANGEMENT_UNORDERED
 						 or args[i + 1] == OPT_ARRANGEMENT_PERTITLE
-						 or args[i + 1] == OPT_ARRANGEMENT_ASCENDING))
+						 or args[i + 1] == OPT_ARRANGEMENT_ASCENDING
+						 or args[i + 1] == OPT_ARRANGEMENT_SHUFFLE))
 				{
 					i++;
 					state[OPT_ARRANGEMENT] = args[i];
@@ -3920,7 +3923,9 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 
 	const auto BY_PASS {
 			state[OPT_ARRANGEMENT] == OPT_ARRANGEMENT_PERTITLE
-			or state[OPT_ARRANGEMENT] == OPT_ARRANGEMENT_ASCENDING};
+			or state[OPT_ARRANGEMENT] == OPT_ARRANGEMENT_ASCENDING
+			or state[OPT_ARRANGEMENT] == OPT_ARRANGEMENT_SHUFFLE
+		};
 					   
 	if (state[OPT_ARRANGEMENT] == OPT_ARRANGEMENT_DEFAULT) {
 		std::sort(regularDirs.begin(), regularDirs.end());
@@ -3985,7 +3990,7 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 	auto dontWrite { state[OPT_NOOUTPUTFILE] == "true" };
 					   
 	std::random_device rd;  //Will be used to obtain a seed for the random number engine
-	std::mt19937 gen(rd()); //Standard mersenne_twister_engine seeded with rd()
+	std::mt19937 mersenneTwisterEngine(rd()); //Standard mersenne_twister_engine seeded with rd()
 	std::uniform_int_distribution<> distrib;
 	std::uniform_int_distribution<> distribCount;
 	unsigned long adsCount[2] {0, 0};
@@ -4077,10 +4082,10 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 				if (not listAdsDir.empty())
 					for (auto i{0}; i<(adsCount[1] == 0
 									   ? adsCount[0]
-									   : distribCount(gen));
+									   : distribCount(mersenneTwisterEngine));
 						++i, ++playlistCount)
 					{
-						auto ads { fs::absolute(listAdsDir[distrib(gen)]).string() };
+						auto ads { fs::absolute(listAdsDir[distrib(mersenneTwisterEngine)]).string() };
 						if (not dontWrite)
 							outputFile 	<< prefix << ads << suffix << '\n';
 						
@@ -4252,7 +4257,8 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 				for (auto& f : *found)
 				{
 					playlistCount++;
-					if (state[OPT_ARRANGEMENT] == OPT_ARRANGEMENT_ASCENDING)
+					if (state[OPT_ARRANGEMENT] == OPT_ARRANGEMENT_ASCENDING
+						or state[OPT_ARRANGEMENT] == OPT_ARRANGEMENT_SHUFFLE)
 						selectFiles.emplace_back(std::move(f));
 					else
 						putIntoPlaylist(std::move(f));
@@ -4261,6 +4267,8 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 	
 		if (state[OPT_ARRANGEMENT] == OPT_ARRANGEMENT_PERTITLE)
 			sortFiles(&selectFiles);
+		else if (state[OPT_ARRANGEMENT] == OPT_ARRANGEMENT_SHUFFLE)
+			std::shuffle(selectFiles.begin(), selectFiles.end(), mersenneTwisterEngine);
 		else
 			std::sort(selectFiles.begin(), selectFiles.end(), ascending);
 		for (auto& f : selectFiles)

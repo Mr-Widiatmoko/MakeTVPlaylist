@@ -43,6 +43,7 @@ constexpr auto OPT_OVERWRITE 		{"overwrite"};				// O
 constexpr auto OPT_SKIPSUBTITLE 	{"skip-subtitle"};			// x
 constexpr auto OPT_OUTDIR 			{"out-dir"};				// d
 constexpr auto OPT_ADSDIR 			{"ads-dir"};				// D
+constexpr auto OPT_ADSCOUNT			{"ads-count"};				// C
 constexpr auto OPT_EXECUTION		{"execution"};				// c
 constexpr auto OPT_EXECUTION_THREAD			{"thread"};
 constexpr auto OPT_EXECUTION_ASYNC			{"async"};
@@ -104,6 +105,15 @@ constexpr auto ADSDIR=\
 "-D, --ads-dir 'directory constains advertise'\n\
         Add advertise directory. Ads file will be inserted between each ordered files.\n\
         You can specifying this multiple times.\n\
+        To set the numbers how many ads shown use --ads-count.\n\
+";
+constexpr auto ADSCOUNT=\
+"-C, --ads-count 'fixed count'\n\
+                 'min count' .. 'max count'\n\
+                 'min count' - 'max count'\n\
+        Set the number of how many ads will be shown per insertion.\n\
+        If you set using range, then ads will be shown randomly between 'min count' to 'max count'.\n\
+        To set where the advertise directories location path, use --ads-dir.\n\
 ";
 constexpr auto VERBOSE=\
 "-V, --verbose [all | info]\n\
@@ -126,7 +136,7 @@ constexpr auto ARRANGEMENT=\
 constexpr auto SEARCH=\
 "--search 'keywords'\n\
         tvplaylist search engine.\n\
-        Equal to --no-output-file:verbose:arrangement=ascending:ignore-case\n\
+        --search is alias from --no-output-file:verbose:arrangement=ascending:ignore-case\n\
           Example:\n\
             --search \"ext=* medalion or title=medalion exclude=horse\"\n\
         You can specifying this multiple times.\n\
@@ -335,7 +345,8 @@ It will showing internal tvplaylist date time recognizer, with format \"Weekday 
 
 constexpr auto OPTS = { &OPT_VERSION, &OPT_HELP, &OPT_ARRANGEMENT,
 	&OPT_SEARCH, &OPT_VERBOSE, &OPT_BENCHMARK, & OPT_OVERWRITE,
-	&OPT_SKIPSUBTITLE, &OPT_OUTDIR, &OPT_ADSDIR, &OPT_EXECUTION, &OPT_FIXFILENAME,
+	&OPT_SKIPSUBTITLE, &OPT_OUTDIR, &OPT_ADSDIR, &OPT_ADSCOUNT,
+	&OPT_EXECUTION, &OPT_FIXFILENAME,
 	&OPT_NOOUTPUTFILE, &OPT_SIZE, &OPT_EXCLSIZE, &OPT_EXT, &OPT_EXCLEXT,
 	&OPT_FIND, &OPT_EXCLFIND, &OPT_REGEX, &OPT_EXCLREGEX, &OPT_EXCLHIDDEN,
 	
@@ -348,7 +359,8 @@ constexpr auto OPTS = { &OPT_VERSION, &OPT_HELP, &OPT_ARRANGEMENT,
 /// Conjunction with OPTS, to enable access OPTS[index] == HELPS[index]
 constexpr const char* const* HELPS[] = { &VERSION, &HELP, &ARRANGEMENT,
 	&SEARCH, &VERBOSE, &BENCHMARK, & OVERWRITE,
-	&SKIPSUBTITLE, &OUTDIR, &ADSDIR, &EXECUTION, &FIXFILENAME,
+	&SKIPSUBTITLE, &OUTDIR, &ADSDIR, &ADSCOUNT,
+	&EXECUTION, &FIXFILENAME,
 	&NOOUTPUTFILE, &SIZE, &SIZE, &EXT, &EXT,
 	&FIND, &FIND, &REGEX, &REGEX, &EXCLHIDDEN,
 	
@@ -360,8 +372,8 @@ constexpr const char* const* HELPS[] = { &VERSION, &HELP, &ARRANGEMENT,
 
 constexpr const char* const* ALL_HELPS[] = {
 	&VERSION, &HELP, &ARRANGEMENT, &SEARCH, &VERBOSE, &BENCHMARK, & OVERWRITE,
-	&SKIPSUBTITLE, &OUTDIR, &ADSDIR, &EXECUTION, &FIXFILENAME, &NOOUTPUTFILE,
-	&EXCLHIDDEN,
+	&SKIPSUBTITLE, &OUTDIR, &ADSDIR, &ADSCOUNT, &EXECUTION, &FIXFILENAME,
+	&NOOUTPUTFILE, &EXCLHIDDEN,
 	
 	&SIZE, &EXT, &FIND, &REGEX, &DATE, &CREATED, &MODIFIED, &ACCESSED, &CHANGED,
 	
@@ -555,12 +567,15 @@ func isEqual(const std::string& source,
 	return false;
 }
 
-func isInt(const std::string& s) -> bool
+func isInt(const std::string& s, int* const value = nullptr) -> bool
 {
 	int result;
 	if (auto [p, ec] = std::from_chars(s.c_str(), s.c_str()+s.size(), result);
-		ec == std::errc())
+		ec == std::errc()) {
+		if (value)
+			*value = result;
 		return true;
+	}
 	
 	return false;
 }
@@ -3055,6 +3070,44 @@ int main(const int argc, char *argv[]) {
 				std::cout << "Expecting directory path. Please see --help "
 				<< args[i].substr(2) << '\n';
 			}
+			else if (isMatch(OPT_ADSCOUNT, 'C')) {
+				if (auto push{[&] (unsigned long pos, unsigned long offset) {
+						auto lower { args[i + 1].substr(0, pos) };
+						auto upper { args[i + 1].substr(pos + offset) };
+						
+						int count[2] { 0, 0 };
+						if (isInt(lower, &count[0]) and isInt(upper, &count[1])
+							and count[0] < count[1]) {
+							state[OPT_ADSCOUNT] = lower + '-' + upper;
+							i++;
+							return true;
+						}
+						return false;
+					}};
+					i + 1 < args.size()) {
+					if (auto pos { args[i + 1].find('-') };
+							pos != std::string::npos
+						and pos != 0 and pos != args[i + 1].size() - 1)
+					{
+						if (push(pos, 1))
+							continue;
+					}
+					else if (pos = args[i + 1].find("..");
+							 pos != std::string::npos)
+					{
+						if (push(pos, 2))
+							continue;
+					}
+					else if (int value{};
+						isInt(args[i + 1], &value)) {
+						i++;
+						state[OPT_ADSCOUNT] = std::to_string(value);
+						continue;
+					}
+				}
+				std::cout << "Expecting number of advertise. Please see --help "
+				<< args[i].substr(2) << '\n';
+			}
 			else if (isMatch(OPT_NOOUTPUTFILE, 	'F', true)) {
 				if (i + 1 < args.size())
 				{
@@ -3895,7 +3948,8 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 	std::random_device rd;  //Will be used to obtain a seed for the random number engine
 	std::mt19937 gen(rd()); //Standard mersenne_twister_engine seeded with rd()
 	std::uniform_int_distribution<> distrib;
-	auto adsCount { regularDirs.size() + seasonDirs.size() };
+	std::uniform_int_distribution<> distribCount;
+	unsigned long adsCount[2] {0, 0};
 					   
 	if (state[OPT_NOOUTPUTFILE] != "true") {
 		outExt = tolower(outputName.extension().string());
@@ -3982,7 +4036,11 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 					std::cout << fullPath << '\n';
 
 				if (not listAdsDir.empty())
-					for (auto i{0}; i<adsCount; ++i, ++playlistCount) {
+					for (auto i{0}; i<(adsCount[1] == 0
+									   ? adsCount[0]
+									   : distribCount(gen));
+						++i, ++playlistCount)
+					{
 						auto ads { fs::absolute(listAdsDir[distrib(gen)]).string() };
 						if (not dontWrite)
 							outputFile 	<< prefix << ads << suffix << '\n';
@@ -4115,10 +4173,24 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 					std::move(found->begin(), found->end(),
 							  std::back_inserter(listAdsDir));
 		distrib = std::uniform_int_distribution<>(0, int(listAdsDir.size() - 1));
-		adsCount = listAdsDir.size() % adsCount == 0
-					? std::min(decltype(listAdsDir.size())(3), listAdsDir.size())
-					: listAdsDir.size() % adsCount
-					;
+			
+		if (auto count_s { state[OPT_ADSCOUNT] };
+			count_s.empty()) {
+			adsCount[0] = regularDirs.size() + seasonDirs.size();
+			adsCount[0] = listAdsDir.size() % adsCount[0] == 0
+						? std::min(decltype(listAdsDir.size())(3), listAdsDir.size())
+						: listAdsDir.size() % adsCount[0];
+		} else {
+			if (auto pos { count_s.find('-') };
+				pos == std::string::npos)
+				adsCount[0] = std::stoul(count_s);
+			else {
+				adsCount[0] = std::stoul(count_s.substr(0, pos));
+				adsCount[1] = std::stoul(count_s.substr(pos + 1));
+				distribCount = std::uniform_int_distribution<>(int(adsCount[0]),
+															   int(adsCount[1]));
+			}
+		}
 	}
 					   
 	if (BY_PASS)

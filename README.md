@@ -14,7 +14,7 @@ This is a utility to create playlist file with extension .m3u8 (by default) that
 
 ![tvplaylist on Terminal](https://raw.githubusercontent.com/Mr-Widiatmoko/MakeTVPlaylist/master/README/ScreenShot3.png "Screen shot of tvplayliston Terminal.app")
 
-For Apple Silicon, Windows, Linux, and POSIX users, you just need to compile [main.cpp](https://raw.githubusercontent.com/Mr-Widiatmoko/MakeTVPlaylist/master/src/main.cpp) using [CMakeLists.txt](https://github.com/Mr-Widiatmoko/MakeTVPlaylist/CMakeLists.txt), please see Installation. 
+For Apple Silicon, Windows, Linux, and POSIX users, you just need to compile [main.cpp](https://raw.githubusercontent.com/Mr-Widiatmoko/MakeTVPlaylist/master/src/main.cpp) using modern c++ compiler or by using [CMakeLists.txt](https://github.com/Mr-Widiatmoko/MakeTVPlaylist/CMakeLists.txt), please see Installation. 
 
 ## Contents:
 - [Release](https://github.com/Mr-Widiatmoko/MakeTVPlaylist/Release) folder contains two release binary files, that is [Make TV Playlist.workflow](https://github.com/Mr-Widiatmoko/MakeTVPlaylist/Release/Make%20TV%20Playlist.workflow.zip) and [tvplaylist](https://github.com/Mr-Widiatmoko/MakeTVPlaylist/Release/tvplaylist)(Only for macOS Intel!, others platform need to compile, see Installation).

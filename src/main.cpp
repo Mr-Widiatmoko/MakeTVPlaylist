@@ -424,47 +424,46 @@ func trim(const std::string& s) -> std::string
 enum IgnoreCase { none, both, left, right };
 
 /// Is left contains right
-func isContains(const char* const l, const char* const r, IgnoreCase ic = none)
+/// Parameters:
+/// - ignoreChar usage, for example for {'.', ' '} -> "La.la.Li" equal "La La Li"
+func isContains(const std::string& l, const std::string& r, IgnoreCase ic = none,
+				const std::pair<char, char>* const ignoreChar = nullptr)
 {
-	if (not l or not r) return std::string::npos;
-	auto szl { std::strlen(l) };
-	auto szr { std::strlen(r) };
-	
-	if (szr > szl) return std::string::npos;
+	if (r.size() > l.size()) return std::string::npos;
 	
 	unsigned k{ 0 };
 	unsigned i{ 0 };
-	if (szl > szr)
-		for (; i<szl; ++i) {
-			auto match = false;
-			switch (ic) {
-				case both:
-					match = std::tolower(l[i]) == std::tolower(r[k]);
-					break;
-				case left:
-					match = std::tolower(l[i]) == r[k];
-					break;
-				case right:
-					match = l[i] == std::tolower(r[k]);
-					break;
-				default:
-					match = l[i] == r[k];
-					break;
-			}
-			if (match and ((k == 0 and szl - i >= szr) or k > 0)) {
-				if (++k == szr)
+	if (l.size() > r.size())
+		for (; i<l.size(); ++i) {
+			auto match { ignoreChar and
+				(  (l[i] == ignoreChar->first 	and r[k] == ignoreChar->second)
+				or (l[i] == ignoreChar->second 	and r[k] == ignoreChar->first)
+				or (l[i] == ignoreChar->first 	and r[k] == ignoreChar->first)
+				or (l[i] == ignoreChar->second 	and r[k] == ignoreChar->second)
+				)};
+			if (not match)
+				switch (ic) {
+					case both:
+						match = std::tolower(l[i]) == std::tolower(r[k]);
+						break;
+					case left:
+						match = std::tolower(l[i]) == r[k];
+						break;
+					case right:
+						match = l[i] == std::tolower(r[k]);
+						break;
+					default:
+						match = l[i] == r[k];
+						break;
+				}
+			if (match and ((k == 0 and l.size() - i >= r.size()) or k > 0)) {
+				if (++k == r.size())
 					break;
 			} else
 				k = 0;
 		}
 	
-	return k == szr ? i - k + 1 : std::string::npos;
-}
-
-inline
-func isContains(const std::string& l, const std::string& r, IgnoreCase ic = none)
-{
-	return isContains(l.c_str(), r.c_str(), ic);
+	return k == r.size() ? i - k + 1 : std::string::npos;
 }
 
 func isEqual(const char* const l, const char* const r, IgnoreCase ic = none)
@@ -500,10 +499,29 @@ func isEqual(const char* const l, const char* const r, IgnoreCase ic = none)
 	return true;
 }
 
-inline
 func isEqual(const std::string& l, const std::string& r, IgnoreCase ic = none)
 {
-	return isEqual(l.c_str(), r.c_str(), ic);
+	if (l.size() != r.size()) return false;
+	
+	for (auto i{ 0 }; i<l.size(); ++i)
+		switch (ic){
+			case both:
+				if (std::tolower(l[i]) != std::tolower(r[i]))
+					return false;
+				break;
+			case left:
+				if (std::tolower(l[i]) != r[i])
+					return false;
+				break;
+			case right:
+				if (l[i] != std::tolower(r[i]))
+					return false;
+				break;
+			default:
+				if (l[i] != r[i])
+					return false;
+		}
+	return true;
 }
 
 inline
@@ -523,7 +541,7 @@ func isEqual(const std::string& source,
 			 IgnoreCase ic = none) -> bool
 {
 	for (auto& check : *args)
-		if (isEqual(source.c_str(), check.c_str(), ic))
+		if (isEqual(source, check, ic))
 			return true;
 
 	return false;
@@ -1934,13 +1952,14 @@ func isValidFile(const fs::path& path) -> bool
 	}
 	
 	if (state[OPT_EXT] not_eq "*"
-		and DEFAULT_EXT.find(std::move(tolower(tmp.extension().string()))) not_eq DEFAULT_EXT.end() /*isEqual(tmp.extension().string().c_str(), &DEFAULT_EXT, left)*/)
+		and DEFAULT_EXT.find(std::move(tolower(tmp.extension().string())))
+		== DEFAULT_EXT.end())
 		return false;
 	
 	if (state[OPT_EXCLEXT] not_eq "*"
 		and not state[OPT_EXCLEXT].empty())
-		if ( EXCLUDE_EXT.find(std::move(tolower(tmp.extension().string()))) not_eq EXCLUDE_EXT.end()
-			/*isEqual(tmp.extension().string().c_str(), &EXCLUDE_EXT, left)*/)
+		if (EXCLUDE_EXT.find(std::move(tolower(tmp.extension().string())))
+			not_eq EXCLUDE_EXT.end())
 			return false;
 	
 	if (state[OPT_DCREATED] 	not_eq ""
@@ -2120,29 +2139,6 @@ func isValidFile(const fs::path& path) -> bool
 	return /*fs::is_regular_file(tmp) and*/ true;
 }
 
-func findSubtitleFile(const fs::path& original,
-					  std::vector<fs::path>* const result)
-{
-	if (auto parentPath{original.parent_path()}; not parentPath.empty()) {
-		auto noext{excludeExtension(original)};
-		std::vector<std::string> x{".srt", ".ass", ".vtt"};
-		try {
-		for (auto& f : fs::directory_iterator(parentPath))
-			if (f.is_regular_file()
-				and f.path().string().size() >= original.string().size()
-				and f.path().string().substr(0, noext.size()) == noext
-				and isEqual(f.path().extension().string(), &x, left))
-
-				result->emplace_back(f.path());
-		} catch (fs::filesystem_error& e) {
-			#ifndef DEBUG
-			if (state[OPT_VERBOSE] == "all")
-			#endif
-				std::cout << e.what() << '\n';
-		}
-	}
-}
-
 func getAvailableFilename(const fs::path& original, const std::string& prefix = " #",
 						  const std::string& suffix = "") -> std::string
 {
@@ -2240,6 +2236,17 @@ func isDirNameValid(const fs::path& dir)
 	return false;
 }
 
+inline
+func isValid(const fs::path& path) -> bool
+{
+	return (fs::is_regular_file(path) and path.filename().string() not_eq ".DS_Store")
+	or not (((fs::status(path).permissions() & (  fs::perms::owner_read
+												| fs::perms::group_read
+												| fs::perms::others_read))
+			== fs::perms::none)
+	or (state[OPT_EXCLHIDDEN] == "true" and path.filename().string()[0] == '.')
+	);
+}
 
 func listDir(const fs::path& path, std::vector<fs::directory_entry>* const out,
 			bool sorted=true)
@@ -2254,7 +2261,7 @@ func listDir(const fs::path& path, std::vector<fs::directory_entry>* const out,
 	}
 	try {
 		for (auto& child : fs::directory_iterator(path)) {
-			if (child.path().filename() == ".DS_Store"
+			if (child.path().filename().string() == ".DS_Store"
 				//or child.is_symlink()
 				or (child.status().permissions()
 					& (fs::perms::owner_read
@@ -2263,14 +2270,18 @@ func listDir(const fs::path& path, std::vector<fs::directory_entry>* const out,
 				continue;
 			else if (child.is_symlink()) {
 				if (const auto ori { fs::read_symlink(child.path()) };
-					not ori.empty() and fs::exists(ori) and fs::is_directory(ori))
-					out->emplace_back(child);
-			} else if (not child.path().empty() and child.is_directory())
-					out->emplace_back(child);
+					ori.empty() or not fs::exists(ori) or not fs::is_directory(ori))
+					continue;
+			} else if (child.path().empty() or not child.is_directory())
+				continue;
+			
+			out->emplace_back(child);
 		}
 	} catch (fs::filesystem_error& e) {
 		#ifndef DEBUG
 		if (state[OPT_VERBOSE] == "all")
+		#else
+			std::cout << "listDir: " << path << '\n';
 		#endif
 			std::cout << e.what() << '\n';
 	}
@@ -2315,7 +2326,9 @@ func listDirRecursively(const fs::path& path,
 		/// If single dir was expanded, then expand each child dir
 		
 		for (auto& d : list)
-			if (state[OPT_EXECUTION] == OPT_EXECUTION_THREAD)
+			if (d.path().empty())
+				continue;
+			else if (state[OPT_EXECUTION] == OPT_EXECUTION_THREAD)
 				threads.emplace_back(listDir, d.path(), &list, false);
 			else if (state[OPT_EXECUTION] == OPT_EXECUTION_ASYNC)
 				asyncs.emplace_back(std::async(
@@ -2387,17 +2400,35 @@ std::vector<fs::path> regularDirs;
 std::vector<fs::path> seasonDirs;
 std::vector<fs::path> selectFiles;
 
-inline
-func isValid(const fs::path& path) -> bool
+const std::vector<std::string> SUBTITLES_EXT { ".srt", ".ass", ".vtt" };
+const std::pair<char, char> FILENAME_IGNORE_CHAR {'.', ' '};
+
+func findSubtitleFile(const fs::path& original,
+					  std::vector<fs::path>* const result)
 {
-	return not (
-	((fs::status(path).permissions() & (fs::perms::owner_read
-											| fs::perms::group_read
-											| fs::perms::others_read))
-			== fs::perms::none)
-	or (state[OPT_EXCLHIDDEN] == "true" and path.filename().string()[0] == '.')
-	);
+	if (auto parentPath{original.parent_path()}; not parentPath.empty()) {
+		auto noext{excludeExtension(original)};
+		std::vector<fs::path> list;
+		listDirRecursively(parentPath, &list);
+		try {
+			for (auto& f : list)
+				if (	isValid(f)
+					and fs::is_regular_file(f)
+					and f.string().size() >= original.string().size()
+					and isEqual(f.extension().string(), &SUBTITLES_EXT, left)
+					and isContains(f.filename().string(), noext, none, &FILENAME_IGNORE_CHAR))
+
+					result->emplace_back(f);
+		} catch (fs::filesystem_error& e) {
+			#ifndef DEBUG
+			if (state[OPT_VERBOSE] == "all")
+			#endif
+				std::cout << e.what() << '\n';
+		}
+	}
 }
+
+
 
 template <typename Container, typename T>
 func insertTo(Container* const out, const T& path)

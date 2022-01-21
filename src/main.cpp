@@ -2410,7 +2410,6 @@ func findSubtitleFile(const fs::path& original,
 		auto noext{excludeExtension(original)};
 		std::vector<fs::path> list;
 		listDirRecursively(parentPath, &list);
-		try {
 			for (auto& f : list)
 				if (	isValid(f)
 					and fs::is_regular_file(f)
@@ -2419,12 +2418,6 @@ func findSubtitleFile(const fs::path& original,
 					and isContains(f.filename().string(), noext, none, &FILENAME_IGNORE_CHAR))
 
 					result->emplace_back(f);
-		} catch (fs::filesystem_error& e) {
-			#ifndef DEBUG
-			if (state[OPT_VERBOSE] == "all")
-			#endif
-				std::cout << e.what() << '\n';
-		}
 	}
 }
 

@@ -368,25 +368,6 @@ constexpr const char* const* ALL_HELPS[] = {
 
 #define func auto
 
-func isEqual(const char* l, const char* r)
-{
-	if (not l or not r) return false;
-	auto sz1 { std::strlen(l) };
-	auto sz2 { std::strlen(r) };
-	if (sz1 != sz2) return false;
-	
-	const char* _l = l;
-	const char*_r = r;
-	while (sz1-- > 0) {
-		if (*_l != *_r)
-			return false;
-		_l++;
-		_r++;
-	}
-	return true;
-}
-
-
 func tolower(std::string s) -> std::string
 {
 	std::transform(s.begin(), s.end(), s.begin(),
@@ -440,20 +421,109 @@ func trim(const std::string& s) -> std::string
 	return s.substr(start, end);
 }
 
-func isEqual(const std::string_view& source,
-			 const std::initializer_list<const std::string_view>& list) {
+enum IgnoreCase { none, both, left, right };
+
+/// Is left contains right
+func isContains(const char* const l, const char* const r, IgnoreCase ic = none)
+{
+	if (not l or not r) return std::string::npos;
+	auto szl { std::strlen(l) };
+	auto szr { std::strlen(r) };
+	
+	if (szr > szl) return std::string::npos;
+	
+	unsigned k{ 0 };
+	unsigned i{ 0 };
+	if (szl > szr)
+		for (; i<szl; ++i) {
+			auto match = false;
+			switch (ic) {
+				case both:
+					match = std::tolower(l[i]) == std::tolower(r[k]);
+					break;
+				case left:
+					match = std::tolower(l[i]) == r[k];
+					break;
+				case right:
+					match = l[i] == std::tolower(r[k]);
+					break;
+				default:
+					match = l[i] == r[k];
+					break;
+			}
+			if (match and ((k == 0 and szl - i >= szr) or k > 0)) {
+				if (++k == szr)
+					break;
+			} else
+				k = 0;
+		}
+	
+	return k == szr ? i - k + 1 : std::string::npos;
+}
+
+inline
+func isContains(const std::string& l, const std::string& r, IgnoreCase ic = none)
+{
+	return isContains(l.c_str(), r.c_str(), ic);
+}
+
+func isEqual(const char* const l, const char* const r, IgnoreCase ic = none)
+{
+	if (not l or not r) return false;
+	auto sz1 { std::strlen(l) };
+	auto sz2 { std::strlen(r) };
+	if (sz1 != sz2) return false;
+	
+	const char* _l = l;
+	const char*_r = r;
+	while (sz1-- > 0) {
+		switch (ic){
+			case both:
+				if (std::tolower(*_l) != std::tolower(*_r))
+					return false;
+				break;
+			case left:
+				if (std::tolower(*_l) != *_r)
+					return false;
+				break;
+			case right:
+				if (*_l != std::tolower(*_r))
+					return false;
+				break;
+			default:
+				if (*_l != *_r)
+					return false;
+		}
+		_l++;
+		_r++;
+	}
+	return true;
+}
+
+inline
+func isEqual(const std::string& l, const std::string& r, IgnoreCase ic = none)
+{
+	return isEqual(l.c_str(), r.c_str(), ic);
+}
+
+inline
+func isEqual(const char* const source,
+			 const std::initializer_list<const char*>& list,
+			 IgnoreCase ic = none) {
 	for (auto& s : list) {
-		if (source == s)
+		if (isEqual(source, s, ic))
 			return true;
 	}
 	return false;
 }
-func isEqual(const std::string& source, const std::vector<std::string>* args) -> bool
+
+template <template <class ...> class Container, class ... Args>
+func isEqual(const std::string& source,
+			 const Container<std::string, Args ...>* args,
+			 IgnoreCase ic = none) -> bool
 {
 	for (auto& check : *args)
-		if (source.size() == check.size()
-			and source[1] == check[1]
-			and source == check)
+		if (isEqual(source.c_str(), check.c_str(), ic))
 			return true;
 
 	return false;
@@ -474,11 +544,7 @@ func after(const std::string& keyword,
 		   bool ignoreCase = false,
 		   bool trimResult = false) -> std::string
 {
-	unsigned long pos{0};
-	if (ignoreCase)
-		pos=tolower(source).find(keyword);
-	else
-		pos=source.find(keyword);
+	unsigned long pos{ isContains(source, keyword, ignoreCase ? left : none) };
 	
 	if (pos not_eq std::string::npos) {
 		pos += keyword.size();
@@ -579,7 +645,10 @@ func excludeExtension(const fs::path& path) -> std::string
 	return path.string().substr(0, path.string().size() - path.extension().string().size());
 }
 
-func parseExtCommaDelimited(const std::string&& literal, std::vector<std::string>* result)
+/// Automatically lower case in result
+template <template <class ...> class Container, class ... Args>
+func parseExtCommaDelimited(const std::string& literal,
+							Container<std::string, Args...>* result)
 {
 	std::string buffer;
 	for (auto& c : literal) {
@@ -590,10 +659,11 @@ func parseExtCommaDelimited(const std::string&& literal, std::vector<std::string
 				buffer.erase(buffer.begin());
 			else if (buffer[0] not_eq '.')
 				buffer.insert(buffer.begin(), '.');
-			result->emplace_back(buffer);
+			//result->emplace_back(buffer);
+			std::fill_n(std::inserter(*result, result->end()), 1, std::move(buffer));
 			buffer = "";
 		} else
-			buffer += c;
+			buffer += std::tolower(c);
 	}
 }
 
@@ -1242,15 +1312,17 @@ struct ID3
 	friend bool operator % (const ID3& l, const std::string& keyword) {
 		auto keyVal { l.parseInput(keyword) };
 		if (keyVal) {
-			if (l.isCaseInsensitive)
-				keyVal->second = tolower(keyVal->second);
-			
 			if (keyVal->first == "id3") {
 				for (auto& tag : l.tags)
-					if (tag.second.find(keyVal->second) != std::string::npos)
+					if (isContains(	tag.second, keyVal->second,
+									l.isCaseInsensitive ? both : none)
+						!= std::string::npos)
 						return true;
 			} else
-				return l.tags.at(keyVal->first).find(keyVal->second) != std::string::npos;
+				return isContains(l.tags.at(keyVal->first),
+								  keyVal->second,
+								  l.isCaseInsensitive ? both : none)
+						!= std::string::npos;
 		}
 		
 		return false;
@@ -1813,8 +1885,8 @@ public:
 };
 #undef property
 
-std::vector<std::string> EXCLUDE_EXT;
-std::vector<std::string> DEFAULT_EXT {
+std::unordered_set<std::string> EXCLUDE_EXT;
+std::unordered_set<std::string> DEFAULT_EXT { /// Could be improved using std::unordered_set
 	".mp4",  ".mkv", ".mov", ".m4v",  ".mpeg", ".mpg",  ".mts", ".ts",
 	".webm", ".flv", ".wmv", ".avi",  ".divx", ".xvid", ".dv",  ".3gp",
 	".tmvb", ".rm",  ".mpg4",".mqv",  ".ogm",  ".qt",
@@ -1842,12 +1914,12 @@ func isValidFile(const fs::path& path) -> bool
 
 	if (not state[OPT_EXCLEXT].empty() and state[OPT_EXCLEXT] not_eq "*")
 		if (not EXCLUDE_EXT_REPLACED) {
-			parseExtCommaDelimited(tolower(state[OPT_EXCLEXT]), &EXCLUDE_EXT);
+			parseExtCommaDelimited(state[OPT_EXCLEXT], &EXCLUDE_EXT);
 			EXCLUDE_EXT_REPLACED = true;
 		}
 	if (not state[OPT_EXT].empty() and state[OPT_EXT] not_eq "*")
 		if (not DEFAULT_EXT_REPLACED) {
-			parseExtCommaDelimited(tolower(state[OPT_EXT]), &DEFAULT_EXT);
+			parseExtCommaDelimited(state[OPT_EXT], &DEFAULT_EXT);
 			DEFAULT_EXT_REPLACED = true;
 		}
 	
@@ -1862,12 +1934,13 @@ func isValidFile(const fs::path& path) -> bool
 	}
 	
 	if (state[OPT_EXT] not_eq "*"
-		and not isEqual(tolower(tmp.extension().string()), &DEFAULT_EXT))
+		and DEFAULT_EXT.find(std::move(tolower(tmp.extension().string()))) not_eq DEFAULT_EXT.end() /*isEqual(tmp.extension().string().c_str(), &DEFAULT_EXT, left)*/)
 		return false;
 	
 	if (state[OPT_EXCLEXT] not_eq "*"
 		and not state[OPT_EXCLEXT].empty())
-		if (isEqual(tolower(tmp.extension().string()), &EXCLUDE_EXT))
+		if ( EXCLUDE_EXT.find(std::move(tolower(tmp.extension().string()))) not_eq EXCLUDE_EXT.end()
+			/*isEqual(tmp.extension().string().c_str(), &EXCLUDE_EXT, left)*/)
 			return false;
 	
 	if (state[OPT_DCREATED] 	not_eq ""
@@ -1964,11 +2037,10 @@ func isValidFile(const fs::path& path) -> bool
 	
 	if (not listFind.empty() or not listExclFind.empty()) // MARK: Find statement
 	{
-		auto ismp3 { tmp.extension().string() == ".mp3" };
+		auto ismp3 { isEqual(tmp.extension().string().c_str(), ".mp3", left) };
 		auto filename { excludeExtension(tmp.filename()) };
 		auto isCaseInsensitive { state[OPT_CASEINSENSITIVE] == "true" };
-		if (isCaseInsensitive)
-			filename = tolower(filename);
+		
 		ID3 id3;
 		if (ismp3)
 			id3 = ID3(tmp.string().c_str(), isCaseInsensitive);
@@ -1981,7 +2053,8 @@ func isValidFile(const fs::path& path) -> bool
 				if (not handled and ismp3 and (handled = true))
 					found = id3 % keyword;
 				
-				if (not handled and filename.find(keyword) != std::string::npos) {
+				if (not handled and isContains(filename, keyword,
+						isCaseInsensitive ? left : none) not_eq std::string::npos) {
 					found = true;
 					break;
 				}
@@ -1999,7 +2072,8 @@ func isValidFile(const fs::path& path) -> bool
 					return false;
 			}
 			
-			if (not handled and filename.find(keyword) != std::string::npos)
+			if (not handled and isContains(filename, keyword,
+						isCaseInsensitive ? left : none) not_eq std::string::npos)
 				return false;
 		}
 	}
@@ -2057,7 +2131,7 @@ func findSubtitleFile(const fs::path& original,
 			if (f.is_regular_file()
 				and f.path().string().size() >= original.string().size()
 				and f.path().string().substr(0, noext.size()) == noext
-				and isEqual(tolower(f.path().extension().string()), &x))
+				and isEqual(f.path().extension().string(), &x, left))
 
 				result->emplace_back(f.path());
 		} catch (fs::filesystem_error& e) {
@@ -2144,17 +2218,17 @@ func isDirNameValid(const fs::path& dir)
 	if (listFindDir.empty() and listExclFindDir.empty())
 		return true;
 	
-	const auto filename { state[OPT_CASEINSENSITIVE] == "true"
-		? tolower(dir.filename().string())
-		: dir.filename().string() };
-	
+	const auto filename { dir.filename().string() };
+	const auto ignoreCase { state[OPT_CASEINSENSITIVE] == "true" };
 	for (auto& keyword : listFindDir)
-		if (filename.find(keyword) != std::string::npos)
+		if (isContains(filename, keyword,
+					   ignoreCase ? left : none) not_eq std::string::npos)
 			return true;
 	
 	auto result { true };
 	for (auto& keyword : listExclFindDir)
-		if (filename.find(keyword) != std::string::npos)
+		if (isContains(filename, keyword,
+					   ignoreCase ? left : none) not_eq std::string::npos)
 		{
 			result = false;
 			break;
@@ -2412,7 +2486,7 @@ func getBytes(const std::string& s) -> uintmax_t
 	std::string unit{"mb"};
 	std::string value{s};
 	if (s.size() > 2 and std::isalpha(s[s.size() - 2])) {
-		unit = tolower(s.substr(s.size() - 2));
+		unit = s.substr(s.size() - 2);
 		value = s.substr(0, s.size() - 2);
 	}
 	
@@ -2425,10 +2499,10 @@ func getBytes(const std::string& s) -> uintmax_t
 	if (v <= 0)
 		return result;
 	
-	if (unit == "kb") {
+	if (isEqual(unit.c_str(), "kb", left)) {
 		if (v <= (INT_MAX / 1000))
 			result = v * 1000;
-	} else if (unit == "gb") {
+	} else if (isEqual(unit.c_str(), "gb", left)) {
 		if (v <= (INT_MAX / 1000000000))
 			result = v * 1000000000;
 	} else {
@@ -2446,8 +2520,8 @@ func getRange(const std::string& argv, const std::string& separator)
 	if (pos == std::string::npos)
 		return nullptr;
 	
-	auto first{tolower(argv.substr(0, pos))};
-	auto second{tolower(argv.substr(pos + separator.size()))};
+	auto first{argv.substr(0, pos)};
+	auto second{argv.substr(pos + separator.size())};
 
 	uintmax_t from{getBytes(std::move(first))};
 	from = std::max(from, static_cast<uintmax_t>(0));
@@ -2621,7 +2695,8 @@ func parseKeyValue(std::string* const s, bool isExclude) {
 	if (not s or s->empty())
 		return;
 		
-	std::string keyword, value;
+	const char* keyword = "";
+	std::string value;
 	bool isKeyValue { true };
 	for (auto& key : {"dir", OPT_EXT, OPT_EXCLEXT,
 		OPT_CASEINSENSITIVE, OPT_EXCLHIDDEN, OPT_SIZE, OPT_EXCLSIZE,
@@ -2640,8 +2715,7 @@ func parseKeyValue(std::string* const s, bool isExclude) {
 				break;
 			}
 	}
-	if (	keyword == OPT_SIZE
-			 or keyword == OPT_EXCLSIZE)
+	if (isEqual(keyword, { OPT_SIZE,OPT_EXCLSIZE}))
 	{
 		auto pos { value.find("..") };
 		auto next { 2 };
@@ -2677,7 +2751,7 @@ func parseKeyValue(std::string* const s, bool isExclude) {
 		else
 			isKeyValue = false;
 	}
-	else if (keyword == "dir")
+	else if (isEqual(keyword, "dir"))
 	{
 		if (value.empty())
 			isKeyValue = false;
@@ -2687,9 +2761,7 @@ func parseKeyValue(std::string* const s, bool isExclude) {
 			(isExclude ? listExclFindDir : listFindDir).emplace_back(value);
 		}
 	}
-	else if (   keyword == OPT_EXCLHIDDEN
-			 or keyword == OPT_EXT
-			 or keyword == OPT_EXCLEXT) {
+	else if (isEqual(keyword, {OPT_EXCLHIDDEN, OPT_EXT, OPT_EXCLEXT})) {
 		state[keyword] = value;
 	}
 	else if (isEqual(keyword, {OPT_DATE, OPT_EXCLDATE,
@@ -2705,7 +2777,7 @@ func parseKeyValue(std::string* const s, bool isExclude) {
 			   not date.isValid())
 			   isKeyValue = false;
 		   else {
-			   if (keyword == OPT_DATE) {
+			   if (isEqual(keyword, OPT_DATE)) {
 				   listDCreated.emplace_back(std::make_pair(opGt, date));
 				   listDChanged.emplace_back(std::make_pair(opGt, date));
 				   listDModified.emplace_back(std::make_pair(opGt, date));
@@ -2714,7 +2786,7 @@ func parseKeyValue(std::string* const s, bool isExclude) {
 				   state[OPT_DMODIFIED] = "1";
 				   state[OPT_DACCESSED] = "1";
 				   state[OPT_DCHANGED]  = "1";
-			   } else if (keyword == OPT_EXCLDATE) {
+			   } else if (isEqual(keyword, OPT_EXCLDATE)) {
 				   listDExclCreated.emplace_back(std::make_pair(opGt, date));
 				   listDExclChanged.emplace_back(std::make_pair(opGt, date));
 				   listDExclModified.emplace_back(std::make_pair(opGt, date));
@@ -2724,13 +2796,13 @@ func parseKeyValue(std::string* const s, bool isExclude) {
 				   state[OPT_DEXCLACCESSED] = "1";
 				   state[OPT_DEXCLCHANGED]  = "1";
 			   } else {
-				 (keyword == OPT_DCREATED ? listDCreated
-				: keyword == OPT_DCHANGED ? listDChanged
-				: keyword == OPT_DMODIFIED ? listDModified
-				: keyword == OPT_DACCESSED ? listDAccessed
-				: keyword == OPT_DEXCLCREATED ? listDExclCreated
-				: keyword == OPT_DEXCLCHANGED ? listDExclChanged
-				: keyword == OPT_DEXCLMODIFIED ? listDExclModified
+				 (isEqual(keyword, OPT_DCREATED) ? listDCreated
+				: isEqual(keyword, OPT_DCHANGED) ? listDChanged
+				: isEqual(keyword, OPT_DMODIFIED) ? listDModified
+				: isEqual(keyword, OPT_DACCESSED) ? listDAccessed
+				: isEqual(keyword, OPT_DEXCLCREATED) ? listDExclCreated
+				: isEqual(keyword, OPT_DEXCLCHANGED) ? listDExclChanged
+				: isEqual(keyword, OPT_DEXCLMODIFIED) ? listDExclModified
 				: listDExclAccessed
 				).emplace_back(std::make_pair(opGt, date));
 
@@ -2766,7 +2838,7 @@ func parseKeyValue(std::string* const s, bool isExclude) {
 					   not upper.isValid() or lower > upper)
 					   isKeyValue = false;
 				   else {
-					   if (keyword == OPT_DATE) {
+					   if (isEqual(keyword, OPT_DATE)) {
 						   listDCreatedR.emplace_back(std::make_pair(lower, upper));
 						   listDChangedR.emplace_back(std::make_pair(lower, upper));
 						   listDModifiedR.emplace_back(std::make_pair(lower, upper));
@@ -2775,7 +2847,7 @@ func parseKeyValue(std::string* const s, bool isExclude) {
 						   state[OPT_DMODIFIED] = "1";
 						   state[OPT_DACCESSED] = "1";
 						   state[OPT_DCHANGED]  = "1";
-					   } else if (keyword == OPT_EXCLDATE) {
+					   } else if (isEqual(keyword, OPT_EXCLDATE)) {
 						   listDExclCreatedR.emplace_back(std::make_pair(lower, upper));
 						   listDExclChangedR.emplace_back(std::make_pair(lower, upper));
 						   listDExclModifiedR.emplace_back(std::make_pair(lower, upper));
@@ -2785,13 +2857,13 @@ func parseKeyValue(std::string* const s, bool isExclude) {
 						   state[OPT_DEXCLACCESSED] = "1";
 						   state[OPT_DEXCLCHANGED]  = "1";
 					   } else {
-							 (keyword == OPT_DCREATED ? listDCreatedR
-							: keyword == OPT_DCHANGED ? listDChangedR
-							: keyword == OPT_DMODIFIED ? listDModifiedR
-							: keyword == OPT_DACCESSED ? listDAccessedR
-							: keyword == OPT_DEXCLCREATED ? listDExclCreatedR
-							: keyword == OPT_DEXCLCHANGED ? listDExclChangedR
-							: keyword == OPT_DEXCLMODIFIED ? listDExclModifiedR
+							 (isEqual(keyword, OPT_DCREATED) ? listDCreatedR
+							: isEqual(keyword, OPT_DCHANGED) ? listDChangedR
+							: isEqual(keyword, OPT_DMODIFIED) ? listDModifiedR
+							: isEqual(keyword, OPT_DACCESSED) ? listDAccessedR
+							: isEqual(keyword, OPT_DEXCLCREATED) ? listDExclCreatedR
+							: isEqual(keyword, OPT_DEXCLCHANGED) ? listDExclChangedR
+							: isEqual(keyword, OPT_DEXCLMODIFIED) ? listDExclModifiedR
 							: listDExclAccessedR
 							).emplace_back(std::make_pair(lower, upper));
 						   state[keyword] = "1";
@@ -2801,9 +2873,9 @@ func parseKeyValue(std::string* const s, bool isExclude) {
 		   }
 	   }
    }
-   else if (not keyword.empty()) {
+   else if (0 != std::strlen(keyword)) {
 		state[OPT_CASEINSENSITIVE] = value;
-		if (tolower(value) == "true") {
+		if (isEqual(value, "true", left)) {
 			for (auto& k : listFindDir) k = tolower(k);
 			for (auto& k : listExclFindDir) k = tolower(k);
 			for (auto& k : listFind) k = tolower(k);
@@ -2811,7 +2883,7 @@ func parseKeyValue(std::string* const s, bool isExclude) {
 		}
 	}
 	
-	if (isKeyValue and not keyword.empty())
+	if (isKeyValue and 0 != std::strlen(keyword))
 		s->insert(0, 1, char(1));
 }
 #undef func
@@ -2853,12 +2925,12 @@ int main(const int argc, char *argv[]) {
 				and args[i][0] == '-'
 				and args[i][1] == '-')
 			{
-				auto lower { tolower(args[i].substr(2)) };
-				result = lower == with;
+				auto lower { args[i].substr(2) };
+				result = isEqual(lower, with, left);
 				
 				if (not result)
 					for (auto& other : others)
-						if (lower == other)
+						if (isEqual(lower, other, left))
 						{
 							result = true;
 							break;
@@ -2898,13 +2970,17 @@ int main(const int argc, char *argv[]) {
 					state[OPT_DEBUG] = args[i];
 					if (args[i] == "id3")
 					{
-						if (i + 2 == args.size() and tolower(fs::path(args[i + 1]).extension().string()) == ".mp3")
+						if (i + 2 == args.size() and isEqual(
+							fs::path(args[i + 1]).extension().string().c_str(),
+							".mp3", left))
 						{
 							ID3 id3(args[i + 1].c_str());
 							std::cout << id3.string() << '\n';
 							i++;
 						}
-						else if (i + 3 < args.size() and tolower(fs::path(args[i + 3]).extension().string()) == ".mp3")
+						else if (i + 3 < args.size() and isEqual(
+							fs::path(args[i + 3]).extension().string().c_str(),
+							".mp3", left))
 						{
 							ID3 id3(args[i + 3].c_str());
 							std::cout << id3.string() << '\n';
@@ -2940,10 +3016,9 @@ int main(const int argc, char *argv[]) {
 				if (i + 1 < args.size())
 				{
 					i++;
-					if (auto next { tolower(args[i + 1]) };
-						next == "true" or next == "yes")
+					if (isEqual(args[i + 1].c_str(), {"true", "yes"}, left))
 						state[OPT_NOOUTPUTFILE] = "true";
-					else if (next == "false" or next == "no")
+					else if (isEqual(args[i + 1].c_str(), {"false", "no"}, left))
 						state[OPT_NOOUTPUTFILE] = "false";
 					else
 						i--;
@@ -3041,9 +3116,8 @@ int main(const int argc, char *argv[]) {
 			}
 			else if (isMatch(OPT_REGEXSYNTAX, 	'X')) {
 				if (auto found{ false }; i + 1 < args.size()) {
-					for (auto arg { tolower(args[i + 1]) };
-						 auto& s : {"ecma", "basic", "extended", "awk", "grep", "egrep"})
-						if (s == arg) {
+					for (auto& s : {"ecma", "basic", "extended", "awk", "grep", "egrep"})
+						if (isEqual(args[i + 1].c_str(), s, left)) {
 							state[OPT_REGEXSYNTAX] = s;
 							i++;
 							found = true;
@@ -3541,9 +3615,10 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 		<< LABEL(OPT_SKIPSUBTITLE) << PRINT_OPT(state[OPT_SKIPSUBTITLE]) << '\n';
 	{
 		std::cout << LABEL(OPT_EXT) << state[OPT_EXT];
-		if (state[OPT_EXT].empty())
-			for (auto i{0}; i<DEFAULT_EXT.size(); ++i)
-				std::cout << DEFAULT_EXT[i] << (i < DEFAULT_EXT.size() - 1 ? ", " : "");
+		if (auto i{0};
+			state[OPT_EXT].empty())
+			for (auto& ext : DEFAULT_EXT)
+				std::cout << ext << (++i < DEFAULT_EXT.size() - 1 ? ", " : "");
 		std::cout << '\n';
 	}
 	std::cout << LABEL("case-insensitive") << PRINT_OPT(state[OPT_CASEINSENSITIVE]) << '\n';

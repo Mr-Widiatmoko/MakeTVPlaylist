@@ -27,6 +27,7 @@
 #include <clocale>
 #include <sys/stat.h> // TODO: I dont know in Windows, should change to use FileAttribute?
 #include <fstream>
+#include <random>
 
 std::unordered_map<std::string, std::string> state;
 constexpr auto OPT_ARRANGEMENT 		{"arrangement"};			// w
@@ -41,6 +42,7 @@ constexpr auto OPT_BENCHMARK 		{"benchmark"};				// b
 constexpr auto OPT_OVERWRITE 		{"overwrite"};				// O
 constexpr auto OPT_SKIPSUBTITLE 	{"skip-subtitle"};			// x
 constexpr auto OPT_OUTDIR 			{"out-dir"};				// d
+constexpr auto OPT_ADSDIR 			{"ads-dir"};				// D
 constexpr auto OPT_EXECUTION		{"execution"};				// c
 constexpr auto OPT_EXECUTION_THREAD			{"thread"};
 constexpr auto OPT_EXECUTION_ASYNC			{"async"};
@@ -80,7 +82,7 @@ constexpr auto OPT_DEXCLMODIFIED	{"exclude-modified"};		// M
 constexpr auto OPT_DEXCLACCESSED	{"exclude-accessed"};		// A
 constexpr auto OPT_DEXCLCHANGED		{"exclude-changed"};		// G
 
-constexpr auto OPT_DEBUG			{"debug"};                  // D
+constexpr auto OPT_DEBUG			{"debug"};                  // B
 
 constexpr auto VERSION=\
 "tvplaylist version 1.1 (Early 2022)\nTM and (C) 2022 Widiatmoko. \
@@ -97,6 +99,11 @@ Option:\n\
         Display options description.\n\
 -v, --version\n\
         Display version.\n\
+";
+constexpr auto ADSDIR=\
+"-D, --ads-dir 'directory constains advertise'\n\
+        Add advertise directory. Ads file will be inserted between each ordered files.\n\
+        You can specifying this multiple times.\n\
 ";
 constexpr auto VERBOSE=\
 "-V, --verbose [all | info]\n\
@@ -328,7 +335,7 @@ It will showing internal tvplaylist date time recognizer, with format \"Weekday 
 
 constexpr auto OPTS = { &OPT_VERSION, &OPT_HELP, &OPT_ARRANGEMENT,
 	&OPT_SEARCH, &OPT_VERBOSE, &OPT_BENCHMARK, & OPT_OVERWRITE,
-	&OPT_SKIPSUBTITLE, &OPT_OUTDIR, &OPT_EXECUTION, &OPT_FIXFILENAME,
+	&OPT_SKIPSUBTITLE, &OPT_OUTDIR, &OPT_ADSDIR, &OPT_EXECUTION, &OPT_FIXFILENAME,
 	&OPT_NOOUTPUTFILE, &OPT_SIZE, &OPT_EXCLSIZE, &OPT_EXT, &OPT_EXCLEXT,
 	&OPT_FIND, &OPT_EXCLFIND, &OPT_REGEX, &OPT_EXCLREGEX, &OPT_EXCLHIDDEN,
 	
@@ -341,7 +348,7 @@ constexpr auto OPTS = { &OPT_VERSION, &OPT_HELP, &OPT_ARRANGEMENT,
 /// Conjunction with OPTS, to enable access OPTS[index] == HELPS[index]
 constexpr const char* const* HELPS[] = { &VERSION, &HELP, &ARRANGEMENT,
 	&SEARCH, &VERBOSE, &BENCHMARK, & OVERWRITE,
-	&SKIPSUBTITLE, &OUTDIR, &EXECUTION, &FIXFILENAME,
+	&SKIPSUBTITLE, &OUTDIR, &ADSDIR, &EXECUTION, &FIXFILENAME,
 	&NOOUTPUTFILE, &SIZE, &SIZE, &EXT, &EXT,
 	&FIND, &FIND, &REGEX, &REGEX, &EXCLHIDDEN,
 	
@@ -353,7 +360,8 @@ constexpr const char* const* HELPS[] = { &VERSION, &HELP, &ARRANGEMENT,
 
 constexpr const char* const* ALL_HELPS[] = {
 	&VERSION, &HELP, &ARRANGEMENT, &SEARCH, &VERBOSE, &BENCHMARK, & OVERWRITE,
-	&SKIPSUBTITLE, &OUTDIR, &EXECUTION, &FIXFILENAME, &NOOUTPUTFILE, &EXCLHIDDEN,
+	&SKIPSUBTITLE, &OUTDIR, &ADSDIR, &EXECUTION, &FIXFILENAME, &NOOUTPUTFILE,
+	&EXCLHIDDEN,
 	
 	&SIZE, &EXT, &FIND, &REGEX, &DATE, &CREATED, &MODIFIED, &ACCESSED, &CHANGED,
 	
@@ -2924,6 +2932,7 @@ int main(const int argc, char *argv[]) {
 #endif
 
 	std::vector<fs::path> bufferDirs;
+	std::vector<fs::path> listAdsDir;
 
 	state[OPT_SIZEOPGT] = '\0';
 	state[OPT_SIZE] 	= "0";
@@ -2985,7 +2994,7 @@ int main(const int argc, char *argv[]) {
 				if (i + 1 == args.size())
 					return RETURN_VALUE
 			}
-			else if (isMatch(OPT_DEBUG, 		'D', true)) {
+			else if (isMatch(OPT_DEBUG, 		'B', true)) {
 				if (i + 1 < args.size() and
 					(args[i + 1] == "args" or args[i + 1] == "id3"
 					 or args[i + 1] == "date"))
@@ -3035,6 +3044,16 @@ int main(const int argc, char *argv[]) {
 
 					}
 				}
+			}
+			else if (isMatch(OPT_ADSDIR, 'D')) {
+				if (i + 1 < args.size() and fs::exists(args[i + 1])) {
+					i++;
+					listAdsDir.emplace_back(fs::path(args[i]));
+					continue;
+				}
+				
+				std::cout << "Expecting directory path. Please see --help "
+				<< args[i].substr(2) << '\n';
 			}
 			else if (isMatch(OPT_NOOUTPUTFILE, 	'F', true)) {
 				if (i + 1 < args.size())
@@ -3716,7 +3735,14 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 			
 			std::cout  << (i < (inputDirsCount + selectFiles.size()) - 1 ? ", " : "");
 		}
-	std::cout << "\n\n";
+	std::cout << "\n";
+	
+	std::cout << LABEL("Advertise");
+	auto i { -1 };
+	for (i++; auto& d : listAdsDir)
+		std::cout << d.string() << (i < listAdsDir.size() - 1 ? ", " : "\n");
+			
+	std::cout << "\n";
 	#undef LABEL
 	} // END Info
 					   
@@ -3746,6 +3772,20 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 
 	std::vector<std::thread> threads;
 	std::vector<std::future<void>> asyncs;
+					   
+	{
+		std::vector<fs::path> list = std::move(listAdsDir);
+		
+		for (auto& child : list)
+			if (state[OPT_EXECUTION] == OPT_EXECUTION_THREAD)
+				threads.emplace_back([&]() {
+					listDirRecursively(child, &listAdsDir); });
+			else if (state[OPT_EXECUTION] == OPT_EXECUTION_ASYNC)
+				asyncs.emplace_back(std::async(std::launch::async, [&]() {
+					listDirRecursively(child, &listAdsDir); }));
+			else
+				listDirRecursively(child, &listAdsDir);
+	}
 	
 	for (bool isByPass {state[OPT_ARRANGEMENT] == OPT_ARRANGEMENT_ASCENDING};
 		 auto& child : bufferDirs)
@@ -3847,6 +3887,16 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 	unsigned long indexFile{0};
 	unsigned long playlistCount{0};
 	std::string outExt;
+	#ifndef DEBUG
+	auto isVerbose { state[OPT_VERBOSE] == "true" or state[OPT_DEBUG] == "true" };
+	#endif
+	auto dontWrite { state[OPT_NOOUTPUTFILE] == "true" };
+					   
+	std::random_device rd;  //Will be used to obtain a seed for the random number engine
+	std::mt19937 gen(rd()); //Standard mersenne_twister_engine seeded with rd()
+	std::uniform_int_distribution<> distrib;
+	auto adsCount { regularDirs.size() + seasonDirs.size() };
+					   
 	if (state[OPT_NOOUTPUTFILE] != "true") {
 		outExt = tolower(outputName.extension().string());
 		
@@ -3877,7 +3927,7 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 	auto putIntoPlaylist{ [&](const fs::path& file) {
 		auto putIt{ [&](const fs::path& file) {
 			playlistCount++;
-			if (state[OPT_NOOUTPUTFILE] == "true") {
+			if (dontWrite) {
 				#if MAKE_LIB
 				if (outc)
 					*outc += 1;
@@ -3890,7 +3940,8 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 					std::strcpy(outs[playlistCount - 1], fs::absolute(file).string().c_str());
 				#endif
 			}
-			else {
+			
+			{
 				#if defined(_WIN32) || defined(_WIN64)
 				#define OS_NAME	"Windows"
 				#elif defined(__APPLE__)
@@ -3899,32 +3950,49 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 				#define OS_NAME	"Linux"
 				#endif
 
+				const auto fullPath { fs::absolute(file).string() };
+				std::string prefix;
 				std::string suffix;
-				if (outExt == ".pls") {
-					outputFile << "File" << playlistCount << '=';
-					suffix = "\nTitle" + std::to_string( playlistCount)
-						+ "=absolute path on " + OS_NAME;
-				}
-				else if (outExt == ".xspf") {
-					outputFile << "\t\t<track>\n\t\t\t<title>"\
-								OS_NAME\
-								" Path</title>\n"\
-								"\t\t\t<location>file://";
-					suffix = "</location>\n\t\t</track>";
+				if (not dontWrite) {
+					if (outExt == ".pls") {
+						prefix = "File" + std::to_string(playlistCount) + '=';
+						suffix = "\nTitle" + std::to_string( playlistCount)
+							+ "=absolute path on " + OS_NAME;
+					}
+					else if (outExt == ".xspf") {
+						prefix = "\t\t<track>\n\t\t\t<title>"\
+									OS_NAME\
+									" Path</title>\n"\
+									"\t\t\t<location>file://";
+						suffix = "</location>\n\t\t</track>";
+						
+					}
+					else if (outExt == ".wpl") {
+						prefix = "\t\t\t<media src=\"";
+						suffix = "\"/>";
+					}
 					
+					outputFile 	<< prefix << fullPath << suffix << '\n';
 				}
-				else if (outExt == ".wpl") {
-					outputFile << "\t\t\t<media src=\"";
-					suffix = "\"/>";
-				}
-				outputFile 	<< fs::absolute(file).string()
-							<< suffix << '\n';
 				#undef OS_NAME
+				
+				#ifndef DEBUG
+				if (isVerbose)
+				#endif
+					std::cout << fullPath << '\n';
+
+				if (not listAdsDir.empty())
+					for (auto i{0}; i<adsCount; ++i, ++playlistCount) {
+						auto ads { fs::absolute(listAdsDir[distrib(gen)]).string() };
+						if (not dontWrite)
+							outputFile 	<< prefix << ads << suffix << '\n';
+						
+						#ifndef DEBUG
+						if (isVerbose)
+						#endif
+							std::cout << ads << '\n';
+					}
 			}
-			#ifndef DEBUG
-			if (state[OPT_VERBOSE] == "true" or state[OPT_DEBUG] == "true")
-			#endif
-				std::cout << fs::absolute(file).string() << '\n';
 		}};
 		
 		putIt(file);
@@ -3999,6 +4067,22 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 					   
 	start = std::chrono::system_clock::now();
 	
+	{
+		for (auto& dir : listAdsDir)
+			if (not dir.empty() and isDirNameValid(dir)) {
+				if (state[OPT_EXECUTION] == OPT_EXECUTION_THREAD)
+					threads.emplace_back([&, dir]() {
+						filterChildFiles(dir, false);
+					});
+				else if (state[OPT_EXECUTION] == OPT_EXECUTION_ASYNC)
+					asyncs.emplace_back(std::async(std::launch::async, [&, dir]() {
+						filterChildFiles(dir, false);
+					}));
+				else
+					filterChildFiles(dir, false);
+			}
+	}
+					   
 	for (auto i{0}; i<maxDirSize; ++i)
 		for (auto& x : {1, 2})
 			if (i < (x == 1 ? regularDirs.size() : seasonDirs.size()) )
@@ -4023,6 +4107,20 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 		for (auto& a : asyncs)
 			a.wait();
 
+	if (not listAdsDir.empty()) {
+		std::vector<fs::path> list = std::move(listAdsDir);
+		for (auto& dir : list)
+			if (not dir.empty())
+				if (const auto found { records[dir] }; found)
+					std::move(found->begin(), found->end(),
+							  std::back_inserter(listAdsDir));
+		distrib = std::uniform_int_distribution<>(0, int(listAdsDir.size() - 1));
+		adsCount = listAdsDir.size() % adsCount == 0
+					? std::min(decltype(listAdsDir.size())(3), listAdsDir.size())
+					: listAdsDir.size() % adsCount
+					;
+	}
+					   
 	if (BY_PASS)
 	{
 		for (auto& d : seasonDirs)

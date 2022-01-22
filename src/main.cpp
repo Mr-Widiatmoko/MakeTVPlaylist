@@ -30,6 +30,7 @@
 #include <random>
 
 std::unordered_map<std::string, std::string> state;
+constexpr auto OPT_LOAD				{"load-config"};			// L
 constexpr auto OPT_ARRANGEMENT 		{"arrangement"};			// w
 constexpr auto OPT_ARRANGEMENT_DEFAULT		{"default"};
 constexpr auto OPT_ARRANGEMENT_UNORDERED	{"unordered"};
@@ -86,6 +87,20 @@ constexpr auto OPT_DEXCLCHANGED		{"exclude-changed"};		// G
 
 constexpr auto OPT_DEBUG			{"debug"};                  // B
 
+constexpr auto LOAD=\
+"-L, --load-config 'fullpath'\n\
+        Load configuration from custom file.\n\
+        By default on Windows located in \"C:\\ProgramData\\tvplaylist.conf\".\n\
+        Other platfom located in \"/usr/local/etc/tvplaylist.conf\".\n\
+        If config file exist in default location, then it will be automatic loaded.\n\
+        Content of configuration is list of options (with/without \"--\") separated by new line.\n\
+        Example:\n\
+            /* Multi lines\n\
+               comment */\n\
+            // Single line Comment\n\
+            ads-dir   = \"D:\\Videos\\Funny Advertise Collections\"\n\
+            ads-count = 2-10 # Single line Comment\n\
+";
 constexpr auto VERSION=\
 "tvplaylist version 1.1 (Early 2022)\nTM and (C) 2022 Widiatmoko. \
 All Rights Reserved. License and Warranty\n";
@@ -348,7 +363,7 @@ It will showing internal tvplaylist date time recognizer, with format \"Weekday 
 constexpr auto OPTS = { &OPT_VERSION, &OPT_HELP, &OPT_ARRANGEMENT,
 	&OPT_SEARCH, &OPT_VERBOSE, &OPT_BENCHMARK, & OPT_OVERWRITE,
 	&OPT_SKIPSUBTITLE, &OPT_OUTDIR, &OPT_ADSDIR, &OPT_ADSCOUNT,
-	&OPT_EXECUTION, &OPT_FIXFILENAME,
+	&OPT_EXECUTION, &OPT_LOAD, &OPT_FIXFILENAME,
 	&OPT_NOOUTPUTFILE, &OPT_SIZE, &OPT_EXCLSIZE, &OPT_EXT, &OPT_EXCLEXT,
 	&OPT_FIND, &OPT_EXCLFIND, &OPT_REGEX, &OPT_EXCLREGEX, &OPT_EXCLHIDDEN,
 	
@@ -362,7 +377,7 @@ constexpr auto OPTS = { &OPT_VERSION, &OPT_HELP, &OPT_ARRANGEMENT,
 constexpr const char* const* HELPS[] = { &VERSION, &HELP, &ARRANGEMENT,
 	&SEARCH, &VERBOSE, &BENCHMARK, & OVERWRITE,
 	&SKIPSUBTITLE, &OUTDIR, &ADSDIR, &ADSCOUNT,
-	&EXECUTION, &FIXFILENAME,
+	&EXECUTION, &LOAD, &FIXFILENAME,
 	&NOOUTPUTFILE, &SIZE, &SIZE, &EXT, &EXT,
 	&FIND, &FIND, &REGEX, &REGEX, &EXCLHIDDEN,
 	
@@ -373,7 +388,7 @@ constexpr const char* const* HELPS[] = { &VERSION, &HELP, &ARRANGEMENT,
 };
 
 constexpr const char* const* ALL_HELPS[] = {
-	&VERSION, &HELP, &ARRANGEMENT, &SEARCH, &VERBOSE, &BENCHMARK, & OVERWRITE,
+	&VERSION, &HELP, &LOAD, &ARRANGEMENT, &SEARCH, &VERBOSE, &BENCHMARK, & OVERWRITE,
 	&SKIPSUBTITLE, &OUTDIR, &ADSDIR, &ADSCOUNT, &EXECUTION, &FIXFILENAME,
 	&NOOUTPUTFILE, &EXCLHIDDEN,
 	
@@ -2935,6 +2950,121 @@ func parseKeyValue(std::string* const s, bool isExclude) {
 	if (isKeyValue and 0 != std::strlen(keyword))
 		s->insert(0, 1, char(1));
 }
+
+func loadConfig(std::vector<std::string>* const args)
+{
+	if (state[OPT_LOAD].empty()
+		or not fs::exists(state[OPT_LOAD])
+		or not fs::is_regular_file(state[OPT_LOAD]))
+		return;
+	
+	std::ifstream file(state[OPT_LOAD], std::ios::in);
+	char c;
+	
+	file.seekg(0);
+	std::vector<std::string> lines;
+	std::string buff;
+	auto push{[&]() {
+		if (buff.empty())
+			return;
+		lines.emplace_back(buff);
+		buff.clear();
+	}};
+	auto isComment{ false };
+	auto commentCount { 0 };
+	while ((c = file.get()) and not file.eof()) {
+		if (c == 0x0a or c == 0x0d)
+			push();
+		else if (isComment)
+			continue;
+		else if (commentCount > 0) {
+			if (c == '*' and file.peek() == '/') {
+				file.get();
+				commentCount--;
+			}
+			continue;
+		}
+		else if (buff.empty() and c == std::isspace(c))
+			continue;
+		else if (auto peek { file.peek() };
+				 c == '/' and (peek == '/' or peek == '*')) {
+			if (peek == '*')
+				commentCount++;
+			push();
+			isComment = true;
+			file.get();
+			continue;
+		}
+		else if (c == '#') {
+			isComment = true;
+			push();
+		}
+		else {
+			if (buff.empty() and c == '-' and file.peek() == '-') {
+				file.get();
+				continue;
+			}
+			buff += c;
+		}
+	}
+	push();
+	file.close();
+	
+	for (auto& line : lines) {
+		for (const char* const *const opt : OPTS)
+			if (line.starts_with(*opt)) {
+				state[*opt] = "";
+				if (args)
+					args->emplace_back("--" + std::string(*opt));
+				
+				if (auto col{ line.find('=') };
+					col == std::string::npos) {
+					state[*opt] = "true";
+					if (args)
+						args->emplace_back("true");
+				}
+				else {
+					col++;
+					
+					while (++col < line.size() and std::isspace(line[col]))
+						;
+					
+					if (col < line.size()) {
+						auto value { line.substr(col) };
+						
+						std::vector<unsigned> puncs;
+						for (unsigned i{ 0 }; i<value.size(); ++i)
+							if (value[i] == '"')
+								puncs.emplace_back(i);
+						
+						if (value[0] == '"' and puncs.size() % 2 == 0 and puncs.size() > 2) {
+							state[*opt] = "1";
+							if (args)
+								for (unsigned k{ 0 }; k<puncs.size(); k += 2)
+								{
+									std::string sub;
+									for (auto j{puncs[k] + 1}; j<puncs[k + 1]; j++)
+										sub += value[j];
+									// MARK: C++ Library BUG! value.substr(puncs[k] + 1, puncs[k + 1] - 1)
+									args->emplace_back(sub);
+								}
+							break;
+						}
+						else if (value[0] == '"' and *(value.end() - 1) == '"') {
+							value.erase(0, 1);
+							value.erase(value.end() - 1, value.end());
+						}
+
+						state[*opt] = value;
+						if (args)
+							args->emplace_back(value);
+					}
+				}
+				
+				break;
+			}
+	}
+}
 #undef func
 
 #if MAKE_LIB
@@ -2959,11 +3089,21 @@ int main(const int argc, char *argv[]) {
 	state[OPT_EXECUTION]= OPT_EXECUTION_ASYNC;
 	state[OPT_REGEXSYNTAX] = "ecma";
 	state[OPT_ARRANGEMENT] = OPT_ARRANGEMENT_DEFAULT;
-	
+		
 	std::vector<std::string> args;
 	expandArgs(argc, argv, ARGS_START_INDEX, &args);
-	
+
 	std::unordered_set<std::string_view> invalidArgs;
+	
+	#if defined(_WIN32) || defined(_WIN64)
+	#define CONFIG_PATH	"C:\\ProgramData\\tvplaylist.conf"
+	#else
+	#define CONFIG_PATH	"/usr/local/etc/tvplaylist.conf"
+	#endif
+	state[OPT_LOAD] = CONFIG_PATH ;
+	#undef CONFIG_PATH
+	loadConfig(&args);
+
 
 	for (int i{0}; i<args.size(); ++i) {
 		if (auto isMatch{ [&](const char* const with,
@@ -3062,6 +3202,17 @@ int main(const int argc, char *argv[]) {
 					}
 				}
 			}
+			else if (isMatch(OPT_LOAD, 'L')) {
+				if (i + 1 < args.size() and fs::exists(args[i + 1])) {
+					i++;
+					state[OPT_LOAD] = args[i];
+					loadConfig(&args);
+					continue;
+				}
+				
+				std::cout << "Expecting config file path. Please see --help "
+				<< args[i].substr(2) << '\n';
+			}
 			else if (isMatch(OPT_ADSDIR, 'D')) {
 				if (i + 1 < args.size() and fs::exists(args[i + 1])) {
 					i++;
@@ -3086,7 +3237,9 @@ int main(const int argc, char *argv[]) {
 						}
 						return false;
 					}};
-					i + 1 < args.size()) {
+					
+					i + 1 < args.size())
+				{
 					if (auto pos { args[i + 1].find('-') };
 							pos != std::string::npos
 						and pos != 0 and pos != args[i + 1].size() - 1)
@@ -4086,6 +4239,16 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 									   : distribCount(mersenneTwisterEngine));
 						++i, ++playlistCount)
 					{
+						if (outExt == ".pls") {
+							prefix = "File" + std::to_string(playlistCount) + '=';
+							suffix = "\nTitle" + std::to_string( playlistCount)
+								+ "=Ads";
+						}
+						else if (outExt == ".xspf") {
+							prefix = "\t\t<track>\n\t\t\t<title>"\
+										"Ads</title>\n"\
+										"\t\t\t<location>file://";
+						}
 						auto ads { fs::absolute(listAdsDir[distrib(mersenneTwisterEngine)]).string() };
 						if (not dontWrite)
 							outputFile 	<< prefix << ads << suffix << '\n';

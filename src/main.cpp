@@ -39,6 +39,9 @@ constexpr auto OPT_ARRANGEMENT_PERTITLE		{"per-title"};
 constexpr auto OPT_ARRANGEMENT_SHUFFLE		{"shuffle"};
 constexpr auto OPT_ARRANGEMENT_SHUFFLE_DEFAULT	{"default-shuffle"};
 constexpr auto OPT_ARRANGEMENT_SHUFFLE_PERTITLE	{"per-title-shuffle"};
+constexpr auto OPT_ARRANGEMENT_DESCENDING			{"descending"};
+constexpr auto OPT_ARRANGEMENT_DESCENDING_DEFAULT	{"default-descending"};
+constexpr auto OPT_ARRANGEMENT_DESCENDING_PERTITLE	{"per-title-descending"};
 constexpr auto OPT_HELP 			{"help"};					// h
 constexpr auto OPT_VERSION 			{"version"};				// v
 constexpr auto OPT_VERBOSE 			{"verbose"};				// V
@@ -112,8 +115,7 @@ All Rights Reserved. License and Warranty\n";
 
 constexpr auto HELP=\
 "Create playlist file '.m3u8' (by default) from vary directories and files, \
-then arranged one episode per title (by default) \
-for all input titles.\nHosted in https://github.com/Mr-Widiatmoko/MakeTVPlaylist\n\n\
+then arranged one episode per Title (by default).\nHosted in https://github.com/Mr-Widiatmoko/MakeTVPlaylist\n\n\
 Usage:\n    tvplaylist [Option or Dir or File] ...\n\n\
 If no argument was specified, the current directory will be use.\n\n\
 Option:\n\
@@ -150,12 +152,17 @@ constexpr auto ARRANGEMENT=\
 "-w, --arrangement [default | unordered | per-title | ascending | shuffle] \n\
         Specifying how playlist content will be arranged.\n\
         default   : One file per Title, Title sorted ascending.\n\
+                    To set more than one file per Title, pass \"=\"'Count'.\n\
+                    Example: --arrangement default=3\n\
         unordered : One file per Title, Title sorted unordered.\n\
         per-title : All files sorted ascending grouped per Title/Directory.\n\
         ascending : All files sorted ascending by filenames, regardless directory name order.\n\
-        shuffle   : Shuffle all files.\n\
+        shuffle           : Shuffle all files.\n\
         shuffle-default   : \"default\" but each Title has files shuffled.\n\
         shuffle-per-title : \"per-title\" but each Title has files shuffled.\n\
+        descending           : All files sorted descending by filenames, regardless directory name order.\n\
+        descending-default   : \"default\" but each Title has files sorted descending.\n\
+        descending-per-title : \"per-title\" but each Title has files sorted descending.\n\
 ";
 constexpr auto SEARCH=\
 "--search 'keywords'\n\
@@ -2205,7 +2212,7 @@ func getAvailableFilename(const fs::path& original, const std::string& prefix = 
 		return original.string();
 }
 
-func ascending(const fs::path& a, const fs::path& b)
+func sort(const fs::path& a, const fs::path& b, bool ascending)
 {
 	std::string afn { a.filename().string().substr(0,
 	a.filename().string().size() - a.extension().string().size()) };
@@ -2221,11 +2228,24 @@ func ascending(const fs::path& a, const fs::path& b)
 		for (auto i{0}; i<av.size(); ++ i) {
 			if (av[i] == bv[i])
 				continue;
-			return av[i] < bv[i];
+			return ascending ? av[i] < bv[i] : av[i] > bv[i];
 		}
 
 	return afn < bfn;
 }
+
+inline
+func ascending(const fs::path& a, const fs::path& b)
+{
+	return sort(a, b, true);
+}
+
+inline
+func descending(const fs::path& a, const fs::path& b)
+{
+	return sort(a, b, false);
+}
+
 
 func sortFiles(std::vector<fs::path>* const selectFiles)
 {
@@ -3122,6 +3142,8 @@ int main(const int argc, char *argv[]) {
 	loadConfig(&args);
 
 	expandArgs(argc, argv, ARGS_START_INDEX, &args);
+	
+	unsigned long fileCountPerTurn{ 1 };
 
 	std::unordered_set<std::string_view> invalidArgs;
 	
@@ -3310,16 +3332,31 @@ int main(const int argc, char *argv[]) {
 			}
 			else if (isMatch(OPT_ARRANGEMENT, 'w')) {
 				if (i + 1 < args.size()
-					   and (args[i + 1] == OPT_ARRANGEMENT_DEFAULT
+					   and (args[i + 1].starts_with(OPT_ARRANGEMENT_DEFAULT)
 						 or args[i + 1] == OPT_ARRANGEMENT_UNORDERED
 						 or args[i + 1] == OPT_ARRANGEMENT_PERTITLE
 						 or args[i + 1] == OPT_ARRANGEMENT_ASCENDING
 						 or args[i + 1] == OPT_ARRANGEMENT_SHUFFLE
 						 or args[i + 1] == OPT_ARRANGEMENT_SHUFFLE_PERTITLE
-						 or args[i + 1] == OPT_ARRANGEMENT_SHUFFLE_DEFAULT))
+						 or args[i + 1].starts_with(OPT_ARRANGEMENT_SHUFFLE_DEFAULT)
+						 or args[i + 1] == OPT_ARRANGEMENT_DESCENDING
+						 or args[i + 1] == OPT_ARRANGEMENT_DESCENDING_PERTITLE
+						 or args[i + 1].starts_with(OPT_ARRANGEMENT_DESCENDING_DEFAULT)))
 				{
 					i++;
-					state[OPT_ARRANGEMENT] = args[i];
+					std::string value = args[i];
+					if (args[i].starts_with(OPT_ARRANGEMENT_DEFAULT)
+						or args[i].starts_with(OPT_ARRANGEMENT_DEFAULT)
+						or args[i].starts_with(OPT_ARRANGEMENT_DESCENDING_DEFAULT))
+					{
+						auto pos = args[i].find('=');
+						value = args[i].substr(0, pos - 1);
+						auto count_s { args[i].substr(pos + 1) };
+						if (int count; isInt(count_s, &count) and count > 1)
+							fileCountPerTurn = count;
+					}
+					
+					state[OPT_ARRANGEMENT] = value;
 				} else
 					std::cout << "Expecting arrangement type. Please see --help "
 					<< args[i].substr(2) << "\n";
@@ -4122,14 +4159,16 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 
 	const auto BY_PASS {
 			state[OPT_ARRANGEMENT] == OPT_ARRANGEMENT_PERTITLE
-			or state[OPT_ARRANGEMENT] == OPT_ARRANGEMENT_SHUFFLE_DEFAULT
 			or state[OPT_ARRANGEMENT] == OPT_ARRANGEMENT_SHUFFLE_PERTITLE
 			or state[OPT_ARRANGEMENT] == OPT_ARRANGEMENT_ASCENDING
 			or state[OPT_ARRANGEMENT] == OPT_ARRANGEMENT_SHUFFLE
-			
+			or state[OPT_ARRANGEMENT] == OPT_ARRANGEMENT_DESCENDING
+			or state[OPT_ARRANGEMENT] == OPT_ARRANGEMENT_DESCENDING_PERTITLE
 		};
 					   
-	if (state[OPT_ARRANGEMENT] == OPT_ARRANGEMENT_DEFAULT) {
+	if (	state[OPT_ARRANGEMENT] == OPT_ARRANGEMENT_DEFAULT
+		or 	state[OPT_ARRANGEMENT] == OPT_ARRANGEMENT_SHUFFLE_DEFAULT
+		or 	state[OPT_ARRANGEMENT] == OPT_ARRANGEMENT_DESCENDING_DEFAULT) {
 		std::sort(regularDirs.begin(), regularDirs.end());
 		std::sort(seasonDirs.begin(), seasonDirs.end());
 			
@@ -4464,24 +4503,38 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 		for (auto& dir : regularDirs) {
 			if (dir.empty())
 				continue;
-			if (const auto found { records[dir] }; found)
+			if (const auto found { records[dir] }; found) {
+				if (state[OPT_ARRANGEMENT] == OPT_ARRANGEMENT_PERTITLE)
+					std::sort(found->begin(), found->end(), ascending);
+				else if (state[OPT_ARRANGEMENT] == OPT_ARRANGEMENT_DESCENDING_PERTITLE)
+					std::sort(found->begin(), found->end(), descending);
+					
 				for (auto& f : *found)
 				{
 					playlistCount++;
 					if (state[OPT_ARRANGEMENT] == OPT_ARRANGEMENT_ASCENDING
+						or state[OPT_ARRANGEMENT] == OPT_ARRANGEMENT_DESCENDING
 						or state[OPT_ARRANGEMENT] == OPT_ARRANGEMENT_SHUFFLE)
 						selectFiles.emplace_back(std::move(f));
 					else
 						putIntoPlaylist(std::move(f));
 				}
+			}
 		}
 	
 		if (state[OPT_ARRANGEMENT] == OPT_ARRANGEMENT_PERTITLE)
 			sortFiles(&selectFiles);
+			
 		else if (state[OPT_ARRANGEMENT] == OPT_ARRANGEMENT_SHUFFLE)
 			std::shuffle(selectFiles.begin(), selectFiles.end(), mersenneTwisterEngine);
+			
+		else if (	state[OPT_ARRANGEMENT] == OPT_ARRANGEMENT_DESCENDING
+				 or state[OPT_ARRANGEMENT] == OPT_ARRANGEMENT_DESCENDING_PERTITLE)
+			std::sort(selectFiles.begin(), selectFiles.end(), descending);
+			
 		else
 			std::sort(selectFiles.begin(), selectFiles.end(), ascending);
+			
 		for (auto& f : selectFiles)
 			putIntoPlaylist(std::move(f));
 	}
@@ -4511,15 +4564,20 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 							continue;
 						}
 						
-						if (indexFile ==0
-							and state[OPT_ARRANGEMENT] == OPT_ARRANGEMENT_SHUFFLE_PERTITLE)
-							std::shuffle(found->begin(), found->end(), mersenneTwisterEngine);
+						if (indexFile ==0) {
+							if (state[OPT_ARRANGEMENT] == OPT_ARRANGEMENT_SHUFFLE_PERTITLE)
+								std::shuffle(found->begin(), found->end(), mersenneTwisterEngine);
 							
-						if (indexFile < found->size()) {
-							finish = false;
-
-							bufferSort.emplace_back((*found)[indexFile]);
+							else if (state[OPT_ARRANGEMENT] == OPT_ARRANGEMENT_DESCENDING_DEFAULT)
+								std::sort(found->begin(), found->end(), descending);
 						}
+							
+						for (auto c{ 0 }; c < fileCountPerTurn; ++c)
+							if (indexFile + c < found->size()) {
+								finish = false;
+
+								bufferSort.emplace_back((*found)[indexFile + c]);
+							}
 					}
 				} //end pass loop
 			
@@ -4529,7 +4587,7 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 			if (indexFile < selectFiles.size())
 				bufferSort.emplace_back(std::move(selectFiles[indexFile]));
 			
-			indexFile += 1;
+			indexFile += fileCountPerTurn;
 			//if (bufferSort.size() > 1) std::sort(bufferSort.begin(), bufferSort.end());
 			for (auto& ok : bufferSort)
 				putIntoPlaylist(std::move(ok));

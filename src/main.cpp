@@ -37,6 +37,8 @@ constexpr auto OPT_ARRANGEMENT_UNORDERED	{"unordered"};
 constexpr auto OPT_ARRANGEMENT_ASCENDING	{"ascending"};
 constexpr auto OPT_ARRANGEMENT_PERTITLE		{"per-title"};
 constexpr auto OPT_ARRANGEMENT_SHUFFLE		{"shuffle"};
+constexpr auto OPT_ARRANGEMENT_SHUFFLE_DEFAULT	{"default-shuffle"};
+constexpr auto OPT_ARRANGEMENT_SHUFFLE_PERTITLE	{"per-title-shuffle"};
 constexpr auto OPT_HELP 			{"help"};					// h
 constexpr auto OPT_VERSION 			{"version"};				// v
 constexpr auto OPT_VERBOSE 			{"verbose"};				// V
@@ -152,6 +154,8 @@ constexpr auto ARRANGEMENT=\
         per-title : All files sorted ascending grouped per Title/Directory.\n\
         ascending : All files sorted ascending by filenames, regardless directory name order.\n\
         shuffle   : Shuffle all files.\n\
+        shuffle-default   : \"default\" but each Title has files shuffled.\n\
+        shuffle-per-title : \"per-title\" but each Title has files shuffled.\n\
 ";
 constexpr auto SEARCH=\
 "--search 'keywords'\n\
@@ -3310,7 +3314,9 @@ int main(const int argc, char *argv[]) {
 						 or args[i + 1] == OPT_ARRANGEMENT_UNORDERED
 						 or args[i + 1] == OPT_ARRANGEMENT_PERTITLE
 						 or args[i + 1] == OPT_ARRANGEMENT_ASCENDING
-						 or args[i + 1] == OPT_ARRANGEMENT_SHUFFLE))
+						 or args[i + 1] == OPT_ARRANGEMENT_SHUFFLE
+						 or args[i + 1] == OPT_ARRANGEMENT_SHUFFLE_PERTITLE
+						 or args[i + 1] == OPT_ARRANGEMENT_SHUFFLE_DEFAULT))
 				{
 					i++;
 					state[OPT_ARRANGEMENT] = args[i];
@@ -4116,8 +4122,11 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 
 	const auto BY_PASS {
 			state[OPT_ARRANGEMENT] == OPT_ARRANGEMENT_PERTITLE
+			or state[OPT_ARRANGEMENT] == OPT_ARRANGEMENT_SHUFFLE_DEFAULT
+			or state[OPT_ARRANGEMENT] == OPT_ARRANGEMENT_SHUFFLE_PERTITLE
 			or state[OPT_ARRANGEMENT] == OPT_ARRANGEMENT_ASCENDING
 			or state[OPT_ARRANGEMENT] == OPT_ARRANGEMENT_SHUFFLE
+			
 		};
 					   
 	if (state[OPT_ARRANGEMENT] == OPT_ARRANGEMENT_DEFAULT) {
@@ -4449,7 +4458,6 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 		maxDirSize = regularDirs.size();
 		
 		std::sort(regularDirs.begin(), regularDirs.end());
-
 			
 		playlistCount += selectFiles.size();
 			
@@ -4494,13 +4502,29 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 						dir.empty())
 						continue;
 
-					else if (auto found { records[dir] }; found)
+					else if (auto found { records[dir] }; found) {
+						if (state[OPT_ARRANGEMENT] == OPT_ARRANGEMENT_SHUFFLE_PERTITLE)
+						{
+							std::shuffle(found->begin(), found->end(), mersenneTwisterEngine);
+							for (auto& f : *found)
+								putIntoPlaylist(std::move(f));
+							continue;
+						}
+						
+						if (indexFile ==0
+							and state[OPT_ARRANGEMENT] == OPT_ARRANGEMENT_SHUFFLE_PERTITLE)
+							std::shuffle(found->begin(), found->end(), mersenneTwisterEngine);
+							
 						if (indexFile < found->size()) {
 							finish = false;
 
 							bufferSort.emplace_back((*found)[indexFile]);
 						}
+					}
 				} //end pass loop
+			
+			if (state[OPT_ARRANGEMENT] == OPT_ARRANGEMENT_SHUFFLE_PERTITLE)
+				break;
 			
 			if (indexFile < selectFiles.size())
 				bufferSort.emplace_back(std::move(selectFiles[indexFile]));

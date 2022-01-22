@@ -3832,7 +3832,8 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 		}
 	std::cout << "\n";
 	
-	std::cout << LABEL("Advertise");
+	std::cout << LABEL(OPT_ADSCOUNT) << state[OPT_ADSCOUNT] << '\n';
+	std::cout << LABEL(OPT_ADSDIR);
 	auto i { -1 };
 	for (i++; auto& d : listAdsDir)
 		std::cout << d.string() << (i < listAdsDir.size() - 1 ? ", " : "\n");

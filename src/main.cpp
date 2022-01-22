@@ -88,17 +88,20 @@ constexpr auto OPT_DEXCLCHANGED		{"exclude-changed"};		// G
 constexpr auto OPT_DEBUG			{"debug"};                  // B
 
 constexpr auto LOAD=\
-"-L, --load-config 'fullpath'\n\
+"-L, --load-config 'custom file'\n\
         Load configuration from custom file.\n\
-        By default on Windows located in \"C:\\ProgramData\\tvplaylist.conf\".\n\
+        Example:\n\
+            --load-config tuesday_night.txt\n\
+        Default configuration file on Windows located in \"C:\\ProgramData\\tvplaylist.conf\".\n\
         Other platfom located in \"/usr/local/etc/tvplaylist.conf\".\n\
         If config file exist in default location, then it will be automatic loaded.\n\
-        Content of configuration is list of options (with/without \"--\") separated by new line.\n\
+        Content of configuration are list of options (with/out \"--\") separated by new line.\n\
         Example:\n\
             /* Multi lines\n\
                comment */\n\
             // Single line Comment\n\
             ads-dir   = \"D:\\Videos\\Funny Advertise Collections\"\n\
+            ads-dir   = \"D:\\Downloads\\Trailers 2022\"\n\
             ads-count = 2-10 # Single line Comment\n\
 ";
 constexpr auto VERSION=\
@@ -2953,7 +2956,8 @@ func parseKeyValue(std::string* const s, bool isExclude) {
 
 func loadConfig(std::vector<std::string>* const args)
 {
-	if (state[OPT_LOAD].empty()
+	if (not args
+		or state[OPT_LOAD].empty()
 		or not fs::exists(state[OPT_LOAD])
 		or not fs::is_regular_file(state[OPT_LOAD]))
 		return;
@@ -3010,16 +3014,24 @@ func loadConfig(std::vector<std::string>* const args)
 	push();
 	file.close();
 	
-	for (auto& line : lines) {
+	for (auto found{ false };
+		 const auto& line : lines) {
 		for (const char* const *const opt : OPTS)
-			if (line.starts_with(*opt)) {
-				state[*opt] = "";
-				if (args)
-					args->emplace_back("--" + std::string(*opt));
+			if (auto isMnemonic {
+				line.size() >= 2 and line[0] == '-' and std::isalpha(line[1])
+				};
+				isMnemonic or line.starts_with(*opt))
+			{
+				found = true;
+				if (args) {
+					if (isMnemonic)
+						args->emplace_back(line.substr(0, 1));
+					else
+						args->emplace_back("--" + std::string(*opt));
+				}
 				
 				if (auto col{ line.find('=') };
 					col == std::string::npos) {
-					state[*opt] = "true";
 					if (args)
 						args->emplace_back("true");
 				}
@@ -3038,14 +3050,16 @@ func loadConfig(std::vector<std::string>* const args)
 								puncs.emplace_back(i);
 						
 						if (value[0] == '"' and puncs.size() % 2 == 0 and puncs.size() > 2) {
-							state[*opt] = "1";
 							if (args)
 								for (unsigned k{ 0 }; k<puncs.size(); k += 2)
 								{
 									std::string sub;
 									for (auto j{puncs[k] + 1}; j<puncs[k + 1]; j++)
 										sub += value[j];
-									// MARK: C++ Library BUG! value.substr(puncs[k] + 1, puncs[k + 1] - 1)
+									/* MARK: C++ Library BUG!
+										std::string.substr() cannot be used for more than twice.
+										value.substr(puncs[k] + 1, puncs[k + 1] - 1)
+									 */
 									args->emplace_back(sub);
 								}
 							break;
@@ -3055,7 +3069,6 @@ func loadConfig(std::vector<std::string>* const args)
 							value.erase(value.end() - 1, value.end());
 						}
 
-						state[*opt] = value;
 						if (args)
 							args->emplace_back(value);
 					}
@@ -3063,6 +3076,9 @@ func loadConfig(std::vector<std::string>* const args)
 				
 				break;
 			}
+		
+		if (not found)
+			args->emplace_back(line);
 	}
 }
 #undef func
@@ -3091,9 +3107,6 @@ int main(const int argc, char *argv[]) {
 	state[OPT_ARRANGEMENT] = OPT_ARRANGEMENT_DEFAULT;
 		
 	std::vector<std::string> args;
-	expandArgs(argc, argv, ARGS_START_INDEX, &args);
-
-	std::unordered_set<std::string_view> invalidArgs;
 	
 	#if defined(_WIN32) || defined(_WIN64)
 	#define CONFIG_PATH	"C:\\ProgramData\\tvplaylist.conf"
@@ -3104,7 +3117,10 @@ int main(const int argc, char *argv[]) {
 	#undef CONFIG_PATH
 	loadConfig(&args);
 
+	expandArgs(argc, argv, ARGS_START_INDEX, &args);
 
+	std::unordered_set<std::string_view> invalidArgs;
+	
 	for (int i{0}; i<args.size(); ++i) {
 		if (auto isMatch{ [&](const char* const with,
 							  const char mnemonic,
@@ -3224,20 +3240,33 @@ int main(const int argc, char *argv[]) {
 				<< args[i].substr(2) << '\n';
 			}
 			else if (isMatch(OPT_ADSCOUNT, 'C')) {
-				if (auto push{[&] (unsigned long pos, unsigned long offset) {
-						auto lower { args[i + 1].substr(0, pos) };
-						auto upper { args[i + 1].substr(pos + offset) };
-						
-						int count[2] { 0, 0 };
-						if (isInt(lower, &count[0]) and isInt(upper, &count[1])
-							and count[0] < count[1]) {
-							state[OPT_ADSCOUNT] = lower + '-' + upper;
-							i++;
-							return true;
-						}
-						return false;
-					}};
-					
+				if (std::pair<int, int> range;
+					i + 3 < args.size()
+					and (args[i + 2] == ".." or args[i + 2] == "-")
+					and isInt(args[i + 1], &(range.first))
+					and isInt(args[i + 3], &(range.second)))
+				{
+					if (range.first < range.second) {
+						state[OPT_ADSCOUNT] = range.first + '-' + range.second;
+						i += 3;
+						continue;
+					}
+					std::cout << args[i] << " value range is up side down!. "
+					<< range.first << " greater than " << range.second << '\n';
+				}
+				else if (auto push{[&] (unsigned long pos, unsigned long offset) {
+					auto lower { args[i + 1].substr(0, pos) };
+					   auto upper { args[i + 1].substr(pos + offset) };
+					   
+					   int count[2] { 0, 0 };
+					   if (isInt(lower, &count[0]) and isInt(upper, &count[1])
+						   and count[0] < count[1]) {
+						   state[OPT_ADSCOUNT] = lower + '-' + upper;
+						   i++;
+						   return true;
+					   }
+					   return false;
+				   }};
 					i + 1 < args.size())
 				{
 					if (auto pos { args[i + 1].find('-') };
@@ -3425,8 +3454,6 @@ int main(const int argc, char *argv[]) {
 					 or isMatch(OPT_EXCLREGEX, 	'R')) {
 				if (auto found{ false }; i + 1 < args.size())
 				{
-					// TODO: enable to parse type=???
-					
 					if (auto pos { args[i + 1].find('=') };
 						pos != std::string::npos)
 					{
@@ -3623,10 +3650,22 @@ DATE_NEEDED:	std::cout << "Expecting date and/or time after \""
 							<< args[i] << "\" option. Please see --help "
 							<< args[i].substr(2) << "\n";
 			}
-			else if (isMatch(OPT_OVERWRITE, 	'O', true));
-			else if (isMatch(OPT_BENCHMARK, 	'b', true));
-			else if (isMatch(OPT_SKIPSUBTITLE, 	'x', true));
-			else if (isMatch(OPT_EXCLHIDDEN, 	'n', true));
+			else if (isMatch(OPT_OVERWRITE, 	'O', true)) {
+				if (i + 1 < args.size() and isEqual(args[i + 1], {"true", "false"}, left))
+					state[OPT_OVERWRITE] = args[++i];
+			}
+			else if (isMatch(OPT_BENCHMARK, 	'b', true)) {
+				if (i + 1 < args.size() and isEqual(args[i + 1], {"true", "false"}, left))
+					state[OPT_OVERWRITE] = args[++i];
+			}
+			else if (isMatch(OPT_SKIPSUBTITLE, 	'x', true)) {
+				if (i + 1 < args.size() and isEqual(args[i + 1], {"true", "false"}, left))
+					state[OPT_OVERWRITE] = args[++i];
+			}
+			else if (isMatch(OPT_EXCLHIDDEN, 	'n', true)) {
+				if (i + 1 < args.size() and isEqual(args[i + 1], {"true", "false"}, left))
+					state[OPT_OVERWRITE] = args[++i];
+			}
 			else if (isMatch(OPT_VERBOSE, 		'V', true)) {
 				if (i + 1 < args.size() and (args[i + 1] == "all" or args[i + 1] == "info"))
 				{

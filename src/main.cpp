@@ -4437,27 +4437,13 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 					   
 					   
 	start = std::chrono::system_clock::now();
-	
-	{
-		for (auto& dir : listAdsDir)
-			if (not dir.empty() and isDirNameValid(dir)) {
-				if (state[OPT_EXECUTION] == OPT_EXECUTION_THREAD)
-					threads.emplace_back([&, dir]() {
-						filterChildFiles(dir, false);
-					});
-				else if (state[OPT_EXECUTION] == OPT_EXECUTION_ASYNC)
-					asyncs.emplace_back(std::async(std::launch::async, [&, dir]() {
-						filterChildFiles(dir, false);
-					}));
-				else
-					filterChildFiles(dir, false);
-			}
-	}
 					   
-	for (auto i{0}; i<maxDirSize; ++i)
-		for (auto& x : {1, 2})
-			if (i < (x == 1 ? regularDirs.size() : seasonDirs.size()) )
-				if (auto dir { x == 1 ? regularDirs[i] : seasonDirs[i] };
+	for (auto i{0}; i<std::max(maxDirSize, listAdsDir.size()); ++i)
+		for (auto& x : {0, 1, 2})
+			if (i < (x == 1 ? regularDirs.size() : (x == 2 ? seasonDirs.size()
+													: listAdsDir.size())) )
+				if (auto dir { x == 1 ? regularDirs[i] : (x == 2 ? seasonDirs[i]
+														  : listAdsDir[i]) };
 					not dir.empty() and isDirNameValid(dir)) {
 					if (state[OPT_EXECUTION] == OPT_EXECUTION_THREAD)
 						threads.emplace_back([&, dir]() {

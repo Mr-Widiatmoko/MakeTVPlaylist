@@ -550,11 +550,13 @@ func isEqual(const char* const l, const char* const r, IgnoreCase ic = none)
 	return true;
 }
 
-func isEqual(const std::string& l, const std::string& r, IgnoreCase ic = none)
+func isEqual(const std::string& l, const std::string& r, IgnoreCase ic = none,
+			 unsigned long start = 0,
+			 unsigned long end = 0)
 {
 	if (l.size() != r.size()) return false;
 	
-	for (auto i{ 0 }; i<l.size(); ++i)
+	for (auto i{ start }; i< (end > 0 and start < end ? end : l.size()); ++i)
 		switch (ic){
 			case both:
 				if (std::tolower(l[i]) != std::tolower(r[i]))
@@ -578,9 +580,11 @@ func isEqual(const std::string& l, const std::string& r, IgnoreCase ic = none)
 inline
 func isEqual(const char* const source,
 			 const std::initializer_list<const char*>& list,
-			 IgnoreCase ic = none) {
+			 IgnoreCase ic = none,
+			 unsigned long start = 0,
+			 unsigned long end = 0) {
 	for (auto& s : list) {
-		if (isEqual(source, s, ic))
+		if (isEqual(source, s, ic, start, end))
 			return true;
 	}
 	return false;
@@ -589,10 +593,12 @@ func isEqual(const char* const source,
 template <template <class ...> class Container, class ... Args>
 func isEqual(const std::string& source,
 			 const Container<std::string, Args ...>* args,
-			 IgnoreCase ic = none) -> bool
+			 IgnoreCase ic = none,
+			 unsigned long start = 0,
+			 unsigned long end = 0) -> bool
 {
 	for (auto& check : *args)
-		if (isEqual(source, check, ic))
+		if (isEqual(source, check, ic, start, end))
 			return true;
 
 	return false;
@@ -2190,7 +2196,7 @@ func isValidFile(const fs::path& path) -> bool
 			return false;
 	}
 		
-	return /*fs::is_regular_file(tmp) and*/ true;
+	return true;
 }
 
 func getAvailableFilename(const fs::path& original, const std::string& prefix = " #",
@@ -2316,7 +2322,7 @@ func isValid(const fs::path& path) -> bool
 }
 
 func listDir(const fs::path& path, std::vector<fs::directory_entry>* const out,
-			bool sorted=true)
+			bool sorted=true, bool includeRegularFiles = false)
 {
 	if (not out)
 		return;
@@ -2339,7 +2345,9 @@ func listDir(const fs::path& path, std::vector<fs::directory_entry>* const out,
 				if (const auto ori { fs::read_symlink(child.path()) };
 					ori.empty() or not fs::exists(ori) or not fs::is_directory(ori))
 					continue;
-			} else if (child.path().empty() or not child.is_directory())
+			} else if (child.path().empty())
+				continue;
+			else if (not child.is_directory() and not includeRegularFiles)
 				continue;
 			
 			out->emplace_back(child);
@@ -2362,7 +2370,8 @@ func listDir(const fs::path& path, std::vector<fs::directory_entry>* const out,
 
 template <template <class ...> class Container, class ... Args>
 func listDirRecursively(const fs::path& path,
-						Container<fs::path, Args...>* const out)
+						Container<fs::path, Args...>* const out,
+						bool includeRegularFiles)
 	-> void
 {
 	if (not out or path.empty())
@@ -2373,18 +2382,32 @@ func listDirRecursively(const fs::path& path,
 	
 	/// Try to expand single dir and put into list
 	std::vector<fs::directory_entry> list;
+	std::vector<fs::path> dirs;
 	std::vector<std::thread> threads;
 	std::vector<std::future<void>> asyncs;
 	
+	
+	auto emplace{[&]() {
+		for (auto& d : list)
+			std::fill_n(std::inserter(*out, out->end()), 1, std::move(d.path()));
+	}};
 	do {
 		do {
 			list.clear();
-			listDir(head, &list, false);
+			listDir(head, &list, false, includeRegularFiles);
 			if (list.size() == 1)
 				std::fill_n(std::inserter(*out, out->end()), 1,
 							std::move(list[0].path()));
-			if (not list.empty())
-				head = list[0].path();
+			if (not list.empty()) {
+				for (auto& child : list)
+					if (child.is_directory())
+						dirs.emplace_back(std::move(child.path()));
+				if (dirs.empty()) {
+					emplace();
+					return;
+				} else
+					head = dirs[0];
+			}
 		} while(list.size() == 1);
 		
 		if (list.empty())
@@ -2392,16 +2415,18 @@ func listDirRecursively(const fs::path& path,
 		
 		/// If single dir was expanded, then expand each child dir
 		
-		for (auto& d : list)
-			if (d.path().empty())
+		for (auto& d : dirs)
+			if (d.empty())
 				continue;
 			else if (state[OPT_EXECUTION] == OPT_EXECUTION_THREAD)
-				threads.emplace_back(listDir, d.path(), &list, false);
+				threads.emplace_back(listDir, d, &list,
+									 false, includeRegularFiles);
 			else if (state[OPT_EXECUTION] == OPT_EXECUTION_ASYNC)
 				asyncs.emplace_back(std::async(
-						std::launch::async, listDir, d.path(), &list, false));
+						std::launch::async, listDir, d, &list,
+											   false, includeRegularFiles));
 			else
-				listDir(d.path(), &list, false);
+				listDir(d, &list, false, includeRegularFiles);
 		
 		
 		if (state[OPT_EXECUTION] == OPT_EXECUTION_THREAD) {
@@ -2415,8 +2440,7 @@ func listDirRecursively(const fs::path& path,
 			asyncs.clear();
 		}
 		
-		for (auto& d : list)
-			std::fill_n(std::inserter(*out, out->end()), 1, std::move(d.path()));
+		emplace();
 	} while(list.size() > 0);
 }
 
@@ -2474,17 +2498,18 @@ func findSubtitleFile(const fs::path& original,
 					  std::vector<fs::path>* const result)
 {
 	if (auto parentPath{original.parent_path()}; not parentPath.empty()) {
-		auto noext{excludeExtension(original)};
+		auto noext{excludeExtension(original.filename())};
 		std::vector<fs::path> list;
-		listDirRecursively(parentPath, &list);
+		listDirRecursively(parentPath, &list, true);
 			for (auto& f : list)
-				if (	isValid(f)
+				if (not fs::is_directory(f)
+					and isValid(f)
 					and fs::is_regular_file(f)
 					and f.string().size() >= original.string().size()
 					and isEqual(f.extension().string(), &SUBTITLES_EXT, left)
-					and isContains(f.filename().string(), noext, none, &FILENAME_IGNORE_CHAR))
+					and isContains(f.filename().string(), noext, none, &FILENAME_IGNORE_CHAR) not_eq std::string::npos)
 
-					result->emplace_back(f);
+					result->emplace_back(std::move(f));
 	}
 }
 
@@ -4109,29 +4134,29 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 		
 		for (auto& child : list)
 			if (state[OPT_EXECUTION] == OPT_EXECUTION_THREAD)
-				threads.emplace_back([&]() {
-					listDirRecursively(child, &listAdsDir); });
+				threads.emplace_back([&, child]() {
+					listDirRecursively(child, &listAdsDir, false); });
 			else if (state[OPT_EXECUTION] == OPT_EXECUTION_ASYNC)
-				asyncs.emplace_back(std::async(std::launch::async, [&]() {
-					listDirRecursively(child, &listAdsDir); }));
+				asyncs.emplace_back(std::async(std::launch::async, [&, child]() {
+					listDirRecursively(child, &listAdsDir, false); }));
 			else
-				listDirRecursively(child, &listAdsDir);
+				listDirRecursively(child, &listAdsDir, false);
 	}
 	
 	for (bool isByPass {state[OPT_ARRANGEMENT] == OPT_ARRANGEMENT_ASCENDING};
 		 auto& child : bufferDirs)
 		if (state[OPT_EXECUTION] == OPT_EXECUTION_THREAD) {
 			if (isByPass)
-				threads.emplace_back([&]() {
-					listDirRecursively(child, &regularDirs);
+				threads.emplace_back([&, child]() {
+					listDirRecursively(child, &regularDirs, false);
 				});
 			else
 				threads.emplace_back(checkForSeasonDir, child);
 		}
 		else if (state[OPT_EXECUTION] == OPT_EXECUTION_ASYNC)
 			if (isByPass)
-				asyncs.emplace_back(std::async(std::launch::async, [&]() {
-					listDirRecursively(child, &regularDirs);
+				asyncs.emplace_back(std::async(std::launch::async, [&, child]() {
+					listDirRecursively(child, &regularDirs, false);
 				}));
 			else
 				asyncs.emplace_back(std::async(std::launch::async,
@@ -4139,7 +4164,7 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 		else
 		{
 			if (isByPass)
-				listDirRecursively(child, &regularDirs);
+				listDirRecursively(child, &regularDirs, false);
 			else
 				checkForSeasonDir(child);
 		}
@@ -4264,7 +4289,7 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 	}
 	
 	auto putIntoPlaylist{ [&](const fs::path& file) {
-		auto putIt{ [&](const fs::path& file) {
+		auto putIt{ [&](const fs::path& file, const char* title = nullptr) {
 			playlistCount++;
 			if (dontWrite) {
 				#if MAKE_LIB
@@ -4281,27 +4306,20 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 			}
 			
 			{
-				#if defined(_WIN32) || defined(_WIN64)
-				#define OS_NAME	"Windows"
-				#elif defined(__APPLE__)
-				#define OS_NAME	"macOS"
-				#else
-				#define OS_NAME	"Linux"
-				#endif
-
 				const auto fullPath { fs::absolute(file).string() };
-				std::string prefix;
-				std::string suffix;
 				if (not dontWrite) {
+					std::string prefix;
+					std::string suffix;
+
 					if (outExt == ".pls") {
 						prefix = "File" + std::to_string(playlistCount) + '=';
-						suffix = "\nTitle" + std::to_string( playlistCount)
-							+ "=absolute path on " + OS_NAME;
+						suffix = "\nTitle" + std::to_string( playlistCount);
+						suffix += title;
 					}
 					else if (outExt == ".xspf") {
-						prefix = "\t\t<track>\n\t\t\t<title>"\
-									OS_NAME\
-									" Path</title>\n"\
+						prefix = "\t\t<track>\n\t\t\t<title>";
+						prefix += title;
+						prefix += "</title>\n"\
 									"\t\t\t<location>file://";
 						suffix = "</location>\n\t\t</track>";
 						
@@ -4313,49 +4331,45 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 					
 					outputFile 	<< prefix << fullPath << suffix << '\n';
 				}
-				#undef OS_NAME
 				
 				#ifndef DEBUG
 				if (isVerbose)
 				#endif
 					std::cout << fullPath << '\n';
 
-				if (not listAdsDir.empty())
-					for (auto i{0}; i<(adsCount[1] == 0
-									   ? adsCount[0]
-									   : distribCount(mersenneTwisterEngine));
-						++i, ++playlistCount)
-					{
-						if (outExt == ".pls") {
-							prefix = "File" + std::to_string(playlistCount) + '=';
-							suffix = "\nTitle" + std::to_string( playlistCount)
-								+ "=Ads";
-						}
-						else if (outExt == ".xspf") {
-							prefix = "\t\t<track>\n\t\t\t<title>"\
-										"Ads</title>\n"\
-										"\t\t\t<location>file://";
-						}
-						auto ads { fs::absolute(listAdsDir[distrib(mersenneTwisterEngine)]).string() };
-						if (not dontWrite)
-							outputFile 	<< prefix << ads << suffix << '\n';
-						
-						#ifndef DEBUG
-						if (isVerbose)
-						#endif
-							std::cout << ads << '\n';
-					}
 			}
 		}};
+		#if defined(_WIN32) || defined(_WIN64)
+		#define OS_NAME	"Windows"
+		#elif defined(__APPLE__)
+		#define OS_NAME	"macOS"
+		#else
+		#define OS_NAME	"Linux"
+		#endif
 		
-		putIt(file);
-				
+		putIt(file, OS_NAME\
+					" Path");
+			
+
 		if (state[OPT_SKIPSUBTITLE] != "true") {
 			std::vector<fs::path> subtitleFiles;
 			findSubtitleFile(file, &subtitleFiles);
 			for (auto& sf : subtitleFiles)
-				putIt(sf);
+				putIt(std::move(sf), 	"Subtitle Path on "\
+										OS_NAME);
 		}
+			
+		if (not listAdsDir.empty())
+			for (auto i{0}; i<(adsCount[1] == 0
+							   ? adsCount[0]
+							   : distribCount(mersenneTwisterEngine));
+				++i, ++playlistCount)
+				putIt(fs::absolute(
+							listAdsDir[distrib(mersenneTwisterEngine)]).string(),
+							"Ads path on "\
+							OS_NAME);
+		#undef OS_NAME
+
 	}};
 	
 	auto filterChildFiles{ [&records](const fs::path& dir, bool recurive=false) {
@@ -4384,7 +4398,7 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 		try {
 			if (recurive) {
 				std::vector<fs::path> dirs;
-				listDirRecursively(dir, &dirs);
+				listDirRecursively(dir, &dirs, false);
 				std::sort(dirs.begin(), dirs.end());
 				
 				for (auto& d : dirs) {
@@ -4412,6 +4426,9 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 		} catch (fs::filesystem_error& e) {
 			#ifndef DEBUG
 			if (state[OPT_VERBOSE] == "all")
+			#else
+				std::cout << "filterChildFiles(" << dir
+					<< ", recursive: " << recurive << '\n';
 			#endif
 				std::cout << e.what() << '\n';
 		}

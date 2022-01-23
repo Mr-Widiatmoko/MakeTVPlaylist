@@ -39,27 +39,28 @@ To build "tvplaylist" on macOS Apple Silicon, Windows, Linux, or another platfor
 	mkdir Release
 	cd Release
 	cmake ../
-	cmake --build .
-	cp -f tvplaylist /usr/local/bin/
+	make
+	make install
+	make clean
 	
-Don't forget to [Press ENTER]. Thats it, you will get "tvplaylist" on "Release" folder.
+Don't forget to [Press ENTER]. Thats it, you will get "tvplaylist" on "Release" and /usr/local/bin directory.
 
 If you don't have cmake installed then, form 'src' directory on Terminal, paste following:
 
     c++ main.cpp -std=c++2b -stdlib=libc++ -o /usr/local/bin/tvplaylist
 
-Don't forget to [Press ENTER]. Thats it, you will get "tvplaylist" on "/usr/local/bin/" folder.
+Don't forget to [Press ENTER]. Thats it, you will get "tvplaylist" on "/usr/local/bin/" directory.
 
 If you need to build this as library file, then copy below and paste on the Terminal:
 
 	mkdir WHATEVER
 	cd WHATEVER
 	cmake ../ -DMAKE_LIB=1
-	cmake --build .
-	cp -f libtvplaylist.dylib /usr/local/lib/
-	cp -f ../src/libtvplaylist.h /usr/local/include/
+	make
+	make install
+	make clean
  
-Don't forget to [Press ENTER]. Thats it, you will get "libtvplaylist.dylib" on "WHATEVER" folder. 
+Don't forget to [Press ENTER]. Thats it, you will get "libtvplaylist.dylib" on "WHATEVER" directory. 
 
 ## Usage fo Dummies:
 1. For [Make TV Playlist.workflow](https://raw.githubusercontent.com/Mr-Widiatmoko/MakeTVPlaylist/master/Release/Make%20TV%20Playlist.workflow.zip):

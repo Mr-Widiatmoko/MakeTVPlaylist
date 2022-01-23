@@ -4312,8 +4312,9 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 					std::string suffix;
 
 					if (outExt == ".pls") {
-						prefix = "File" + std::to_string(playlistCount) + '=';
-						suffix = "\nTitle" + std::to_string( playlistCount);
+						auto indexString{ std::to_string(playlistCount) };
+						prefix = "File" + indexString + '=';
+						suffix = "\nTitle" + indexString + '=';
 						suffix += title;
 					}
 					else if (outExt == ".xspf") {

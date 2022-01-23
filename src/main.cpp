@@ -242,7 +242,10 @@ constexpr auto EXT=\
 -E, --exclude-ext \"'extension', 'extension' ...\"\n\
         Filter only (or exclude) files that match specific extensions, separated by comma.\n\
             Example: --ext \"pdf, docx\" or --ext=pdf,docx\n\
-        To process all files use *, example: --ext=* \n\
+        To process all files use character *.\n\
+            Example: --ext=* \n\
+        To enable get contents from other playlists, you must include the playlist extensions.\n\
+            Example: --ext=mp4,mkv,mp3,m3u,m3u8,pls,wpl,xspf\n\
 ";
 constexpr auto SIZE=\
 "-s, --size < | > 'size'\n\
@@ -323,7 +326,10 @@ constexpr auto FIXFILENAME=\
 "-f, --out-filename 'filename'\n\
         Override output playlist filename, by default it will crreate \".m3u8\" playlist.\n\
         To create \".pls\" or \".xspf\" or \".wpl\" playlist, pass it as extension filename.\n\
-        For example: --out-filename=my_playlist.xspf.\n\
+            Example: --out-filename=my_playlist.xspf.\n\
+        To convert or grab files inside another playlist file, \n\
+        first add playlist ext[s] and media file ext[s] you desired into --ext.\n\
+            Example: --ext=mp4,pls,wpl,xspf another.pls another.wpl another.xspf\n\
 ";
 constexpr auto NOOUTPUTFILE=\
 "-F, --no-ouput-file [yes | no]\n\
@@ -2011,14 +2017,15 @@ func isValidFile(const fs::path& path) -> bool
 			return false;
 	}
 	
+	std::string fileExt { tolower(tmp.extension().string()) };
 	if (state[OPT_EXT] not_eq "*"
-		and DEFAULT_EXT.find(std::move(tolower(tmp.extension().string())))
+		and DEFAULT_EXT.find(fileExt)
 		== DEFAULT_EXT.end())
 		return false;
 	
 	if (state[OPT_EXCLEXT] not_eq "*"
 		and not state[OPT_EXCLEXT].empty())
-		if (EXCLUDE_EXT.find(std::move(tolower(tmp.extension().string())))
+		if (EXCLUDE_EXT.find(fileExt)
 			not_eq EXCLUDE_EXT.end())
 			return false;
 	
@@ -2116,7 +2123,7 @@ func isValidFile(const fs::path& path) -> bool
 	
 	if (not listFind.empty() or not listExclFind.empty()) // MARK: Find statement
 	{
-		auto ismp3 { isEqual(tmp.extension().string().c_str(), ".mp3", left) };
+		auto ismp3 { isEqual(fileExt, ".mp3") };
 		auto filename { excludeExtension(tmp.filename()) };
 		auto isCaseInsensitive { state[OPT_CASEINSENSITIVE] == "true" };
 		
@@ -3130,6 +3137,107 @@ func loadConfig(std::vector<std::string>* const args)
 			args->emplace_back(line);
 	}
 }
+
+func loadPlaylist(const fs::path& path, std::vector<fs::path>* const outPaths)
+{
+	if (not outPaths or path.empty() or not fs::exists(path))
+		return;
+
+	auto lastParent { fs::current_path() };
+	fs::current_path(path.parent_path());
+	
+	std::ifstream file(path.string(), std::ios::in);
+	
+	func push{[&outPaths](std::string& buff) {
+		if (buff.empty())
+			return;
+		outPaths->emplace_back(fs::absolute(fs::path(buff)));
+		buff.clear();
+	}};
+	
+	func after{[&file](const char* const keyword, std::string* const before = nullptr) {
+		char c;
+		unsigned long index = 0;
+		unsigned long indexMax = std::strlen(keyword);
+		std::string buff;
+		while ((c = file.get()) and not file.eof()) {
+			if (c == keyword[index]) {
+				index++;
+				if (index == indexMax) {
+					buff.clear();
+					break;
+				}
+				if (before)
+					buff += c;
+				continue;
+			}
+
+			if (before)
+				*before += buff + c;
+			index = 0;
+		}
+		
+		return index not_eq 0;
+	}};
+	
+	func getLines{[&push, &file](std::vector<fs::path>* const lines) {
+		std::string buff;
+//		func push{[&buff, &lines]() {
+//			if (buff.empty())
+//				return;
+//			lines->emplace_back(fs::path(buff));
+//			buff.clear();
+//		}};
+		bool isComment{ false };
+		char c;
+		
+		while ((c = file.get()) and not file.eof()) {
+			if (c == 0x0a or c == 0x0d)
+				push(buff);
+			else if (isComment)
+				continue;
+			else if (buff.empty() and c == std::isspace(c))
+				continue;
+			else if (c == '#') {
+				isComment = true;
+				push(buff);
+			}
+			else
+				buff += c;
+		}
+	}};
+	
+	func xspf{[&outPaths, &push, &after]() {
+		while (after("<location>file://"))
+			if (std::string value; after("</location>", &value))
+				push(value);
+	}};
+	
+	func wpl{[&outPaths, &push, &after]() {
+		while (after("<media src=\""))
+			if (std::string value;
+				after("\"/>", &value) or after("\" />", &value))
+				push(value);
+	}};
+
+	func pls{[&outPaths, &getLines]() {
+		getLines(outPaths);
+		
+	}};
+	
+	func m3u{[&outPaths, &getLines]() {
+		getLines(outPaths);
+	}};
+	
+	file.seekg(0);
+	if (isEqual(path.extension().string(), ".xspf", left)) xspf();
+	else if (isEqual(path.extension().string(), ".pls", left)) pls();
+	else if (isEqual(path.extension().string(), ".wpl", left)) wpl();
+	else if (isEqual(path.extension().string().c_str(), {".m3u", ".m3u8"}, left)) m3u();
+	file.close();
+	
+	fs::current_path(lastParent);
+}
 #undef func
 
 #if MAKE_LIB
@@ -3719,19 +3827,19 @@ DATE_NEEDED:	std::cout << "Expecting date and/or time after \""
 							<< args[i].substr(2) << "\n";
 			}
 			else if (isMatch(OPT_OVERWRITE, 	'O', true)) {
-				if (i + 1 < args.size() and isEqual(args[i + 1], {"true", "false"}, left))
+				if (i + 1 < args.size() and isEqual(args[i + 1].c_str(), {"true", "false"}, left))
 					state[OPT_OVERWRITE] = args[++i];
 			}
 			else if (isMatch(OPT_BENCHMARK, 	'b', true)) {
-				if (i + 1 < args.size() and isEqual(args[i + 1], {"true", "false"}, left))
+				if (i + 1 < args.size() and isEqual(args[i + 1].c_str(), {"true", "false"}, left))
 					state[OPT_OVERWRITE] = args[++i];
 			}
 			else if (isMatch(OPT_SKIPSUBTITLE, 	'x', true)) {
-				if (i + 1 < args.size() and isEqual(args[i + 1], {"true", "false"}, left))
+				if (i + 1 < args.size() and isEqual(args[i + 1].c_str(), {"true", "false"}, left))
 					state[OPT_OVERWRITE] = args[++i];
 			}
 			else if (isMatch(OPT_EXCLHIDDEN, 	'n', true)) {
-				if (i + 1 < args.size() and isEqual(args[i + 1], {"true", "false"}, left))
+				if (i + 1 < args.size() and isEqual(args[i + 1].c_str(), {"true", "false"}, left))
 					state[OPT_OVERWRITE] = args[++i];
 			}
 			else if (isMatch(OPT_VERBOSE, 		'V', true)) {
@@ -3894,8 +4002,19 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 		} else if (fs::is_directory(args[i]))
 			insertTo(&bufferDirs, fs::path(args[i]));
 		else if (fs::is_regular_file(std::move(fs::path(args[i])))) {
-			if (isValidFile(fs::absolute(args[i])))
-				insertTo(&selectFiles, fs::absolute(args[i]));
+			if (auto path{ fs::absolute(args[i]) };
+				
+				isValidFile(path))
+			{
+				std::vector<fs::path> list;
+				loadPlaylist(path, &list);
+				if (list.empty())
+					insertTo(&selectFiles, path);
+				else
+					for (auto& f : list)
+						if (isValidFile(f))
+							insertTo(&selectFiles, std::move(f));
+			}
 		} else
 			invalidArgs.emplace(args[i]);
 	}
@@ -4406,8 +4525,16 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 					std::vector<fs::path> tmp;
 					
 					for (auto& f : fs::directory_iterator(d))
-						if (filter(f))
-							tmp.emplace_back(std::move(f));
+						if (filter(f)) {
+							std::vector<fs::path> list;
+							loadPlaylist(f.path().string(), &list);
+							if (list.empty())
+								tmp.emplace_back(std::move(f));
+							else
+								for (auto& p : list)
+									if (isValid(p) and isValidFile(p))
+										tmp.emplace_back(std::move(p));
+						}
 					
 					sortFiles(&tmp);
 					
@@ -4419,8 +4546,16 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 			}
 			
 			for (auto& f : fs::directory_iterator(dir))
-				if (filter(f))
-					bufferFiles.emplace_back(std::move(f));
+				if (filter(f)) {
+					std::vector<fs::path> list;
+						  loadPlaylist(f.path().string(), &list);
+						  if (list.empty())
+							  bufferFiles.emplace_back(std::move(f));
+						  else
+							  for (auto& p : list)
+								  if (isValid(p) and isValidFile(p))
+									  bufferFiles.emplace_back(std::move(p));
+				}
 			
 			putToRecord(true);
 			

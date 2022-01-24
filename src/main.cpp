@@ -3217,7 +3217,7 @@ func loadPlaylist(const fs::path& path, std::vector<fs::path>* const outPaths)
 			}
 			
 			if (commentCount == 0) {
-				if (c == keyword[index]) {
+				if (std::tolower(c) == std::tolower(keyword[index])) {
 					index++;
 					if (index == indexMax) {
 						buff.clear();

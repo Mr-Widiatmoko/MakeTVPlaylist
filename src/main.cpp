@@ -4536,6 +4536,22 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 			"<playlist version=\"1\" xmlns=\"http://xspf.org/ns/0/\">\n"\
 			"\t<trackList>\n";
 		}
+		else if (outExt == ".xml") {
+			outputFile << "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"\
+			"<!DOCTYPE plist PUBLIC \"-//Apple Computer//DTD PLIST 1.0//EN\" "\
+			"\"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">\n"\
+			"<plist version=\"1.0\">\n"\
+			"<dict>\n"\
+			"\t<key>Major Version</key><integer>1</integer>\n"\
+			"\t<key>Minor Version</key><integer>1</integer>\n"\
+			"\t<key>Date</key><date>";
+			outputFile << /*2022-01-24T15:33:46Z*/"";
+			outputFile << "</date>\n"\
+			"\t<key>Application Version</key><string>1.1</string>\n"\
+			"\t<key>Tracks</key>\n"\
+			"\t<dict>"
+			;
+		}
 		else if (outExt == ".wpl")
 		{
 			outputFile << "<?wpl version=\"1.0\"?>\n"\
@@ -4657,6 +4673,15 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 									+ name
 									+ "</title>\t\t<ref href=\"";
 						suffix = "\"/>\n\t</entry>";
+					}
+					else if (outExt == ".xml") {
+						auto key = std::to_string(1000 - playlistCount);
+						prefix = "\t\t<key>" + key + "</key>\n"\
+								"\t\t<dict>\n"\
+								"\t\t\t<key>Track ID</key><integer>" + key + "</integer>\n"\
+								"\t\t\t<key>Name</key><string>" + name + "</string>\n"\
+								"\t\t\t<key>Location</key><string>file://";
+						suffix = "</string>\n\t\t</dict>";
 					}
 					
 					outputFile 	<< prefix << fullPath << suffix << '\n';
@@ -4967,6 +4992,9 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 		}
 		else if (isEqual(outExt.c_str(), {".asx", ".wax", ".wvx"})) {
 			outputFile << "</asx>\n";
+		}
+		else if (outExt == ".xml") {
+			outputFile << "\t</dict>\n</dict>\n</plist>";
 		}
 			
 		if (outputFile.is_open())

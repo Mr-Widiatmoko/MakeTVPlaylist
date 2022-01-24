@@ -3182,9 +3182,15 @@ func loadPlaylist(const fs::path& path, std::vector<fs::path>* const outPaths)
 			return;
 		auto found { false };
 		for (const char* const protocol : NETWORK_PROTOCOLS)
-			if (buff.starts_with(protocol)) {
+			if (buff.find('%') != std::string::npos
+				and buff.starts_with(protocol)) {
 				replace_all(buff, "%20", " "); // TODO: Decoding percent-encoded triplets of unreserved characters. Percent-encoded triplets of the URI in the ranges of ALPHA (%41–%5A and %61–%7A), DIGIT (%30–%39), hyphen (%2D), period (%2E), underscore (%5F), or tilde (%7E) do not require percent-encoding and should be decoded to their corresponding unreserved characters.
-				
+				replace_all(buff, "%3D", "=");
+				replace_all(buff, "%2B", "+");
+				replace_all(buff, "%2D", "-");
+				replace_all(buff, "%3F", "?");
+				replace_all(buff, "%3B", ";");
+				replace_all(buff, "%25", "%");
 				outPaths->emplace_back(fs::path(buff));
 				found = true;
 				break;
@@ -3305,10 +3311,11 @@ func loadPlaylist(const fs::path& path, std::vector<fs::path>* const outPaths)
 //						< to  &lt;
 //						> to  &gt;
 //						& to  &amp;
-						for (auto w { 0 }; w<sizeof(XML_CHARS_ALIAS) /sizeof(XML_CHARS_ALIAS[0]); ++w)
-							if (isContains(value, XML_CHARS_ALIAS[w], left)) {
-								replace_all(value, XML_CHARS_ALIAS[w], XML_CHAR_NORMAL[w]);
-							}
+						if (value.find('&') != std::string::npos)
+							for (auto w { 0 }; w<sizeof(XML_CHARS_ALIAS) /sizeof(XML_CHARS_ALIAS[0]); ++w)
+								if (isContains(value, XML_CHARS_ALIAS[w], left)) {
+									replace_all(value, XML_CHARS_ALIAS[w], XML_CHAR_NORMAL[w]);
+								}
 						push(value);
 						return true;
 					}
@@ -4578,8 +4585,15 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 				auto fullPath { file.string() };
 				auto needAboslute { true };
 				for (const char* const protocol : NETWORK_PROTOCOLS)
-					if (fullPath.starts_with(protocol)) {
+					if (fullPath.find('%') != std::string::npos
+						and fullPath.starts_with(protocol)) {
 						replace_all(fullPath, "%20", " ");
+						replace_all(fullPath, "%3D", "=");
+						replace_all(fullPath, "%2B", "+");
+						replace_all(fullPath, "%2D", "-");
+						replace_all(fullPath, "%3F", "?");
+						replace_all(fullPath, "%3B", ";");
+						replace_all(fullPath, "%25", "%");
 						needAboslute = false;
 						break;
 					}
@@ -4594,11 +4608,12 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 					if (isEqual(outExt.c_str(), {".wpl", ".b4s", ".smil",
 												 ".asx", ".wax", ".wvx"}))
 					{
-						for (auto w { 0 }; w<sizeof(XML_CHARS_ALIAS) /sizeof(XML_CHARS_ALIAS[0]); ++w)
-							if (isContains(fullPath, XML_CHARS_ALIAS[w], left)) {
-								replace_all(fullPath, XML_CHARS_ALIAS[w], XML_CHAR_NORMAL[w]);
-								break;
-							}
+						if (fullPath.find('&') != std::string::npos)
+							for (auto w { 0 }; w<sizeof(XML_CHARS_ALIAS) /sizeof(XML_CHARS_ALIAS[0]); ++w)
+								if (isContains(fullPath, XML_CHARS_ALIAS[w], left)) {
+									replace_all(fullPath, XML_CHARS_ALIAS[w], XML_CHAR_NORMAL[w]);
+									break;
+								}
 						
 						if (not isEqual(outExt.c_str(), {".wpl", ".smil"}))
 						{

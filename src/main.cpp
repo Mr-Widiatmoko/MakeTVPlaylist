@@ -3145,7 +3145,7 @@ func loadConfig(std::vector<std::string>* const args)
 }
 
 const std::string XML_CHARS_ALIAS[] = {"&quot", "&apos", "&lt", "&gt", "&amp"};
-const std::string XML_CHAR_NORMAL[] = {"\"", "\\", "<", "<", "&"};
+const std::string XML_CHARS_NORMAL[] = {"\"", "\\", "<", "<", "&"};
 constexpr auto NETWORK_PROTOCOLS = {"http:", "https:", "ftp:", "ftps:", "rtsp:", "mms:"};
 
 func replace_all(std::string& inout, std::string_view what, std::string_view with)
@@ -3314,7 +3314,7 @@ func loadPlaylist(const fs::path& path, std::vector<fs::path>* const outPaths)
 						if (value.find('&') != std::string::npos)
 							for (auto w { 0 }; w<sizeof(XML_CHARS_ALIAS) /sizeof(XML_CHARS_ALIAS[0]); ++w)
 								if (isContains(value, XML_CHARS_ALIAS[w], left)) {
-									replace_all(value, XML_CHARS_ALIAS[w], XML_CHAR_NORMAL[w]);
+									replace_all(value, XML_CHARS_ALIAS[w], XML_CHARS_NORMAL[w]);
 								}
 						push(value);
 						return true;
@@ -4587,13 +4587,13 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 				for (const char* const protocol : NETWORK_PROTOCOLS)
 					if (fullPath.find('%') != std::string::npos
 						and fullPath.starts_with(protocol)) {
-						replace_all(fullPath, "%20", " ");
-						replace_all(fullPath, "%3D", "=");
-						replace_all(fullPath, "%2B", "+");
-						replace_all(fullPath, "%2D", "-");
-						replace_all(fullPath, "%3F", "?");
-						replace_all(fullPath, "%3B", ";");
-						replace_all(fullPath, "%25", "%");
+						replace_all(fullPath, " ", "%20");
+						replace_all(fullPath, "=", "%3D");
+						replace_all(fullPath, "+", "%2B");
+						replace_all(fullPath, "-", "%2D");
+						replace_all(fullPath, "?", "%3F");
+						replace_all(fullPath, ";", "%3B");
+						replace_all(fullPath, "%", "%25");
 						needAboslute = false;
 						break;
 					}
@@ -4610,8 +4610,8 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 					{
 						if (fullPath.find('&') != std::string::npos)
 							for (auto w { 0 }; w<sizeof(XML_CHARS_ALIAS) /sizeof(XML_CHARS_ALIAS[0]); ++w)
-								if (isContains(fullPath, XML_CHARS_ALIAS[w], left)) {
-									replace_all(fullPath, XML_CHARS_ALIAS[w], XML_CHAR_NORMAL[w]);
+								if (isContains(fullPath, XML_CHARS_NORMAL[w], left)) {
+									replace_all(fullPath, XML_CHARS_NORMAL[w], XML_CHARS_ALIAS[w]);
 									break;
 								}
 						

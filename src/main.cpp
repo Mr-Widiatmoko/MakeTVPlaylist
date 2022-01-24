@@ -3200,6 +3200,7 @@ func loadPlaylist(const fs::path& path, std::vector<fs::path>* const outPaths)
 					commentCount--;
 				else {
 					file->unget();
+					file->unget();
 				}
 			}
 			

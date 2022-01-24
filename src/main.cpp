@@ -3191,20 +3191,45 @@ func loadPlaylist(const fs::path& path, std::vector<fs::path>* const outPaths)
 		unsigned long indexMax = std::strlen(keyword);
 		std::string buff;
 		const auto lastPos { file->tellg() };
+		unsigned commentCount { 0 };
 		while ((c = file->get()) and not file->eof()) {
-			if (c == keyword[index]) {
-				index++;
-				if (index == indexMax) {
-					buff.clear();
-					break;
+			if (commentCount > 0
+				and c == '-' and file->peek() == '-') {
+				if (file->get()
+					and file->get() == '>')
+					commentCount--;
+				else {
+					file->unget();
 				}
-				if (before)
-					buff += c;
-				continue;
 			}
+			
+			if (c == '<' and file->peek() == '!') {
+				if (file->get() and
+					file->get() == '-' and file->peek() == '-')
+				{
+					file->get();
+					commentCount++;
+				} else {
+					file->unget();
+					file->unget();
+				}
+			}
+			
+			if (commentCount == 0) {
+				if (c == keyword[index]) {
+					index++;
+					if (index == indexMax) {
+						buff.clear();
+						break;
+					}
+					if (before)
+						buff += c;
+					continue;
+				}
 
-			if (before)
-				*before += buff + c;
+				if (before)
+					*before += buff + c;
+			}
 			index = 0;
 		}
 		
@@ -4549,7 +4574,9 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 					else if (outExt == ".b4s") {
 						prefix = "\t\t<entry Playstring=\"file:";
 						suffix = "\">\n\t\t\t<Name>"
-									+ file.filename().string()
+									+ file.filename().string().substr(0,
+										file.filename().string().size() -
+										file.extension().string().size())
 									+ "</Name>\n\t\t</entry>";
 					}
 					else if (outExt == ".smil") {
@@ -4557,7 +4584,11 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 						suffix = "\"/>";
 					}
 					else if (isEqual(outExt.c_str(), {".asx", ".wax", ".wvx"})) {
-						prefix = "\t<entry>\t\t<ref href=\"";
+						prefix = "\t<entry>\n\t\t<title>"
+									+ file.filename().string().substr(0,
+										file.filename().string().size() -
+										file.extension().string().size())
+									+ "</title>\t\t<ref href=\"";
 						suffix = "\"/>\n\t</entry>";
 					}
 					

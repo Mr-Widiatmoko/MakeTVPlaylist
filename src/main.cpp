@@ -114,8 +114,8 @@ constexpr auto VERSION=\
 All Rights Reserved. License and Warranty\n";
 
 constexpr auto HELP=\
-"Create playlist file '.m3u8' (by default) from vary directories and files, \
-then arranged one episode per Title (by default).\nHosted in https://github.com/Mr-Widiatmoko/MakeTVPlaylist\n\n\
+"Create playlist file from vary directories and files, \
+then by default, arranged one episode per Title.\nHosted in https://github.com/Mr-Widiatmoko/MakeTVPlaylist\n\n\
 Usage:\n    tvplaylist [Option or Dir or File] ...\n\n\
 If no argument was specified, the current directory will be use.\n\n\
 Option:\n\
@@ -134,7 +134,7 @@ constexpr auto ADSCOUNT=\
 "-C, --ads-count 'fixed count'\n\
                  'min count' .. 'max count'\n\
                  'min count' - 'max count'\n\
-        Set the number of how many ads will be shown per insertion.\n\
+        Set the number of how many ads will be shown per insertion. Set 0 to disable ads.\n\
         If you set using range, then ads will be shown randomly between 'min count' to 'max count'.\n\
         To set where the advertise directories location path, use --ads-dir.\n\
 ";
@@ -325,11 +325,13 @@ constexpr auto CHANGED=\
 constexpr auto FIXFILENAME=\
 "-f, --out-filename 'filename'\n\
         Override output playlist filename, by default it will crreate \".m3u8\" playlist.\n\
-        To create \".pls\" or \".xspf\" or \".wpl\" playlist, pass it as extension filename.\n\
+        To create \".pls\", \".wpl\", or others type of playlist, pass it as extension filename.\n\
             Example: --out-filename=my_playlist.xspf.\n\
         To convert or grab files inside another playlist file, \n\
         first add playlist ext[s] and media file ext[s] you desired into --ext.\n\
             Example: --ext=mp4,pls,wpl,xspf another.pls another.wpl another.xspf\n\
+        Here the example to convert from different type of playlist to another type:\n\
+            Example: --ext=mp3,m3u old_musics.m3u --out-filename=old_music.xspf\n\
 ";
 constexpr auto NOOUTPUTFILE=\
 "-F, --no-ouput-file [yes | no]\n\
@@ -946,7 +948,7 @@ private:
 	func get_ull(const Date& l, const Date& r)
 					-> std::pair<unsigned long long, unsigned long long>{
 		std::string sleft, sright;
-		auto go{[&](const unsigned short& x, const unsigned short& y) {
+		auto go{[&sleft, &sright](const unsigned short& x, const unsigned short& y) {
 			if (x == 0 or y == 0) return;
 			
 			auto sx { std::to_string(x) };
@@ -1586,7 +1588,7 @@ public:
 		file.seekp(end - 128);
 		int pos = int(file.tellp());
 		
-		auto set{[&](const char* val, int size) {
+		auto set{[&file, &pos](const char* val, int size) {
 			if (val) {
 				if (size == 1) {
 					char ONE[1];
@@ -1907,7 +1909,7 @@ public:
 		}
 		else
 		{
-			func get{[&](int size, bool isGenre = false) -> std::string {
+			func get{[&file](int size, bool isGenre = false) -> std::string {
 				char buffer[size + 1];
 				buffer[size] = '\0';
 				for(int i = 0; i < size; ++i)
@@ -2394,7 +2396,7 @@ func listDirRecursively(const fs::path& path,
 	std::vector<std::future<void>> asyncs;
 	
 	
-	auto emplace{[&]() {
+	auto emplace{[&list, &out]() {
 		for (auto& d : list)
 			std::fill_n(std::inserter(*out, out->end()), 1, std::move(d.path()));
 	}};
@@ -2661,7 +2663,7 @@ func expandArgs(const int argc, char* const argv[],
 {
 	bool newFull{ false };
 	unsigned lastOptCode{ 0 };
-	func push{ [&](char* const arg, unsigned index, int last) {
+	func push{ [&newFull, &args](char* const arg, unsigned index, int last) {
 		if (last < 0 or index - last <= 0) return;
 				
 		unsigned size = index - last + (newFull ? 2 : 0);
@@ -3024,7 +3026,7 @@ func loadConfig(std::vector<std::string>* const args)
 	file.seekg(0);
 	std::vector<std::string> lines;
 	std::string buff;
-	auto push{[&]() {
+	auto push{[&lines, &buff]() {
 		if (buff.empty())
 			return;
 		lines.emplace_back(buff);
@@ -3033,8 +3035,11 @@ func loadConfig(std::vector<std::string>* const args)
 	auto isComment{ false };
 	auto commentCount { 0 };
 	while ((c = file.get()) and not file.eof()) {
-		if (c == 0x0a or c == 0x0d)
+		if (c == 0x0a or c == 0x0d) {
 			push();
+			if (commentCount == 0 and isComment)
+				isComment = false;
+		}
 		else if (isComment)
 			continue;
 		else if (commentCount > 0) {
@@ -3142,25 +3147,51 @@ func loadPlaylist(const fs::path& path, std::vector<fs::path>* const outPaths)
 {
 	if (not outPaths or path.empty() or not fs::exists(path))
 		return;
-
-	auto lastParent { fs::current_path() };
-	fs::current_path(path.parent_path());
 	
-	std::ifstream file(path.string(), std::ios::in);
+	fs::path lastParent;
+	func prolog{[&path, &lastParent](std::ifstream* const file) {
+		lastParent = fs::current_path();
+		fs::current_path(path.parent_path());
+		*file = std::ifstream(path.string(), std::ios::in);
+		file->seekg(0);
+	}};
+	
+	func epilogue{[&lastParent](std::ifstream* const file) {
+		file->close();
+		fs::current_path(lastParent);
+	}};
 	
 	func push{[&outPaths](std::string& buff) {
 		if (buff.empty())
 			return;
-		outPaths->emplace_back(fs::absolute(fs::path(buff)));
+		auto found { false };
+		for (const char* const protocol :
+			 {"http:", "https:", "ftp:", "rtsp:", "mms:"})
+			if (buff.starts_with(protocol)) {
+				outPaths->emplace_back(fs::path(buff));
+				found = true;
+				break;
+			}
+		
+		if (not found) {
+			if (buff.starts_with("file://"))
+				buff = buff.substr(7);
+			outPaths->emplace_back(fs::absolute(fs::path(buff)));
+		}
+		
 		buff.clear();
 	}};
 	
-	func after{[&file](const char* const keyword, std::string* const before = nullptr) {
+	func after{[](std::ifstream* const file,
+				  const char* const keyword,
+				  std::string* const before = nullptr)
+	{
 		char c;
 		unsigned long index = 0;
 		unsigned long indexMax = std::strlen(keyword);
 		std::string buff;
-		while ((c = file.get()) and not file.eof()) {
+		const auto lastPos { file->tellg() };
+		while ((c = file->get()) and not file->eof()) {
 			if (c == keyword[index]) {
 				index++;
 				if (index == indexMax) {
@@ -3177,66 +3208,118 @@ func loadPlaylist(const fs::path& path, std::vector<fs::path>* const outPaths)
 			index = 0;
 		}
 		
-		return index not_eq 0;
+		if (index not_eq 0)
+			return true;
+		else {
+			file->seekg(lastPos);
+			return false;
+		}
 	}};
 	
-	func getLines{[&push, &file](std::vector<fs::path>* const lines) {
+	func getLines{[](std::ifstream* const file,
+					 std::vector<std::string>* const lines)
+	{
 		std::string buff;
-//		func push{[&buff, &lines]() {
-//			if (buff.empty())
-//				return;
-//			lines->emplace_back(fs::path(buff));
-//			buff.clear();
-//		}};
 		bool isComment{ false };
 		char c;
-		
-		while ((c = file.get()) and not file.eof()) {
-			if (c == 0x0a or c == 0x0d)
-				push(buff);
+		func push{[&buff, &lines]() {
+			if (not buff.empty()) {
+				lines->emplace_back(buff);
+				buff.clear();
+			}
+		}};
+		while ((c = file->get()) and not file->eof()) {
+			if (c == 0x0a or c == 0x0d) {
+				push();
+				isComment = false;
+			}
 			else if (isComment)
 				continue;
 			else if (buff.empty() and c == std::isspace(c))
 				continue;
 			else if (c == '#') {
 				isComment = true;
-				push(buff);
+				push();
 			}
 			else
 				buff += c;
 		}
 	}};
 	
-	func xspf{[&outPaths, &push, &after]() {
-		while (after("<location>file://"))
-			if (std::string value; after("</location>", &value))
-				push(value);
+	func xml_tag{[&push, &after]
+		(std::ifstream* const file,
+		 std::initializer_list<const char* const>* const prefixes,
+		 std::initializer_list<const char* const>* const suffixes)
+	{
+		for (const char* const prefix : *prefixes)
+			if (after(file, prefix)) {
+				for (const char* const suffix : *suffixes)
+					if (std::string value;
+						after(file, suffix, &value))
+					{
+						push(value);
+						return true;
+					}
+				break;
+			}
+		return false;
 	}};
 	
-	func wpl{[&outPaths, &push, &after]() {
-		while (after("<media src=\""))
-			if (std::string value;
-				after("\"/>", &value) or after("\" />", &value))
-				push(value);
-	}};
-
-	func pls{[&outPaths, &getLines]() {
-		getLines(outPaths);
-		
-	}};
-	
-	func m3u{[&outPaths, &getLines]() {
-		getLines(outPaths);
+	func xml{[&prolog, &epilogue, &xml_tag, &push, &after]
+		(std::initializer_list<const char* const>&& prefixes,
+		 std::initializer_list<const char* const>&& suffixes)
+	{
+		std::ifstream file;
+		prolog(&file);
+		while (xml_tag(&file, &prefixes, &suffixes))
+				;
+		epilogue(&file);
 	}};
 	
-	file.seekg(0);
-	if (isEqual(path.extension().string(), ".xspf", left)) xspf();
-	else if (isEqual(path.extension().string(), ".pls", left)) pls();
-	else if (isEqual(path.extension().string(), ".wpl", left)) wpl();
-	else if (isEqual(path.extension().string().c_str(), {".m3u", ".m3u8"}, left)) m3u();
-	file.close();
+	func pls{[&prolog, &epilogue, &getLines, &push]() {
+		std::ifstream file;
+		prolog(&file);
+		std::vector<std::string> lines;
+		getLines(&file, &lines);
+		for (auto& line : lines)
+			if (unsigned long col;
+				line.starts_with("File")
+				and (col = line.find('=')) != std::string::npos)
+			{
+				std::string path { line.substr(col + 1) };
+				push(path);
+			}
+		epilogue(&file);
+	}};
 	
-	fs::current_path(lastParent);
+	func m3u{[&prolog, &epilogue, &getLines, &push]() {
+		std::ifstream file;
+		prolog(&file);
+		std::vector<std::string> lines;
+		getLines(&file, &lines);
+		for (auto& line : lines)
+			push(line);
+		epilogue(&file);
+	}};
+	
+	const auto ext { path.extension().string() };
+	if (isEqual(ext.c_str(), {".m3u8", ".m3u", ".ram"}, left))
+		m3u();
+	else if (isEqual(ext, ".pls", left))
+		pls();
+	else if (isEqual(ext, ".xspf", left))
+		xml({"<location>file://"}, {"</location>"});
+	else if (isEqual(ext, ".wpl", left))
+		xml({"<media src=\""}, {"\""});
+	else if (isEqual(ext, ".b4s", left))
+		xml({"<entry Playstring=\"file:"}, {"\""});
+	else if (isEqual(ext, ".smil", left))
+		xml({"<audio src=\""}, {"\""});
+	else if (isEqual(ext.c_str(), {".asx", ".wax", ".wvx"}, left))
+		xml({"<ref href=\""}, {"\""});
+	
+	//itunes 	{"<key>Location</key><string>"}, {"</string>"}
+	//rdf		{"<dc:identifier>"}, {"</dc:identifier>"}
 }
 #undef func
 
@@ -3281,7 +3364,7 @@ int main(const int argc, char *argv[]) {
 	std::unordered_set<std::string_view> invalidArgs;
 	
 	for (int i{0}; i<args.size(); ++i) {
-		if (auto isMatch{ [&](const char* const with,
+		if (auto isMatch{ [&args, &i](const char* const with,
 							  const char mnemonic,
 							  bool writeBoolean=false,
 							  const std::initializer_list<const char*>& others = {}) {
@@ -3413,7 +3496,7 @@ int main(const int argc, char *argv[]) {
 					std::cout << args[i] << " value range is up side down!. "
 					<< range.first << " greater than " << range.second << '\n';
 				}
-				else if (auto push{[&] (unsigned long pos, unsigned long offset) {
+				else if (auto push{[&args, &i] (unsigned long pos, unsigned long offset) {
 					auto lower { args[i + 1].substr(0, pos) };
 					   auto upper { args[i + 1].substr(pos + offset) };
 					   
@@ -4405,6 +4488,21 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 				"\t<body>\n"\
 				"\t\t<seq>\n";
 		}
+		else if (outExt == ".smil") {
+			outputFile << "<?wpl version=\"1.0\"?>\n"\
+				"<smil>\n"\
+				"\t<body>\n"\
+				"\t\t<seq>\n";
+		}
+		else if (outExt == ".b4s") {
+			outputFile << "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n"\
+			"<WindampXML>\n"\
+			"\t<playlist>\n";
+		}
+		else if (isEqual(outExt.c_str(), {".asx", ".wax", ".wvx"})) {
+			outputFile << "<asx version=\"3.0\"?>\n"\
+				"\t\t<title>" << outputName.filename().string() << "</title>\n";
+		}
 	}
 	
 	auto putIntoPlaylist{ [&](const fs::path& file) {
@@ -4447,6 +4545,20 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 					else if (outExt == ".wpl") {
 						prefix = "\t\t\t<media src=\"";
 						suffix = "\"/>";
+					}
+					else if (outExt == ".b4s") {
+						prefix = "\t\t<entry Playstring=\"file:";
+						suffix = "\">\n\t\t\t<Name>"
+									+ file.filename().string()
+									+ "</Name>\n\t\t</entry>";
+					}
+					else if (outExt == ".smil") {
+						prefix = "\t\t\t<audio src=\"";
+						suffix = "\"/>";
+					}
+					else if (isEqual(outExt.c_str(), {".asx", ".wax", ".wvx"})) {
+						prefix = "\t<entry>\t\t<ref href=\"";
+						suffix = "\"/>\n\t</entry>";
 					}
 					
 					outputFile 	<< prefix << fullPath << suffix << '\n';
@@ -4746,11 +4858,17 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 			outputFile << "\nNumberOfEntries=" << playlistCount
 				<< "\nVersion=2\n";
 		}
-		else if (outExt == ".xspf") {
-			outputFile << "\t</trackList>\n<playlist>\n";
+		else if (outExt == ".b4s") {
+			outputFile << "\t</playlist>\n</WinampXML>\n";
 		}
-		else if (outExt == ".wpl") {
-			outputFile << "\t\t</seq>\n\t</body>\n<smil>\n";
+		else if (outExt == ".xspf") {
+			outputFile << "\t</trackList>\n</playlist>\n";
+		}
+		else if (isEqual(outExt.c_str(), {".wpl", ".smil"})) {
+			outputFile << "\t\t</seq>\n\t</body>\n</smil>\n";
+		}
+		else if (isEqual(outExt.c_str(), {".asx", ".wax", ".wvx"})) {
+			outputFile << "</asx>\n";
 		}
 			
 		if (outputFile.is_open())

@@ -3144,8 +3144,9 @@ func loadConfig(std::vector<std::string>* const args)
 	}
 }
 
-const std::string alias[] = {"&quot", "&apos", "&lt", "&gt", "&amp"};
-const std::string with[] = {"\"", "\\", "<", "<", "&"};
+const std::string XML_CHARS_ALIAS[] = {"&quot", "&apos", "&lt", "&gt", "&amp"};
+const std::string XML_CHAR_NORMAL[] = {"\"", "\\", "<", "<", "&"};
+constexpr auto NETWORK_PROTOCOLS = {"http:", "https:", "ftp:", "ftps:", "rtsp:", "mms:"};
 
 func replace_all(std::string& inout, std::string_view what, std::string_view with)
 {
@@ -3180,10 +3181,10 @@ func loadPlaylist(const fs::path& path, std::vector<fs::path>* const outPaths)
 		if (buff.empty())
 			return;
 		auto found { false };
-		for (const char* const protocol :
-			 {"http:", "https:", "ftp:", "ftps:", "rtsp:", "mms:"})
+		for (const char* const protocol : NETWORK_PROTOCOLS)
 			if (buff.starts_with(protocol)) {
 				replace_all(buff, "%20", " "); // TODO: Decoding percent-encoded triplets of unreserved characters. Percent-encoded triplets of the URI in the ranges of ALPHA (%41–%5A and %61–%7A), DIGIT (%30–%39), hyphen (%2D), period (%2E), underscore (%5F), or tilde (%7E) do not require percent-encoding and should be decoded to their corresponding unreserved characters.
+				
 				outPaths->emplace_back(fs::path(buff));
 				found = true;
 				break;
@@ -3304,9 +3305,9 @@ func loadPlaylist(const fs::path& path, std::vector<fs::path>* const outPaths)
 //						< to  &lt;
 //						> to  &gt;
 //						& to  &amp;
-						for (auto w { 0 }; w<sizeof(alias) /sizeof(alias[0]); ++w)
-							if (isContains(value, alias[w], left)) {
-								replace_all(value, alias[w], with[w]);
+						for (auto w { 0 }; w<sizeof(XML_CHARS_ALIAS) /sizeof(XML_CHARS_ALIAS[0]); ++w)
+							if (isContains(value, XML_CHARS_ALIAS[w], left)) {
+								replace_all(value, XML_CHARS_ALIAS[w], XML_CHAR_NORMAL[w]);
 							}
 						push(value);
 						return true;
@@ -4576,8 +4577,7 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 			{
 				auto fullPath { file.string() };
 				auto needAboslute { true };
-				for (const char* const protocol :
-					 {"http:", "https:", "ftp:", "ftps:", "rtsp:", "mms:"})
+				for (const char* const protocol : NETWORK_PROTOCOLS)
 					if (fullPath.starts_with(protocol)) {
 						replace_all(fullPath, "%20", " ");
 						needAboslute = false;
@@ -4594,9 +4594,9 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 					if (isEqual(outExt.c_str(), {".wpl", ".b4s", ".smil",
 												 ".asx", ".wax", ".wvx"}))
 					{
-						for (auto w { 0 }; w<sizeof(alias) /sizeof(alias[0]); ++w)
-							if (isContains(fullPath, alias[w], left)) {
-								replace_all(fullPath, alias[w], with[w]);
+						for (auto w { 0 }; w<sizeof(XML_CHARS_ALIAS) /sizeof(XML_CHARS_ALIAS[0]); ++w)
+							if (isContains(fullPath, XML_CHARS_ALIAS[w], left)) {
+								replace_all(fullPath, XML_CHARS_ALIAS[w], XML_CHAR_NORMAL[w]);
 								break;
 							}
 						

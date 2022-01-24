@@ -2403,6 +2403,7 @@ func listDirRecursively(const fs::path& path,
 	do {
 		do {
 			list.clear();
+			dirs.clear();
 			listDir(head, &list, false, includeRegularFiles);
 			if (list.size() == 1)
 				std::fill_n(std::inserter(*out, out->end()), 1,
@@ -3143,6 +3144,20 @@ func loadConfig(std::vector<std::string>* const args)
 	}
 }
 
+const std::string alias[] = {"&quot", "&apos", "&lt", "&gt", "&amp"};
+const std::string with[] = {"\"", "\\", "<", "<", "&"};
+
+func replace_all(std::string& inout, std::string_view what, std::string_view with)
+{
+	std::size_t count{};
+	for (std::string::size_type pos{};
+		 inout.npos != (pos = inout.find(what.data(), pos, what.length()));
+		 pos += with.length(), ++count) {
+		inout.replace(pos, what.length(), with.data(), with.length());
+	}
+}
+ 
+
 func loadPlaylist(const fs::path& path, std::vector<fs::path>* const outPaths)
 {
 	if (not outPaths or path.empty() or not fs::exists(path))
@@ -3166,8 +3181,9 @@ func loadPlaylist(const fs::path& path, std::vector<fs::path>* const outPaths)
 			return;
 		auto found { false };
 		for (const char* const protocol :
-			 {"http:", "https:", "ftp:", "rtsp:", "mms:"})
+			 {"http:", "https:", "ftp:", "ftps:", "rtsp:", "mms:"})
 			if (buff.starts_with(protocol)) {
+				replace_all(buff, "%20", " "); // TODO: Decoding percent-encoded triplets of unreserved characters. Percent-encoded triplets of the URI in the ranges of ALPHA (%41–%5A and %61–%7A), DIGIT (%30–%39), hyphen (%2D), period (%2E), underscore (%5F), or tilde (%7E) do not require percent-encoding and should be decoded to their corresponding unreserved characters.
 				outPaths->emplace_back(fs::path(buff));
 				found = true;
 				break;
@@ -3283,6 +3299,15 @@ func loadPlaylist(const fs::path& path, std::vector<fs::path>* const outPaths)
 					if (std::string value;
 						after(file, suffix, &value))
 					{
+//						" to  &quot;
+//						' to  &apos;
+//						< to  &lt;
+//						> to  &gt;
+//						& to  &amp;
+						for (auto w { 0 }; w<sizeof(alias) /sizeof(alias[0]); ++w)
+							if (isContains(value, alias[w], left)) {
+								replace_all(value, alias[w], with[w]);
+							}
 						push(value);
 						return true;
 					}
@@ -4549,11 +4574,41 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 			}
 			
 			{
-				const auto fullPath { fs::absolute(file).string() };
+				auto fullPath { file.string() };
+				auto needAboslute { true };
+				for (const char* const protocol :
+					 {"http:", "https:", "ftp:", "ftps:", "rtsp:", "mms:"})
+					if (fullPath.starts_with(protocol)) {
+						replace_all(fullPath, "%20", " ");
+						needAboslute = false;
+						break;
+					}
+				
+				if (needAboslute)
+					fullPath = fs::absolute(file).string();
+				
 				if (not dontWrite) {
 					std::string prefix;
 					std::string suffix;
-
+					std::string name;
+					if (isEqual(outExt.c_str(), {".wpl", ".b4s", ".smil",
+												 ".asx", ".wax", ".wvx"}))
+					{
+						for (auto w { 0 }; w<sizeof(alias) /sizeof(alias[0]); ++w)
+							if (isContains(fullPath, alias[w], left)) {
+								replace_all(fullPath, alias[w], with[w]);
+								break;
+							}
+						
+						if (not isEqual(outExt.c_str(), {".wpl", ".smil"}))
+						{
+							fs::path tmp = fs::path(fullPath).filename();
+							name = tmp.string().substr(0,
+								tmp.string().size()
+								- tmp.extension().string().size());
+						}
+					}
+					
 					if (outExt == ".pls") {
 						auto indexString{ std::to_string(playlistCount) };
 						prefix = "File" + indexString + '=';
@@ -4575,9 +4630,7 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 					else if (outExt == ".b4s") {
 						prefix = "\t\t<entry Playstring=\"file:";
 						suffix = "\">\n\t\t\t<Name>"
-									+ file.filename().string().substr(0,
-										file.filename().string().size() -
-										file.extension().string().size())
+									+ name
 									+ "</Name>\n\t\t</entry>";
 					}
 					else if (outExt == ".smil") {
@@ -4586,9 +4639,7 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 					}
 					else if (isEqual(outExt.c_str(), {".asx", ".wax", ".wvx"})) {
 						prefix = "\t<entry>\n\t\t<title>"
-									+ file.filename().string().substr(0,
-										file.filename().string().size() -
-										file.extension().string().size())
+									+ name
 									+ "</title>\t\t<ref href=\"";
 						suffix = "\"/>\n\t</entry>";
 					}

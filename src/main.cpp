@@ -9,9 +9,7 @@
 //  distribution and at https://github.com/Mr-Widiatmoko/MakeTVPlaylist/LICENSE.txt
 //
 
-#if DEBUG
 #include <chrono>
-#endif
 #include <iostream>
 #include <string>
 #include <charconv>
@@ -30,6 +28,7 @@
 #include <random>
 
 std::unordered_map<std::string, std::string> state;
+constexpr auto OPT_WRITEDEFAULTS	{"write-defaults"};			// W
 constexpr auto OPT_LOAD				{"load-config"};			// L
 constexpr auto OPT_ARRANGEMENT 		{"arrangement"};			// w
 constexpr auto OPT_ARRANGEMENT_DEFAULT		{"default"};
@@ -92,6 +91,25 @@ constexpr auto OPT_DEXCLCHANGED		{"exclude-changed"};		// G
 
 constexpr auto OPT_DEBUG			{"debug"};                  // B
 
+#if defined(_WIN32) || defined(_WIN64)
+#define CONFIG_PATH	"C:\\ProgramData\\tvplaylist.conf"
+#else
+#define CONFIG_PATH	"/usr/local/etc/tvplaylist.conf"
+#endif
+
+constexpr auto WRITE=\
+"-W, --write-defaults [reset | edit | add]\n\
+     --write-config [reset | edit | add]\n\
+        Write anything you defined to \""\
+        CONFIG_PATH\
+"\" as new default.\n\
+        To reset to factory default, pass \"reset\".\n\
+        Example: --write-defaults reset\n\
+        To edit existing, pass \"edit\".\n\
+        Example: --ads-count=1-3:write-config=edit\n\
+        To add new option, pass \"add\".\n\
+        Example: -W=add -D=/tmp/Downloads:D=/tmp/Backup\n\
+";
 constexpr auto LOAD=\
 "-L, --load-config 'custom file'\n\
         Load configuration from custom file.\n\
@@ -101,6 +119,7 @@ constexpr auto LOAD=\
         Other platfom located in \"/usr/local/etc/tvplaylist.conf\".\n\
         If config file exist in default location, then it will be automatic loaded.\n\
         Content of configuration are list of options (with/out \"--\") separated by new line.\n\
+        To write config you can use option --write-config, either by specifying \"edit\", \"reset\", or \"add\" as parameter.\n\
         Example:\n\
             /* Multi lines\n\
                comment */\n\
@@ -375,9 +394,9 @@ Common normal: \"Monday Jan 15 2022 7:00 PM\"\n\
                \"Mon, 15/january/2022 7:0:0 pm\"\n\
                \"Monday 1/15/2022 19:0\"\n\
 Equal and Acceptable: \"15 pm mon 7:0 2022/jan\"\n\
-If you want to test 'date and/or time' use --debug=date 'date and/or time', for the example:\n\
+If you want to test 'date and/or time' use --debug=date 'date and/or time' ['format'], for the example:\n\
 	 --debug=date \"pm 3:33\"\n\
-	 or --debug=date wed\n\
+	 or --debug=date now \"Date: %F, Time: %T.\"\n\
 It will showing internal tvplaylist date time recognizer, with format \"Weekday Year/Month/Day Hour:Minute:Second\".\n\
 ";
 
@@ -385,7 +404,7 @@ It will showing internal tvplaylist date time recognizer, with format \"Weekday 
 constexpr auto OPTS = { &OPT_VERSION, &OPT_HELP, &OPT_ARRANGEMENT,
 	&OPT_SEARCH, &OPT_VERBOSE, &OPT_BENCHMARK, & OPT_OVERWRITE,
 	&OPT_SKIPSUBTITLE, &OPT_OUTDIR, &OPT_ADSDIR, &OPT_ADSCOUNT,
-	&OPT_EXECUTION, &OPT_LOAD, &OPT_FIXFILENAME,
+	&OPT_EXECUTION, &OPT_LOAD, &OPT_WRITEDEFAULTS, &OPT_FIXFILENAME,
 	&OPT_NOOUTPUTFILE, &OPT_SIZE, &OPT_EXCLSIZE, &OPT_EXT, &OPT_EXCLEXT,
 	&OPT_FIND, &OPT_EXCLFIND, &OPT_REGEX, &OPT_EXCLREGEX, &OPT_EXCLHIDDEN,
 	
@@ -399,7 +418,7 @@ constexpr auto OPTS = { &OPT_VERSION, &OPT_HELP, &OPT_ARRANGEMENT,
 constexpr const char* const* HELPS[] = { &VERSION, &HELP, &ARRANGEMENT,
 	&SEARCH, &VERBOSE, &BENCHMARK, & OVERWRITE,
 	&SKIPSUBTITLE, &OUTDIR, &ADSDIR, &ADSCOUNT,
-	&EXECUTION, &LOAD, &FIXFILENAME,
+	&EXECUTION, &LOAD, &WRITE, &FIXFILENAME,
 	&NOOUTPUTFILE, &SIZE, &SIZE, &EXT, &EXT,
 	&FIND, &FIND, &REGEX, &REGEX, &EXCLHIDDEN,
 	
@@ -410,8 +429,8 @@ constexpr const char* const* HELPS[] = { &VERSION, &HELP, &ARRANGEMENT,
 };
 
 constexpr const char* const* ALL_HELPS[] = {
-	&VERSION, &HELP, &LOAD, &ARRANGEMENT, &SEARCH, &VERBOSE, &BENCHMARK, & OVERWRITE,
-	&SKIPSUBTITLE, &OUTDIR, &ADSDIR, &ADSCOUNT, &EXECUTION, &FIXFILENAME,
+	&VERSION, &HELP, &LOAD, &WRITE, &ARRANGEMENT, &SEARCH, &VERBOSE, &BENCHMARK,
+	&OVERWRITE, &SKIPSUBTITLE, &OUTDIR, &ADSDIR, &ADSCOUNT, &EXECUTION, &FIXFILENAME,
 	&NOOUTPUTFILE, &EXCLHIDDEN,
 	
 	&SIZE, &EXT, &FIND, &REGEX, &DATE, &CREATED, &MODIFIED, &ACCESSED, &CHANGED,
@@ -562,7 +581,7 @@ func isEqual(const std::string& l, const std::string& r, IgnoreCase ic = none,
 			 unsigned long start = 0,
 			 unsigned long end = 0)
 {
-	if (l.size() != r.size()) return false;
+	if ((start not_eq 0 or end not_eq 0) and l.size() != r.size()) return false;
 	
 	for (auto i{ start }; i< (end > 0 and start < end ? end : l.size()); ++i)
 		switch (ic){
@@ -684,7 +703,7 @@ func printHelp(const char* const arg = nullptr)
 			}
 			i++;
 			if (i >= OPTS.size() - 2) {
-				std::cout << "No option named \"" << arg << '\"';
+				std::cout << "⚠️ No option named \"" << arg << '\"';
 				std::vector<std::string> found;
 				for (auto& opt : OPTS)
 					if (getLikely(arg, *opt) > 80)
@@ -812,9 +831,9 @@ struct Date
 		return std::mktime(&tm); //std::time(nullptr);
 	}
 
-	func string(const char* const format = nullptr) const -> std::string {
+	func string(const char* const format = nullptr, bool UTC = false) const -> std::string {
 		std::string s;
-		if (format) {
+		if (format and std::strlen(format) > 0) {
 			std::tm tm{};
 			if (year > 0)
 				tm.tm_year = year-1900;
@@ -827,9 +846,10 @@ struct Date
 			tm.tm_sec = second;
 			if (weekday > 0)
 				tm.tm_wday = weekday;
-			auto t =  std::mktime(&tm);
+			std::time_t t =  std::mktime(&tm);
 			char mbstr[100];
-			if (std::strftime(mbstr, sizeof(mbstr), format, std::localtime(&t)))
+			if (std::strftime(mbstr, sizeof(mbstr), format,
+							  UTC ? std::gmtime(&t) : std::localtime(&t)))
 				s = mbstr;
 		} else {
 			if (weekday > 0)
@@ -893,9 +913,9 @@ private:
 	/*ja_JP.UTF-8:*/ "1月", "2月", "3月", "4月", "5月", "6月", "7月", "8月", "9月", "10月", "11月", "12月",
 	/*zh_CN.UTF-8:*/ "一月", "二月", "三月", "四月", "五月", "六月", "七月", "八月", "九月", "十月", "十一月", "十二月",
 	};
-	
-	func getWeekDayName(unsigned short index, const char* const locale = nullptr)
-		const -> std::string
+public:
+	static func getWeekDayName(unsigned short index, const char* const locale = nullptr)
+		-> std::string
 	{
 		if (index >= 1 or index <= 7) {
 			std::tm tm{};
@@ -912,7 +932,22 @@ private:
 		return std::string("");
 	}
 	
-	func getWeekDayIndex(int aYear = 0,
+	static func getWeekDayNames(const char* result[7], const char* const locale = nullptr) {
+		for (auto i{9}, k{0}; i<16; ++i, ++k) {
+			std::tm tm{};
+			tm.tm_year = 2020-1900; // 2020
+			tm.tm_mon = 2-1; // February
+			tm.tm_mday = i; // 15th
+			std::time_t t = std::mktime(&tm); //std::time(nullptr);
+			
+			char mbstr[3];
+			std::setlocale(LC_ALL, locale ? locale : std::locale().name().c_str());
+			if (std::strftime(mbstr, sizeof(mbstr), "%a", std::localtime(&t)))
+				result[k] = mbstr;
+		}
+	}
+
+	static func getWeekDayIndex(int aYear = 0,
 					unsigned short aMonth = 0,
 					unsigned short aDay = 0,
 					unsigned short expectedWeekDay = 0)
@@ -944,9 +979,10 @@ private:
 		return unsigned(0);
 	}
 	
-	static
-	func get_ull(const Date& l, const Date& r)
-					-> std::pair<unsigned long long, unsigned long long>{
+private:
+	static func get_ull(const Date& l, const Date& r)
+					-> std::pair<unsigned long long, unsigned long long>
+	{
 		std::string sleft, sright;
 		auto go{[&sleft, &sright](const unsigned short& x, const unsigned short& y) {
 			if (x == 0 or y == 0) return;
@@ -985,16 +1021,8 @@ private:
 		return std::stoull(Y + m + d + H + M + S);
 	}
 	
-public:
-	Date(const long* tl) {
-		char a[5];
-		unsigned short * property[] = {&weekday, &year, &month, &day, &hour, &minute, &second};
-		for (unsigned short i{ 0 }; auto& f : {"%u", "%Y", "%m", "%d", "%H", "%M", "%S"}) {
-			std::strftime(a, sizeof(a), f, std::localtime(tl));
-			*property[i++] = std::stoi(a);
-		}
-		
-		// Just not trust weekday returned from strftime("%u")
+	func setWeekday()
+	{
 		const std::chrono::year_month_day 	ymd
 			{ std::chrono::year(year) / month / day };
 		const std::chrono::weekday 			aweekday
@@ -1003,11 +1031,52 @@ public:
 		if (weekday != aweekday.iso_encoding())
 			weekday = aweekday.iso_encoding();
 	}
+public:
+	static func now() -> Date
+	{
+		const std::chrono::time_point<std::chrono::system_clock> now =
+				std::chrono::system_clock::now();
+		const std::time_t t = std::chrono::system_clock::to_time_t(now);
+
+		Date date(&t);
+		return date;
+	}
+	
+	func set(const std::time_t* t, bool UTC = false)
+	{
+		char a[5];
+		unsigned short * property[] = {&year, &month, &day, &hour, &minute, &second};
+		for (unsigned short i{ 0 }; auto& f : {"%Y", "%m", "%d", "%H", "%M", "%S"}) {
+			std::strftime(a, sizeof(a), f,
+						  UTC ? std::gmtime(t) : std::localtime(t));
+			*property[i++] = std::stoi(a);
+		}
+		
+		// Just not trust weekday returned from strftime("%u")
+		setWeekday();
+	}
+	
+	Date(const std::time_t* const t, bool UTC = false) {
+		set(t, UTC);
+	}
 		
 	Date(const std::string& s): year{0}, month{0}, day{0}, weekday{0},
 								hour{0}, minute{0}, second{0}
 	{
-										
+		if (isEqual(s.c_str(), {"now", "today"}, left)) {
+			const std::chrono::time_point<std::chrono::system_clock> now =
+					std::chrono::system_clock::now();
+			const std::time_t t = std::chrono::system_clock::to_time_t(now);
+			set(&t);
+			if (isEqual(s, "today")) {
+				hour = 0;
+				minute = 0;
+				second = 0;
+			}
+				
+			return;
+		}
+			
 		auto isDigit{[](const std::string& s) -> bool
 		{
 			for (auto i{0}; i<s.size(); ++i)
@@ -1140,7 +1209,7 @@ public:
 				}
 				continue;
 			} else
-				std::cout << "Unknown other: " << s << '\n';
+				std::cout << "⚠️ Cannot understand literal \"" << s << "\"!.\n";
 		}
 		
 		
@@ -1183,7 +1252,7 @@ public:
 			}}.iso_encoding();
 			
 			if (weekDay > -1 and weekDay != weekday)
-				std::cout << "Invalid Weekday was defined for " << string("%B %d %Y") << "!\n";
+				std::cout << "⚠️ Invalid Weekday was defined for " << string("%B %d %Y") << "!\n";
 		}
 			
 		unsigned short* property[] = {&hour, &minute, &second };
@@ -1194,7 +1263,7 @@ public:
 			} else if (i < sizeof(property)/sizeof(property[0]))
 				*property[i++] = t;
 			else
-				std::cout << "Invalid unit time on "
+				std::cout << "⚠️ Invalid unit time on "
 					<< hour << ':'<< minute << ':' << second << '\n';
 		if (hasPM)
 			hour += 12;
@@ -1208,25 +1277,8 @@ public:
 	}
 
 	func isValid() -> bool {
-		return (0 > year or month > 0 or day > 0 or hour <= 24 or minute <= 60 or second <= 60);
-	}
-
-	func getWeekDays(const char* const locale, const char* result[7]) {
-		for (auto i{9}, k{0}; i<16; ++i, ++k) {
-			std::tm tm{};
-			tm.tm_year = 2020-1900; // 2020
-			tm.tm_mon = 2-1; // February
-			tm.tm_mday = i; // 15th
-			//		tm.tm_hour = 10;
-			//		tm.tm_min = 15;
-			//		tm.tm_isdst = 0; // Not daylight saving
-			std::time_t t = std::mktime(&tm); //std::time(nullptr);
-			
-			char mbstr[3];
-			std::setlocale(LC_ALL, locale ? locale : std::locale().name().c_str());
-			if (std::strftime(mbstr, sizeof(mbstr), "%a", std::localtime(&t)))
-				result[k] = mbstr;
-		}
+		return not (year == 0 and month == 0 and day == 0 and hour == 0 and minute == 0 and second == 0 and weekday == 0)
+		and (year > 0 or month > 0 or day > 0 or hour <= 24 or minute <= 60 or second <= 60);
 	}
 
 };
@@ -2664,24 +2716,23 @@ func expandArgs(const int argc, char* const argv[],
 {
 	bool newFull{ false };
 	unsigned lastOptCode{ 0 };
-	func push{ [&newFull, &args](char* const arg, unsigned index, int last) {
+	func push{ [&newFull, &args](const char* const arg,
+								 const unsigned index,
+								 const int last) {
 		if (last < 0 or index - last <= 0) return;
 				
-		unsigned size = index - last + (newFull ? 2 : 0);
-		char dst[size];
+		unsigned size = index - last;
+		std::string newArg;
 
-		unsigned i { 0 };
-		if (newFull) {
-			dst[i++] = '-';
-			dst[i++] = '-';
-		}
+		if (newFull)
+			newArg = "--";
 		
-		for (auto inc{last}; i < size; ++i, ++inc)
-			dst[i] = arg[inc];
-		
-		dst[i] = '\0';
-		
-		args->emplace_back(std::string(dst));
+		char dst[size];
+		dst[size] = '\0';
+		std::memcpy(dst, arg + last, sizeof dst);
+		newArg += dst;
+
+		args->emplace_back(std::move(newArg));
 		
 		if (newFull)
 			newFull = false;
@@ -3012,6 +3063,153 @@ func parseKeyValue(std::string* const s, bool isExclude) {
 	if (isKeyValue and 0 != std::strlen(keyword))
 		s->insert(0, 1, char(1));
 }
+template <typename  T>
+func getLines(std::basic_istream<T>* const inputStream,
+			  std::vector<std::string>* const lines,
+			  const std::initializer_list<std::string>&& excludePrefix)
+{
+	int commentCount { 0 };
+	bool isComment { false };
+	std::string buff;
+	T c;
+		
+	func push{[&lines, &buff]() {
+		if (buff.empty())
+			return;
+		lines->emplace_back(buff);
+		buff.clear();
+	}};
+	
+	func hasPrefix{[&c, &inputStream, &excludePrefix]() {
+		unsigned i { 0 };
+		for (const auto& s : excludePrefix) {
+			if (c == s[i]) {
+				i++;
+				
+				if (i == s.size())
+					return true;
+					
+				c = inputStream->get();
+			}
+			
+			for (; i>0; --i)
+				inputStream->unget();
+		}
+		
+		return false;
+	}};
+	
+	while ((c = inputStream->get()) and not inputStream->eof()) {
+		if (c == 0x0a or c == 0x0d) {
+			push();
+			if (commentCount == 0 and isComment)
+				isComment = false;
+		}
+		else if (isComment)
+			continue;
+		else if (commentCount > 0) {
+			if (c == '*' and inputStream->peek() == '/') {
+				inputStream->get();
+				commentCount--;
+			}
+			continue;
+		}
+		else if (buff.empty() and c == std::isspace(c))
+			continue;
+		else if (auto peek { inputStream->peek() };
+				 c == '/' and (peek == '/' or peek == '*')) {
+			if (peek == '*')
+				commentCount++;
+			push();
+			isComment = true;
+			inputStream->get();
+			continue;
+		}
+		else if (c == '#') {
+			isComment = true;
+			push();
+		}
+		else {
+			if (buff.empty() and excludePrefix.size() > 0 and hasPrefix())
+				continue;
+			
+			buff += c;
+		}
+	}
+	push();
+}
+
+enum WriteMode { New, Edit, Add };
+
+func writeConfig(const std::vector<std::string>* const args,
+				   const WriteMode mode)
+{
+	std::vector<std::string> lines;
+	
+	if (mode not_eq New) {
+		std::ifstream file(CONFIG_PATH);
+		file.seekg(0);
+		getLines(&file, &lines, {});
+		file.close();
+		
+		if (mode == Edit)
+			for (const auto& arg : *args)
+				if (auto isMnemonic { arg.size() == 2 and arg[0] == '-' and std::isalpha(arg[1]) };
+					isMnemonic or arg.starts_with("--"))
+					for (auto i{ lines.begin() }; i<lines.end(); ++i) {
+						if (isEqual(arg.c_str() + 2, *i, none, 0, arg.size() - 2)
+							or (isMnemonic
+							and lines.size() >= 2 and (*i)[0] == '-' and (*i)[1] == arg[1]
+							and (lines.size() == 2 or ((*i)[2] == '=' or (*i)[2] == ' '))))
+							lines.erase(i);
+					}
+	}
+
+	
+	std::fstream file(CONFIG_PATH, std::ios::out);
+	#define DATE_FORMAT	"%A, %d %B %Y at %I:%M:%S %p"
+	if (mode == New )
+		file << "# Configuration made in " << Date::now().string(DATE_FORMAT) << '\n';
+	
+	for (const auto& line : lines)
+		file << line << '\n';
+	
+	if (mode not_eq New)
+		file << "# Edited on " << Date::now().string(DATE_FORMAT) << '\n';
+	#undef DATE_FORMAT
+	
+	for (unsigned i { 0 }; i<args->size(); ++i) {
+		const auto s = (*args)[i];
+		unsigned offset = 0;
+		auto isOpt { s.starts_with("--") };
+		if (isOpt)
+			offset = 2;
+		else if (isOpt = s.size() >= 2 and s[0] == '-' and std::isalpha(s[1])
+				 and (s.size() == 2 or (s[2] == '=' or s[2] == ' '));
+				 isOpt)
+			offset = 1;
+		if (isOpt) {
+			if ((offset == 2 and isEqual(s.c_str() + offset, { OPT_WRITEDEFAULTS, OPT_LOAD }))
+				or (offset == 1 and (s[1] == 'W' or s[1] == 'L')))
+			{
+				if (auto next { i + 1 < args->size() ? (*args)[i + 1] : "" };
+					OPT_WRITEDEFAULTS and not isEqual(next.c_str(), {"reset", "edit"}))
+					;
+				else
+					i++;
+				continue;
+			}
+			
+			file << '\n';
+		} else
+			file << ' '; //(i == args->size() ? '\0' : ' ');
+		file << s.c_str() + (isOpt ? offset : 0);
+	}
+	file << '\n';
+	file.flush();
+	
+	file.close();
+}
 
 func loadConfig(std::vector<std::string>* const args)
 {
@@ -3022,67 +3220,23 @@ func loadConfig(std::vector<std::string>* const args)
 		return;
 	
 	std::ifstream file(state[OPT_LOAD], std::ios::in);
-	char c;
-	
 	file.seekg(0);
+
 	std::vector<std::string> lines;
-	std::string buff;
-	auto push{[&lines, &buff]() {
-		if (buff.empty())
-			return;
-		lines.emplace_back(buff);
-		buff.clear();
-	}};
-	auto isComment{ false };
-	auto commentCount { 0 };
-	while ((c = file.get()) and not file.eof()) {
-		if (c == 0x0a or c == 0x0d) {
-			push();
-			if (commentCount == 0 and isComment)
-				isComment = false;
-		}
-		else if (isComment)
-			continue;
-		else if (commentCount > 0) {
-			if (c == '*' and file.peek() == '/') {
-				file.get();
-				commentCount--;
-			}
-			continue;
-		}
-		else if (buff.empty() and c == std::isspace(c))
-			continue;
-		else if (auto peek { file.peek() };
-				 c == '/' and (peek == '/' or peek == '*')) {
-			if (peek == '*')
-				commentCount++;
-			push();
-			isComment = true;
-			file.get();
-			continue;
-		}
-		else if (c == '#') {
-			isComment = true;
-			push();
-		}
-		else {
-			if (buff.empty() and c == '-' and file.peek() == '-') {
-				file.get();
-				continue;
-			}
-			buff += c;
-		}
-	}
-	push();
+	getLines(&file, &lines, {"--"});
+	
 	file.close();
 	
 	for (auto found{ false };
 		 const auto& line : lines) {
 		for (const char* const *const opt : OPTS)
 			if (auto isMnemonic {
-				line.size() >= 2 and line[0] == '-' and std::isalpha(line[1])
-				};
-				isMnemonic or line.starts_with(*opt))
+				line.size() >= 2 and line[0] == '-' and std::isalpha(line[1]) };
+				isMnemonic
+				or (line.size() > 3 and line[0] == '-' and line[1] == '-'
+					and 0 == std::strncmp(line.c_str() + 2, *opt, std::strlen(*opt)))
+				or (line.starts_with(*opt))
+				)
 			{
 				found = true;
 				if (args) {
@@ -3093,12 +3247,13 @@ func loadConfig(std::vector<std::string>* const args)
 				}
 				
 				if (auto col{ line.find('=') };
-					col == std::string::npos) {
-					if (args)
-						args->emplace_back("true");
-				}
-				else {
-					col++;
+					col != std::string::npos
+					or line.find(' ') != std::string::npos)
+				{
+					if (col == std::string::npos)
+						col = line.find(' ');
+					else
+						col++;
 					
 					while (++col < line.size() and std::isspace(line[col]))
 						;
@@ -3377,7 +3532,6 @@ func loadPlaylist(const fs::path& path, std::vector<fs::path>* const outPaths)
 	else if (isEqual(ext.c_str(), {".asx", ".wax", ".wvx"}, left))
 		xml({"<ref href=\""}, {"\""});
 	
-	//itunes 	{"<key>Location</key><string>"}, {"</string>"}
 	//rdf		{"<dc:identifier>"}, {"</dc:identifier>"}
 }
 #undef func
@@ -3407,13 +3561,8 @@ int main(const int argc, char *argv[]) {
 		
 	std::vector<std::string> args;
 	
-	#if defined(_WIN32) || defined(_WIN64)
-	#define CONFIG_PATH	"C:\\ProgramData\\tvplaylist.conf"
-	#else
-	#define CONFIG_PATH	"/usr/local/etc/tvplaylist.conf"
-	#endif
 	state[OPT_LOAD] = CONFIG_PATH ;
-	#undef CONFIG_PATH
+	
 	loadConfig(&args);
 
 	expandArgs(argc, argv, ARGS_START_INDEX, &args);
@@ -3507,15 +3656,43 @@ int main(const int argc, char *argv[]) {
 						}
 						return RETURN_VALUE
 					}
-					if (args[i] == "date" and i + 1 < args.size())
-					{
-						i++;
-						Date date((args[i]));
-						std::cout << '\"' << args[i] << '\"'
-						<< "  -> \"" << date.string() << "\" "
-						<< (date.isValid() ? "✅" : "❌") << '\n';
+					if (args[i] == "date") {
+//						if (i + 2 < args.size()) {
+//							Date date((args[++i]));
+//
+//							std::cout << '\"' << args[i] << '\"'
+//							<< "  -> \"" << date.string(args[++i].c_str()) << "\" "
+//							<< (date.isValid() ? "✅" : "❌") << '\n';
+//						}
+						if (i + 1 < args.size()) {
+							i++;
+							auto input { args[i] };
+							
+							Date date(input);
+							
+							std::cout << '\"' << input << '\"' << "  -> \"";
+							
+							std::cout << date.string(i + 1 < args.size()
+													 ? args[++i].c_str()
+													 : nullptr);
+							std::cout << "\" "
+								<< (date.isValid() ? "✅" : "❌") << '\n';
+						}
+						
 						return RETURN_VALUE
-
+					}
+				}
+			}
+			else if (isMatch(OPT_WRITEDEFAULTS, 'W', true, {"write-config"})) {
+				if (i + 1 < args.size()) {
+					if (args[i + 1] == "reset") {
+						fs::remove(CONFIG_PATH);
+						state[OPT_WRITEDEFAULTS].clear();
+						i++;
+					}
+					else if (args[i + 1] == "edit" or args[i + 1] == "add") {
+						i++;
+						state[OPT_WRITEDEFAULTS] = args[i];
 					}
 				}
 			}
@@ -3527,7 +3704,7 @@ int main(const int argc, char *argv[]) {
 					continue;
 				}
 				
-				std::cout << "Expecting config file path. Please see --help "
+				std::cout << "⚠️ Expecting config file path. Please see --help "
 				<< args[i].substr(2) << '\n';
 			}
 			else if (isMatch(OPT_ADSDIR, 'D')) {
@@ -3537,7 +3714,7 @@ int main(const int argc, char *argv[]) {
 					continue;
 				}
 				
-				std::cout << "Expecting directory path. Please see --help "
+				std::cout << "⚠️ Expecting directory path. Please see --help "
 				<< args[i].substr(2) << '\n';
 			}
 			else if (isMatch(OPT_ADSCOUNT, 'C')) {
@@ -3590,7 +3767,7 @@ int main(const int argc, char *argv[]) {
 						continue;
 					}
 				}
-				std::cout << "Expecting number of advertise. Please see --help "
+				std::cout << "⚠️ Expecting number of advertise. Please see --help "
 				<< args[i].substr(2) << '\n';
 			}
 			else if (isMatch(OPT_NOOUTPUTFILE, 	'F', true)) {
@@ -3633,7 +3810,7 @@ int main(const int argc, char *argv[]) {
 					
 					state[OPT_ARRANGEMENT] = value;
 				} else
-					std::cout << "Expecting arrangement type. Please see --help "
+					std::cout << "⚠️ Expecting arrangement type. Please see --help "
 					<< args[i].substr(2) << "\n";
 			}
 			else if (isMatch(OPT_CASEINSENSITIVE, 'N', true,
@@ -3693,7 +3870,7 @@ int main(const int argc, char *argv[]) {
 					if (last != -1)
 						push();
 				} else
-					std::cout << "Expecting search keyword!\n";
+					std::cout << "⚠️ Expecting search keyword!\n";
 			}
 			else if (isMatch(OPT_FIND, 			'i')
 					 or isMatch(OPT_EXCLFIND, 	'I')) {
@@ -3748,7 +3925,7 @@ int main(const int argc, char *argv[]) {
 						push();
 					#endif
 				} else
-					std::cout << "Expecting keyword after \""
+					std::cout << "⚠️ Expecting keyword after \""
 					<< args[i] << "\" option. Please see --help "
 					<< args[i].substr(2) << "\n";
 			}
@@ -3764,7 +3941,7 @@ int main(const int argc, char *argv[]) {
 					if (found)
 						continue;
 				}
-				std::cout << "Expecting regular expression syntax after \""
+				std::cout << "⚠️ Expecting regular expression syntax after \""
 							<< args[i] << "\" option. Please see --help "
 							<< args[i].substr(2) << "\n";
 			}
@@ -3806,7 +3983,7 @@ int main(const int argc, char *argv[]) {
 						i++;
 					}
 				} else
-					std::cout << "Expecting regular expression after \""
+					std::cout << "⚠️ Expecting regular expression after \""
 								<< args[i] << "\" option. Please see --help "
 								<< args[i].substr(2) << "\n";
 			}
@@ -3883,8 +4060,8 @@ int main(const int argc, char *argv[]) {
 				{
 					auto push{[&](const Date& lower, const Date& upper) {
 						if (lower > upper) {
-							std::cout << "Date range up side down!"
-							<< lower.string() << " > " << upper.string() << '\n';
+							std::cout << "⚠️ Date range up side down!, "
+							<< lower.string() << " greater than " << upper.string() << '\n';
 							return false;
 						}
 						if (opt == OPT_DATE) {
@@ -3964,7 +4141,7 @@ int main(const int argc, char *argv[]) {
 						
 					}
 				}
-DATE_NEEDED:	std::cout << "Expecting date and/or time after \""
+DATE_NEEDED:	std::cout << "⚠️ Expecting date and/or time after \""
 							<< args[i] << "\" option. Please see --help "
 							<< args[i].substr(2) << "\n";
 			}
@@ -3999,7 +4176,7 @@ DATE_NEEDED:	std::cout << "Expecting date and/or time after \""
 					else
 						state[OPT_EXECUTION] = "Linear";
 				} else
-					std::cout << "Expecting 'thread', 'async', or 'none' after \""
+					std::cout << "⚠️ Expecting 'thread', 'async', or 'none' after \""
 					<< args[i] << "\" option. Please see --help "
 					<< args[i].substr(2) << "\n";
 			} else if (isMatch(OPT_EXT, 	'e')
@@ -4022,7 +4199,7 @@ DATE_NEEDED:	std::cout << "Expecting date and/or time after \""
 						state[OPT_OUTDIR] = fs::path(args[i]).parent_path().string();
 					}
 				} else
-					std::cout << "Expecting file name after \""
+					std::cout << "⚠️ Expecting file name after \""
 					<< args[i] << "\" option (eg: \"my_playlist.m3u8\"). Please see --help "
 					<< args[i].substr(2) << "\n";
 			}
@@ -4034,7 +4211,7 @@ DATE_NEEDED:	std::cout << "Expecting date and/or time after \""
 						tmp[tmp.size() - 1] not_eq fs::path::preferred_separator)
 						state[OPT_OUTDIR] += fs::path::preferred_separator;
 				} else
-					std::cout << "Expecting directory after \""
+					std::cout << "⚠️ Expecting directory after \""
 					<< args[i] << "\" option (eg: \"Downloads/\"). Please see --help "
 					<< args[i].substr(2) << "\n";
 			}
@@ -4127,7 +4304,7 @@ DATE_NEEDED:	std::cout << "Expecting date and/or time after \""
 						state[s_first] = first;
 
 						if (std::stoul(second) < std::stoul(first)) {
-							std::cout << "Fail: Range is up side down! \""
+							std::cout << "⚠️ Range is up side down! \""
 								<< groupNumber(first) << " bytes greater than "
 								<< groupNumber(second) << " bytes\"\n";
 							state[s_first] = "0";
@@ -4138,7 +4315,7 @@ DATE_NEEDED:	std::cout << "Expecting date and/or time after \""
 					}
 				}
 				else
-SIZE_NEEDED:		std::cout << "Expecting operator '<' or '>' followed\
+SIZE_NEEDED:		std::cout << "⚠️ Expecting operator '<' or '>' followed\
 by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..to'\
  Please see --help " << OPT_SIZE << "\n";
 		} else if (fs::is_directory(args[i]))
@@ -4164,7 +4341,7 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 	if (not invalidArgs.empty()) {
 		std::string_view invalid_args[invalidArgs.size()];
 		std::move(invalidArgs.begin(), invalidArgs.end(), invalid_args);
-		std::cout << "\nWhat " << (invalidArgs.size() > 1 ? "are these" : "is this") << "? :\n";
+		std::cout << "\n⚠️ What " << (invalidArgs.size() > 1 ? "are these" : "is this") << "? :\n";
 		for (auto i{ 0 }; i<invalidArgs.size(); ++i) {
 			auto item { &invalid_args[i] };
 			std::string others;
@@ -4193,6 +4370,12 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 		}
 		std::cout << "\nFor more information, please try to type \""
 			<< fs::path(argv[0]).filename().string() << " --help\"\n\n";
+	}
+	
+	if (invalidArgs.empty() and not state[OPT_WRITEDEFAULTS].empty()) {
+		writeConfig(&args, state[OPT_WRITEDEFAULTS] == "edit" ? Edit
+					: state[OPT_WRITEDEFAULTS] == "add" ? Add : New);
+		return RETURN_VALUE;
 	}
 
 	if (bufferDirs.empty() and selectFiles.empty())
@@ -4545,7 +4728,7 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 			"\t<key>Major Version</key><integer>1</integer>\n"\
 			"\t<key>Minor Version</key><integer>1</integer>\n"\
 			"\t<key>Date</key><date>";
-			outputFile << /*2022-01-24T15:33:46Z*/"";
+			outputFile << Date::now().string("%FT%T");
 			outputFile << "</date>\n"\
 			"\t<key>Application Version</key><string>1.1</string>\n"\
 			"\t<key>Tracks</key>\n"\
@@ -4601,8 +4784,7 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 				auto fullPath { file.string() };
 				auto needAboslute { true };
 				for (const char* const protocol : NETWORK_PROTOCOLS)
-					if (fullPath.find('%') != std::string::npos
-						and fullPath.starts_with(protocol)) {
+					if (fullPath.starts_with(protocol)) {
 						replace_all(fullPath, " ", "%20");
 						replace_all(fullPath, "=", "%3D");
 						replace_all(fullPath, "+", "%2B");
@@ -4624,13 +4806,12 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 					if (isEqual(outExt.c_str(), {".wpl", ".b4s", ".smil",
 												 ".asx", ".wax", ".wvx"}))
 					{
-						if (fullPath.find('&') != std::string::npos)
-							for (auto w { 0 }; w<sizeof(XML_CHARS_ALIAS) /sizeof(XML_CHARS_ALIAS[0]); ++w)
-								if (isContains(fullPath, XML_CHARS_NORMAL[w], left)) {
-									replace_all(fullPath, XML_CHARS_NORMAL[w], XML_CHARS_ALIAS[w]);
-									break;
-								}
-						
+						for (auto w { 0 }; w<sizeof(XML_CHARS_ALIAS) /sizeof(XML_CHARS_ALIAS[0]); ++w)
+							if (isContains(fullPath, XML_CHARS_NORMAL[w], left)) {
+								replace_all(fullPath, XML_CHARS_NORMAL[w], XML_CHARS_ALIAS[w]);
+								break;
+							}
+					
 						if (not isEqual(outExt.c_str(), {".wpl", ".smil"}))
 						{
 							fs::path tmp = fs::path(fullPath).filename();
@@ -4997,6 +5178,7 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 			outputFile << "\t</dict>\n</dict>\n</plist>";
 		}
 			
+		outputFile.flags();
 		if (outputFile.is_open())
 			outputFile.close();
 			
@@ -5006,3 +5188,4 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 			std::cout << fs::absolute(outputName).string() << '\n';
 	}
 }
+#undef CONFIG_PATH

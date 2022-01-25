@@ -139,7 +139,7 @@ then by default, arranged one episode per Title.\nHosted in https://github.com/M
 Usage:\n    tvplaylist [Option or Dir or File] ...\n\n\
 If no argument was specified, the current directory will be use.\n\n\
 Option:\n\
--h, --help [option]\n\
+-h, --help ['keyword']\n\
         Display options description.\n\
 -v, --version\n\
         Display version.\n\
@@ -402,7 +402,7 @@ It will showing internal tvplaylist date time recognizer, with format \"Weekday 
 ";
 
 
-constexpr auto OPTS = { &OPT_VERSION, &OPT_HELP, &OPT_ARRANGEMENT,
+constexpr const char* const* OPTS[] = { &OPT_VERSION, &OPT_HELP, &OPT_ARRANGEMENT,
 	&OPT_SEARCH, &OPT_VERBOSE, &OPT_BENCHMARK, & OPT_OVERWRITE,
 	&OPT_SKIPSUBTITLE, &OPT_OUTDIR, &OPT_ADSDIR, &OPT_ADSCOUNT,
 	&OPT_EXECUTION, &OPT_LOAD, &OPT_WRITEDEFAULTS, &OPT_FIXFILENAME,
@@ -412,6 +412,8 @@ constexpr auto OPTS = { &OPT_VERSION, &OPT_HELP, &OPT_ARRANGEMENT,
 	&OPT_DATE, &OPT_EXCLDATE,
 	&OPT_DCREATED, &OPT_DMODIFIED, &OPT_DACCESSED, &OPT_DCHANGED,
 	&OPT_DEXCLCREATED, &OPT_DEXCLMODIFIED, &OPT_DEXCLACCESSED, &OPT_DEXCLCHANGED,
+	
+	/// Ignored
 	&OPT_DEBUG
 };
 
@@ -426,8 +428,13 @@ constexpr const char* const* HELPS[] = { &VERSION, &HELP, &ARRANGEMENT,
 	&DATE, &DATE,
 	&CREATED, &MODIFIED, &ACCESSED, &CHANGED,
 	&CREATED, &MODIFIED, &ACCESSED, &CHANGED,
+	
+	/// Ignored
 	&HELP_REST, &HELP_DATE_REST
 };
+
+static_assert((sizeof(OPTS)/sizeof(OPTS[0])) - 1 == (sizeof(HELPS)/sizeof(HELPS[0])) - 2,
+			  "Size need to be equal!, to be able accessed by index");
 
 constexpr const char* const* ALL_HELPS[] = {
 	&VERSION, &HELP, &LOAD, &WRITE, &ARRANGEMENT, &SEARCH, &VERBOSE, &BENCHMARK,
@@ -645,23 +652,6 @@ func isInt(const std::string& s, int* const value = nullptr) -> bool
 	return false;
 }
 
-func after(const std::string& keyword,
-		   const std::string& source,
-		   bool ignoreCase = false,
-		   bool trimResult = false) -> std::string
-{
-	unsigned long pos{ isContains(source, keyword, ignoreCase ? left : none) };
-	
-	if (pos not_eq std::string::npos) {
-		pos += keyword.size();
-		
-		auto result = source.substr(pos, source.size());
-		
-		return (trimResult ? trim(result) : result);
-	}
-	return source;
-}
-
 inline
 func getLikely(const std::string_view& src, const std::string_view& with) {
 	auto first { src.begin() }, last { src.end() };
@@ -682,37 +672,65 @@ func getLikely(const std::string_view& src, const std::string_view& with) {
 
 func printHelp(const char* const arg = nullptr)
 {
+	func print{[](const int i) {
+		std::cout << *HELPS[i];
+		if (isEqual(*OPTS[i], { OPT_DATE, OPT_EXCLDATE, OPT_DCREATED,
+			OPT_DEXCLCREATED, OPT_DCHANGED, OPT_DEXCLCHANGED, OPT_DMODIFIED,
+			OPT_DEXCLMODIFIED, OPT_DACCESSED, OPT_DEXCLACCESSED}))
+			std::cout << HELP_DATE_REST;
+	}};
 	if (auto i{0}; arg) {
 		for (auto& opt : OPTS) {
 			if (isEqual(arg, *opt)) {
 				if (isEqual(arg, OPT_HELP))
-				{
 					for (auto& help : ALL_HELPS)
 						std::cout << *help;
-				} else {
-					std::cout << *HELPS[i];
-								
-					if (isEqual(arg, OPT_DATE) or isEqual(arg, OPT_EXCLDATE)
-						or isEqual(arg, OPT_DCREATED) or isEqual(arg, OPT_DEXCLCREATED)
-						or isEqual(arg, OPT_DCHANGED) or isEqual(arg, OPT_DEXCLCHANGED)
-						or isEqual(arg, OPT_DMODIFIED) or isEqual(arg, OPT_DEXCLMODIFIED)
-						or isEqual(arg, OPT_DACCESSED) or isEqual(arg, OPT_DEXCLACCESSED)
-						)
-						std::cout << HELP_DATE_REST;
-				}
+				else
+					print(i);
 				break;
 			}
 			i++;
-			if (i >= OPTS.size() - 2) {
-				std::cout << "⚠️ No option named \"" << arg << '\"';
+			if (i >= (sizeof(OPTS)/sizeof(OPTS[0])) - 1) {
 				std::vector<std::string> found;
-				for (auto& opt : OPTS)
-					if (getLikely(arg, *opt) > 80)
+				auto k { 0 };
+				auto indexFound { k };
+				for (auto& opt : OPTS) {
+					if (getLikely(arg, *opt) > 80) {
 						found.emplace_back(*opt);
-				if (not found.empty()) {
-					std::cout << ", do you mean ";
-					for (auto k{0}; k<found.size(); ++k)
-						std::cout << '\"' << found[k] << '\"' << (k + 1 == found.size() ? "." : " or ");
+						indexFound = k;
+					}
+					k++;
+				}
+				if (found.size() == 1) {
+					print(indexFound);
+				}
+				else {
+					std::vector<int> foundIndexes;
+					if (found.empty()) {
+						for (auto h { 0 }; ; ++h) {
+							if (h >= (sizeof(ALL_HELPS)/sizeof(ALL_HELPS[0])) - 2)
+								break;
+							if (isContains(*ALL_HELPS[h], arg, both) not_eq std::string::npos)
+								foundIndexes.emplace_back(h);
+						}
+					}
+					
+					if (foundIndexes.empty())
+						std::cout << "⚠️ No option named \"" << arg << '\"';
+					else {
+						std::cout << "Found " << foundIndexes.size()
+						<< " result containing \"" << arg << "\":\n\n";
+						for (auto& id : foundIndexes) {
+							print(id);
+							std::cout << '\n';
+						}
+					}
+						
+					if (foundIndexes.empty() and not found.empty()) {
+						std::cout << ", do you mean ";
+						for (auto k{0}; k<found.size(); ++k)
+							std::cout << '\"' << found[k] << '\"' << (k + 1 == found.size() ? "." : " or ");
+					}
 				}
 				std::cout << '\n';
 				break;
@@ -2570,7 +2588,7 @@ func findSubtitleFile(const fs::path& original,
 					and fs::is_regular_file(f)
 					and f.string().size() >= original.string().size()
 					and isEqual(f.extension().string(), &SUBTITLES_EXT, left)
-					and isContains(f.filename().string(), noext, none, &FILENAME_IGNORE_CHAR) not_eq std::string::npos)
+					and isContains(f.filename().string(), noext, both, &FILENAME_IGNORE_CHAR) not_eq std::string::npos)
 
 					result->emplace_back(std::move(f));
 	}
@@ -3145,39 +3163,16 @@ enum WriteMode { New, Edit, Add };
 func writeConfig(const std::vector<std::string>* const args,
 				   const WriteMode mode)
 {
-	std::vector<std::string> lines;
-	
-	if (mode not_eq New) {
-		std::ifstream file(CONFIG_PATH);
-		file.seekg(0);
-		getLines(&file, &lines, {});
-		file.close();
-		
-		if (mode == Edit)
-			for (const auto& arg : *args)
-				if (auto isMnemonic { arg.size() == 2 and arg[0] == '-' and std::isalpha(arg[1]) };
-					isMnemonic or arg.starts_with("--"))
-					for (auto i{ lines.begin() }; i<lines.end(); ++i) {
-						if (isEqual(arg.c_str() + 2, *i, none, 0, arg.size() - 2)
-							or (isMnemonic
-							and lines.size() >= 2 and (*i)[0] == '-' and (*i)[1] == arg[1]
-							and (lines.size() == 2 or ((*i)[2] == '=' or (*i)[2] == ' '))))
-							lines.erase(i);
-					}
-	}
-
-	
 	std::fstream file(CONFIG_PATH, std::ios::out);
 	#define DATE_FORMAT	"%A, %d %B %Y at %I:%M:%S %p"
 	if (mode == New )
 		file << "# Configuration made in " << Date::now().string(DATE_FORMAT) << '\n';
-	
-	for (const auto& line : lines)
-		file << line << '\n';
-	
-	if (mode not_eq New)
+	else
 		file << "# Edited on " << Date::now().string(DATE_FORMAT) << '\n';
 	#undef DATE_FORMAT
+	
+	std::vector<std::string> lines;
+	std::string buffer;
 	
 	for (unsigned i { 0 }; i<args->size(); ++i) {
 		const auto s = (*args)[i];
@@ -3190,8 +3185,8 @@ func writeConfig(const std::vector<std::string>* const args,
 				 isOpt)
 			offset = 1;
 		if (isOpt) {
-			if ((offset == 2 and isEqual(s.c_str() + offset, { OPT_WRITEDEFAULTS, OPT_LOAD }))
-				or (offset == 1 and (s[1] == 'W' or s[1] == 'L')))
+			if ((offset == 2 and isEqual(s.c_str() + offset, { OPT_WRITEDEFAULTS/*, OPT_LOAD*/ }))
+				or (offset == 1 and (s[1] == 'W' /*or s[1] == 'L'*/)))
 			{
 				if (auto next { i + 1 < args->size() ? (*args)[i + 1] : "" };
 					OPT_WRITEDEFAULTS and not isEqual(next.c_str(), {"reset", "edit"}))
@@ -3200,12 +3195,46 @@ func writeConfig(const std::vector<std::string>* const args,
 					i++;
 				continue;
 			}
-			
-			file << '\n';
+			if (not buffer.empty())
+				lines.emplace_back(std::move(buffer));
+			buffer.clear();
 		} else
-			file << ' '; //(i == args->size() ? '\0' : ' ');
-		file << s.c_str() + (isOpt ? offset : 0);
+			buffer += ' ';
+		buffer += s.c_str() + (isOpt ? offset : 0);
 	}
+	if (not buffer.empty())
+		lines.emplace_back(std::move(buffer));
+	
+	/// Remove duplication
+	std::unordered_set<std::string> definedList;
+	for (auto line = lines.end() - 1; line>=lines.begin(); --line) {
+		auto found { false };
+		for (auto& opt : {OPT_LOAD, OPT_ARRANGEMENT, OPT_VERBOSE,
+			OPT_BENCHMARK, OPT_OVERWRITE, OPT_SKIPSUBTITLE, OPT_OUTDIR,
+			OPT_ADSCOUNT, OPT_EXECUTION, OPT_FIXFILENAME, OPT_EXCLHIDDEN,
+			OPT_EXT, OPT_EXCLEXT})
+		{
+			if (line->starts_with(opt)) {
+				if (definedList.find(opt) == definedList.end())
+					definedList.emplace(opt);
+				else
+					lines.erase(line);
+				found = true;
+				break;
+			}
+		}
+		
+		if (not found) {
+			if (definedList.find(*line) == definedList.end())
+				definedList.emplace(*line);
+			else
+				lines.erase(line);
+		}
+	}
+	
+	for (auto& line : lines)
+		file << line << '\n';
+	
 	file << '\n';
 	file.flush();
 	
@@ -3232,7 +3261,12 @@ func loadConfig(std::vector<std::string>* const args)
 		 const auto& line : lines) {
 		for (const char* const *const opt : OPTS)
 			if (auto isMnemonic {
-				line.size() >= 2 and line[0] == '-' and std::isalpha(line[1]) };
+				(line.size() >= 2 and line[0] == '-' and std::isalpha(line[1])
+				 and (line.size() == 2 or (line[3] == '=' or line[3] == ' ')))
+				or (line.size() == 1 and std::isalpha(line[0]))
+				or (line.size() > 2 and std::isalpha(line[0])
+					and (line[1] == '=' or line[1] == ' '))
+			};
 				isMnemonic
 				or (line.size() > 3 and line[0] == '-' and line[1] == '-'
 					and 0 == std::strncmp(line.c_str() + 2, *opt, std::strlen(*opt)))
@@ -3241,8 +3275,12 @@ func loadConfig(std::vector<std::string>* const args)
 			{
 				found = true;
 				if (args) {
-					if (isMnemonic)
-						args->emplace_back(line.substr(0, 1));
+					if (isMnemonic) {
+						if (line[0] == '-')
+							args->emplace_back(line.substr(0, 2));
+						else
+							args->emplace_back("-" + line.substr(0, 1));
+					}
 					else
 						args->emplace_back("--" + std::string(*opt));
 				}
@@ -3469,7 +3507,7 @@ func loadPlaylist(const fs::path& path, std::vector<fs::path>* const outPaths)
 //						& to  &amp;
 						if (value.find('&') != std::string::npos)
 							for (auto w { 0 }; w<sizeof(XML_CHARS_ALIAS) /sizeof(XML_CHARS_ALIAS[0]); ++w)
-								if (isContains(value, XML_CHARS_ALIAS[w], left)) {
+								if (isContains(value, XML_CHARS_ALIAS[w], left) not_eq std::string::npos) {
 									replace_all(value, XML_CHARS_ALIAS[w], XML_CHARS_NORMAL[w]);
 								}
 						push(value);
@@ -3532,6 +3570,8 @@ func loadPlaylist(const fs::path& path, std::vector<fs::path>* const outPaths)
 		xml({"<audio src=\""}, {"\""});
 	else if (isEqual(ext.c_str(), {".asx", ".wax", ".wvx"}, left))
 		xml({"<ref href=\""}, {"\""});
+	else if (isEqual(ext, ".xml", left))
+		xml({"<key>Location</key><string>file://"}, {"</string>"});
 	
 	//rdf		{"<dc:identifier>"}, {"</dc:identifier>"}
 }
@@ -3658,13 +3698,6 @@ int main(const int argc, char *argv[]) {
 						return RETURN_VALUE
 					}
 					if (args[i] == "date") {
-//						if (i + 2 < args.size()) {
-//							Date date((args[++i]));
-//
-//							std::cout << '\"' << args[i] << '\"'
-//							<< "  -> \"" << date.string(args[++i].c_str()) << "\" "
-//							<< (date.isValid() ? "✅" : "❌") << '\n';
-//						}
 						if (i + 1 < args.size()) {
 							i++;
 							auto input { args[i] };
@@ -3730,7 +3763,7 @@ int main(const int argc, char *argv[]) {
 						i += 3;
 						continue;
 					}
-					std::cout << args[i] << " value range is up side down!. "
+					std::cout << "⚠️ " << args[i] << " value range is up side down!. "
 					<< range.first << " greater than " << range.second << '\n';
 				}
 				else if (auto push{[&args, &i] (unsigned long pos, unsigned long offset) {
@@ -4324,7 +4357,7 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 		else if (fs::is_regular_file(std::move(fs::path(args[i])))) {
 			if (auto path{ fs::absolute(args[i]) };
 				
-				isValidFile(path))
+				isValid(path) and isValidFile(path))
 			{
 				std::vector<fs::path> list;
 				loadPlaylist(path, &list);
@@ -4332,12 +4365,13 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 					insertTo(&selectFiles, path);
 				else
 					for (auto& f : list)
-						if (isValidFile(f))
+						if (isValid(f) and isValidFile(f))
 							insertTo(&selectFiles, std::move(f));
 			}
 		} else
 			invalidArgs.emplace(args[i]);
 	}
+	// MARK: End option matching
 	
 	if (not invalidArgs.empty()) {
 		std::string_view invalid_args[invalidArgs.size()];
@@ -4370,15 +4404,9 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 			std::cout << '"' << *item << '"' << others << '\n';
 		}
 		std::cout << "\nFor more information, please try to type \""
-			<< fs::path(argv[0]).filename().string() << " --help\"\n\n";
+			<< fs::path(argv[0]).filename().string() << " --help ['keyword']\"\n\n";
 	}
 	
-	if (invalidArgs.empty() and not state[OPT_WRITEDEFAULTS].empty()) {
-		writeConfig(&args, state[OPT_WRITEDEFAULTS] == "edit" ? Edit
-					: state[OPT_WRITEDEFAULTS] == "add" ? Add : New);
-		return RETURN_VALUE;
-	}
-
 	if (bufferDirs.empty() and selectFiles.empty())
 		insertTo(&bufferDirs, fs::current_path());
 	
@@ -4549,6 +4577,12 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 					   
 	if (not invalidArgs.empty())
 		return RETURN_VALUE
+					   
+	if (invalidArgs.empty() and not state[OPT_WRITEDEFAULTS].empty()) {
+		writeConfig(&args, state[OPT_WRITEDEFAULTS] == "edit" ? Edit
+				: state[OPT_WRITEDEFAULTS] == "add" ? Add : New);
+		return RETURN_VALUE;
+	}
 
 	{///Clean up <key=val> dir=??? in listFind and listExclFind
 		auto cleanUp{[](std::vector<std::string>* list) -> void {
@@ -4808,7 +4842,7 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 												 ".asx", ".wax", ".wvx"}))
 					{
 						for (auto w { 0 }; w<sizeof(XML_CHARS_ALIAS) /sizeof(XML_CHARS_ALIAS[0]); ++w)
-							if (isContains(fullPath, XML_CHARS_NORMAL[w], left)) {
+							if (isContains(fullPath, XML_CHARS_NORMAL[w], left) not_eq std::string::npos) {
 								replace_all(fullPath, XML_CHARS_NORMAL[w], XML_CHARS_ALIAS[w]);
 								break;
 							}

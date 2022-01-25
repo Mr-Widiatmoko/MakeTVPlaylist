@@ -115,8 +115,9 @@ constexpr auto LOAD=\
         Load configuration from custom file.\n\
         Example:\n\
             --load-config tuesday_night.txt\n\
-        Default configuration file on Windows located in \"C:\\ProgramData\\tvplaylist.conf\".\n\
-        Other platfom located in \"/usr/local/etc/tvplaylist.conf\".\n\
+        Default configuration file located in \""\
+			CONFIG_PATH\
+"\".\n\
         If config file exist in default location, then it will be automatic loaded.\n\
         Content of configuration are list of options (with/out \"--\") separated by new line.\n\
         To write as defaults instead executing defined options, you can use option --write-config, either by specifying \"edit\", \"reset\", or \"add\" as parameter.\n\

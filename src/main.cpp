@@ -1279,7 +1279,7 @@ public:
 
 	func isValid() -> bool {
 		return not (year == 0 and month == 0 and day == 0 and hour == 0 and minute == 0 and second == 0 and weekday == 0)
-		and (year > 0 or month > 0 or day > 0 or hour <= 24 or minute <= 60 or second <= 60);
+		and (weekday <= 7 or year > 0 or month <= 12 or day <= 33 or hour <= 24 or minute <= 60 or second <= 60);
 	}
 
 };

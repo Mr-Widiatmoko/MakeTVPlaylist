@@ -102,7 +102,7 @@ constexpr auto WRITE=\
      --write-config [reset | edit | add]\n\
         Write anything you defined to \""\
         CONFIG_PATH\
-"\" as new default.\n\
+"\" as new default, instead executing it.\n\
         To reset to factory default, pass \"reset\".\n\
         Example: --write-defaults reset\n\
         To edit existing, pass \"edit\".\n\
@@ -119,7 +119,7 @@ constexpr auto LOAD=\
         Other platfom located in \"/usr/local/etc/tvplaylist.conf\".\n\
         If config file exist in default location, then it will be automatic loaded.\n\
         Content of configuration are list of options (with/out \"--\") separated by new line.\n\
-        To write config you can use option --write-config, either by specifying \"edit\", \"reset\", or \"add\" as parameter.\n\
+        To write as defaults instead executing defined options, you can use option --write-config, either by specifying \"edit\", \"reset\", or \"add\" as parameter.\n\
         Example:\n\
             /* Multi lines\n\
                comment */\n\

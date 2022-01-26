@@ -101,7 +101,7 @@ constexpr auto OPT_DEBUG			{"debug"};                  // B
 constexpr auto SHOW=\
 "--[show | display | print]-[config | defaults]\n\
         Display options summary only, then quit.\n\
-        See also --verbose=info or --debug=args.\n\
+        See also --verbose or --verbose=info or --debug=args or --benchmark.\n\
         Example: --print-defsult\n\
 ";
 constexpr auto WRITE=\

@@ -30,7 +30,7 @@
 std::unordered_map<std::string, std::string> state;
 constexpr auto OPT_SHOWCONFIG		{"show-config"};
 constexpr auto OPT_WRITEDEFAULTS	{"write-defaults"};			// W
-constexpr auto OPT_LOAD				{"load-config"};			// L
+constexpr auto OPT_LOADCONFIG		{"load-config"};			// L
 constexpr auto OPT_ARRANGEMENT 		{"arrangement"};			// w
 constexpr auto OPT_ARRANGEMENT_DEFAULT		{"default"};
 constexpr auto OPT_ARRANGEMENT_UNORDERED	{"unordered"};
@@ -102,7 +102,8 @@ constexpr auto SHOW=\
 "--show-[config | defaults]\n\
 --display-[config | defaults]\n\
 --print-[config | defaults]\n\
-        Display options summary only, then quit. See also --verbose=info or --debug=args.";
+        Display options summary only, then quit. See also --verbose=info or --debug=args.\n\
+";
 constexpr auto WRITE=\
 "-W, --write-defaults [reset | edit | add]\n\
      --write-config [reset | edit | add]\n\
@@ -411,7 +412,7 @@ It will showing internal tvplaylist date time recognizer, with format \"Weekday 
 constexpr const char* const* OPTS[] = { &OPT_VERSION, &OPT_HELP, &OPT_ARRANGEMENT,
 	&OPT_SEARCH, &OPT_VERBOSE, &OPT_BENCHMARK, & OPT_OVERWRITE,
 	&OPT_SKIPSUBTITLE, &OPT_OUTDIR, &OPT_ADSDIR, &OPT_ADSCOUNT,
-	&OPT_EXECUTION, &OPT_LOAD, &OPT_WRITEDEFAULTS, &OPT_SHOWCONFIG, &OPT_FIXFILENAME,
+	&OPT_EXECUTION, &OPT_LOADCONFIG, &OPT_WRITEDEFAULTS, &OPT_SHOWCONFIG, &OPT_FIXFILENAME,
 	&OPT_NOOUTPUTFILE, &OPT_SIZE, &OPT_EXCLSIZE, &OPT_EXT, &OPT_EXCLEXT,
 	&OPT_FIND, &OPT_EXCLFIND, &OPT_REGEX, &OPT_EXCLREGEX, &OPT_EXCLHIDDEN,
 	
@@ -442,7 +443,7 @@ constexpr const char* const* HELPS[] = { &VERSION, &HELP, &ARRANGEMENT,
 static_assert((sizeof(OPTS)/sizeof(OPTS[0])) - 1 == (sizeof(HELPS)/sizeof(HELPS[0])) - 2,
 			  "Size need to be equal!, to be able accessed by index");
 
-constexpr const char* const* SINGLE_VALUE_OPT[] = {&OPT_LOAD, &OPT_SHOWCONFIG,
+constexpr const char* const* SINGLE_VALUE_OPT[] = {&OPT_LOADCONFIG, &OPT_SHOWCONFIG,
 	&OPT_ARRANGEMENT,
 	&OPT_VERBOSE, &OPT_BENCHMARK, &OPT_OVERWRITE, &OPT_SKIPSUBTITLE,
 	&OPT_OUTDIR, &OPT_ADSCOUNT, &OPT_EXECUTION, &OPT_FIXFILENAME, &OPT_EXCLHIDDEN,
@@ -3260,12 +3261,12 @@ func writeConfig(const std::vector<std::string>* const args,
 func loadConfig(std::vector<std::string>* const args)
 {
 	if (not args
-		or state[OPT_LOAD].empty()
-		or not fs::exists(state[OPT_LOAD])
-		or not fs::is_regular_file(state[OPT_LOAD]))
+		or state[OPT_LOADCONFIG].empty()
+		or not fs::exists(state[OPT_LOADCONFIG])
+		or not fs::is_regular_file(state[OPT_LOADCONFIG]))
 		return;
 	
-	std::ifstream file(state[OPT_LOAD], std::ios::in);
+	std::ifstream file(state[OPT_LOADCONFIG], std::ios::in);
 	file.seekg(0);
 
 	std::vector<std::string> lines;
@@ -3618,7 +3619,7 @@ int main(const int argc, char *argv[]) {
 		
 	std::vector<std::string> args;
 	
-	state[OPT_LOAD] = CONFIG_PATH ;
+	state[OPT_LOADCONFIG] = CONFIG_PATH ;
 	
 	loadConfig(&args);
 
@@ -3750,10 +3751,10 @@ int main(const int argc, char *argv[]) {
 					}
 				}
 			}
-			else if (isMatch(OPT_LOAD, 'L')) {
+			else if (isMatch(OPT_LOADCONFIG, 'L')) {
 				if (i + 1 < args.size() and fs::exists(args[i + 1])) {
 					i++;
-					state[OPT_LOAD] = args[i];
+					state[OPT_LOADCONFIG] = args[i];
 					loadConfig(&args);
 					continue;
 				}

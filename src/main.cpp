@@ -28,6 +28,7 @@
 #include <random>
 
 std::unordered_map<std::string, std::string> state;
+constexpr auto OPT_SHOWCONFIG		{"show-config"};
 constexpr auto OPT_WRITEDEFAULTS	{"write-defaults"};			// W
 constexpr auto OPT_LOAD				{"load-config"};			// L
 constexpr auto OPT_ARRANGEMENT 		{"arrangement"};			// w
@@ -97,6 +98,11 @@ constexpr auto OPT_DEBUG			{"debug"};                  // B
 #define CONFIG_PATH	"/usr/local/etc/tvplaylist.conf"
 #endif
 
+constexpr auto SHOW=\
+"--show-[config | defaults]\n\
+--display-[config | defaults]\n\
+--print-[config | defaults]\n\
+        Display options summary only, then quit. See also --verbose=info or --debug=args.";
 constexpr auto WRITE=\
 "-W, --write-defaults [reset | edit | add]\n\
      --write-config [reset | edit | add]\n\
@@ -405,7 +411,7 @@ It will showing internal tvplaylist date time recognizer, with format \"Weekday 
 constexpr const char* const* OPTS[] = { &OPT_VERSION, &OPT_HELP, &OPT_ARRANGEMENT,
 	&OPT_SEARCH, &OPT_VERBOSE, &OPT_BENCHMARK, & OPT_OVERWRITE,
 	&OPT_SKIPSUBTITLE, &OPT_OUTDIR, &OPT_ADSDIR, &OPT_ADSCOUNT,
-	&OPT_EXECUTION, &OPT_LOAD, &OPT_WRITEDEFAULTS, &OPT_FIXFILENAME,
+	&OPT_EXECUTION, &OPT_LOAD, &OPT_WRITEDEFAULTS, &OPT_SHOWCONFIG, &OPT_FIXFILENAME,
 	&OPT_NOOUTPUTFILE, &OPT_SIZE, &OPT_EXCLSIZE, &OPT_EXT, &OPT_EXCLEXT,
 	&OPT_FIND, &OPT_EXCLFIND, &OPT_REGEX, &OPT_EXCLREGEX, &OPT_EXCLHIDDEN,
 	
@@ -421,7 +427,7 @@ constexpr const char* const* OPTS[] = { &OPT_VERSION, &OPT_HELP, &OPT_ARRANGEMEN
 constexpr const char* const* HELPS[] = { &VERSION, &HELP, &ARRANGEMENT,
 	&SEARCH, &VERBOSE, &BENCHMARK, & OVERWRITE,
 	&SKIPSUBTITLE, &OUTDIR, &ADSDIR, &ADSCOUNT,
-	&EXECUTION, &LOAD, &WRITE, &FIXFILENAME,
+	&EXECUTION, &LOAD, &WRITE, &SHOW, &FIXFILENAME,
 	&NOOUTPUTFILE, &SIZE, &SIZE, &EXT, &EXT,
 	&FIND, &FIND, &REGEX, &REGEX, &EXCLHIDDEN,
 	
@@ -436,7 +442,8 @@ constexpr const char* const* HELPS[] = { &VERSION, &HELP, &ARRANGEMENT,
 static_assert((sizeof(OPTS)/sizeof(OPTS[0])) - 1 == (sizeof(HELPS)/sizeof(HELPS[0])) - 2,
 			  "Size need to be equal!, to be able accessed by index");
 
-constexpr const char* const* SINGLE_VALUE_OPT[] = {&OPT_LOAD, &OPT_ARRANGEMENT,
+constexpr const char* const* SINGLE_VALUE_OPT[] = {&OPT_LOAD, &OPT_SHOWCONFIG,
+	&OPT_ARRANGEMENT,
 	&OPT_VERBOSE, &OPT_BENCHMARK, &OPT_OVERWRITE, &OPT_SKIPSUBTITLE,
 	&OPT_OUTDIR, &OPT_ADSCOUNT, &OPT_EXECUTION, &OPT_FIXFILENAME, &OPT_EXCLHIDDEN,
 	&OPT_EXT, &OPT_EXCLEXT};
@@ -449,7 +456,7 @@ constexpr const char* const* MULTI_VALUE_OPT[] = {
 	&OPT_DEXCLCREATED, &OPT_DEXCLMODIFIED, &OPT_DEXCLACCESSED, &OPT_DEXCLCHANGED,};
 
 constexpr const char* const* ALL_HELPS[] = {
-	&VERSION, &HELP, &LOAD, &WRITE, &ARRANGEMENT, &SEARCH, &VERBOSE, &BENCHMARK,
+	&VERSION, &HELP, &LOAD, &WRITE, &SHOW, &ARRANGEMENT, &SEARCH, &VERBOSE, &BENCHMARK,
 	&OVERWRITE, &SKIPSUBTITLE, &OUTDIR, &ADSDIR, &ADSCOUNT, &EXECUTION, &FIXFILENAME,
 	&NOOUTPUTFILE, &EXCLHIDDEN,
 	
@@ -3726,6 +3733,10 @@ int main(const int argc, char *argv[]) {
 					}
 				}
 			}
+			else if (isMatch(OPT_SHOWCONFIG, '\0', true,
+			{ "show-defaults", "display-config", "display-defaults",
+			  "print-config", "print-defaults",
+			}));
 			else if (isMatch(OPT_WRITEDEFAULTS, 'W', true, {"write-config"})) {
 				if (i + 1 < args.size()) {
 					if (args[i + 1] == "reset") {
@@ -4463,7 +4474,8 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 	}
 	
 	#ifndef DEBUG
-	if (not invalidArgs.empty() or state[OPT_VERBOSE] == "all"
+	if (state[OPT_SHOWCONFIG] == "true" or
+		not invalidArgs.empty() or state[OPT_VERBOSE] == "all"
 		or state[OPT_VERBOSE] == "info" or state[OPT_BENCHMARK] == "true"
 		or state[OPT_DEBUG] == "true" or state[OPT_DEBUG] == "args")
 	#endif
@@ -4584,7 +4596,7 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 	#undef LABEL
 	} // END Info
 					   
-	if (not invalidArgs.empty())
+	if (not invalidArgs.empty() or state[OPT_SHOWCONFIG] == "true")
 		return RETURN_VALUE
 					   
 	if (invalidArgs.empty() and not state[OPT_WRITEDEFAULTS].empty()) {

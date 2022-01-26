@@ -99,10 +99,10 @@ constexpr auto OPT_DEBUG			{"debug"};                  // B
 #endif
 
 constexpr auto SHOW=\
-"--show-[config | defaults]\n\
---display-[config | defaults]\n\
---print-[config | defaults]\n\
-        Display options summary only, then quit. See also --verbose=info or --debug=args.\n\
+"--[show | display | print]-[config | defaults]\n\
+        Display options summary only, then quit.\n\
+        See also --verbose=info or --debug=args.\n\
+        Example: --print-defsult\n\
 ";
 constexpr auto WRITE=\
 "-W, --write-defaults [reset | edit | add]\n\

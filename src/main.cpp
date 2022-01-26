@@ -4597,14 +4597,17 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 	#undef LABEL
 	} // END Info
 					   
-	if (not invalidArgs.empty() or state[OPT_SHOWCONFIG] == "true")
-		return RETURN_VALUE
+	if (not invalidArgs.empty())
+		return RETURN_VALUE;
 					   
 	if (invalidArgs.empty() and not state[OPT_WRITEDEFAULTS].empty()) {
 		writeConfig(&args, state[OPT_WRITEDEFAULTS] == "edit" ? Edit
 				: state[OPT_WRITEDEFAULTS] == "add" ? Add : New);
 		return RETURN_VALUE;
 	}
+
+    if (state[OPT_SHOWCONFIG] == "true")
+        return RETURN_VALUE;
 
 	{///Clean up <key=val> dir=??? in listFind and listExclFind
 		auto cleanUp{[](std::vector<std::string>* list) -> void {

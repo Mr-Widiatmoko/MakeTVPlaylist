@@ -43,13 +43,14 @@ To build "tvplaylist" on macOS Apple Silicon, Windows, Linux, or another platfor
 	make install
 	make clean
 	
-Don't forget to [Press ENTER]. Thats it, you will get "tvplaylist" on "Release" and /usr/local/bin directory.
+Don't forget to [Press ENTER]. Thats it, you will get "tvplaylist" on "/usr/local/bin" directory.
 
 If you don't have cmake installed then, form 'src' directory on Terminal, paste following:
 
-    c++ main.cpp -std=c++2b -stdlib=libc++ -o /usr/local/bin/tvplaylist
+    c++ main.cpp -std=c++2b -o /usr/local/bin/tvplaylist
 
 Don't forget to [Press ENTER]. Thats it, you will get "tvplaylist" on "/usr/local/bin/" directory.
+There was a bug in macOS on LLVM libc++ (from Xcode 13.2.1) for std::basic_string.substr() used in multiple times inside loops. So I encourage you to use libstdc++ (may be works) if you have one.
 
 If you need to build this as library file, then copy below and paste on the Terminal:
 
@@ -60,7 +61,7 @@ If you need to build this as library file, then copy below and paste on the Term
 	make install
 	make clean
  
-Don't forget to [Press ENTER]. Thats it, you will get "libtvplaylist.dylib" on "WHATEVER" directory. 
+Don't forget to [Press ENTER]. Thats it, you will get "libtvplaylist.dylib" on "/usr/local/lib" directory and "libtvplaylist.h" on "/usr/local/include" directory. 
 
 ## Usage fo Dummies:
 1. For [Make TV Playlist.workflow](https://raw.githubusercontent.com/Mr-Widiatmoko/MakeTVPlaylist/master/Release/Make%20TV%20Playlist.workflow.zip):

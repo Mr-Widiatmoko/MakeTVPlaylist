@@ -436,6 +436,18 @@ constexpr const char* const* HELPS[] = { &VERSION, &HELP, &ARRANGEMENT,
 static_assert((sizeof(OPTS)/sizeof(OPTS[0])) - 1 == (sizeof(HELPS)/sizeof(HELPS[0])) - 2,
 			  "Size need to be equal!, to be able accessed by index");
 
+constexpr const char* const* SINGLE_VALUE_OPT[] = {&OPT_LOAD, &OPT_ARRANGEMENT,
+	&OPT_VERBOSE, &OPT_BENCHMARK, &OPT_OVERWRITE, &OPT_SKIPSUBTITLE,
+	&OPT_OUTDIR, &OPT_ADSCOUNT, &OPT_EXECUTION, &OPT_FIXFILENAME, &OPT_EXCLHIDDEN,
+	&OPT_EXT, &OPT_EXCLEXT};
+constexpr const char* const* MULTI_VALUE_OPT[] = {
+	&OPT_ADSDIR,
+	&OPT_SIZE, &OPT_EXCLSIZE,
+	&OPT_FIND, &OPT_EXCLFIND, &OPT_REGEX, &OPT_EXCLREGEX,
+	&OPT_DATE, &OPT_EXCLDATE,
+	&OPT_DCREATED, &OPT_DMODIFIED, &OPT_DACCESSED, &OPT_DCHANGED,
+	&OPT_DEXCLCREATED, &OPT_DEXCLMODIFIED, &OPT_DEXCLACCESSED, &OPT_DEXCLCHANGED,};
+
 constexpr const char* const* ALL_HELPS[] = {
 	&VERSION, &HELP, &LOAD, &WRITE, &ARRANGEMENT, &SEARCH, &VERBOSE, &BENCHMARK,
 	&OVERWRITE, &SKIPSUBTITLE, &OUTDIR, &ADSDIR, &ADSCOUNT, &EXECUTION, &FIXFILENAME,
@@ -3209,14 +3221,11 @@ func writeConfig(const std::vector<std::string>* const args,
 	std::unordered_set<std::string> definedList;
 	for (auto line = lines.end() - 1; line>=lines.begin(); --line) {
 		auto found { false };
-		for (auto& opt : {OPT_LOAD, OPT_ARRANGEMENT, OPT_VERBOSE,
-			OPT_BENCHMARK, OPT_OVERWRITE, OPT_SKIPSUBTITLE, OPT_OUTDIR,
-			OPT_ADSCOUNT, OPT_EXECUTION, OPT_FIXFILENAME, OPT_EXCLHIDDEN,
-			OPT_EXT, OPT_EXCLEXT})
+		for (auto& opt : SINGLE_VALUE_OPT)
 		{
-			if (line->starts_with(opt)) {
-				if (definedList.find(opt) == definedList.end())
-					definedList.emplace(opt);
+			if (line->starts_with(*opt)) {
+				if (definedList.find(*opt) == definedList.end())
+					definedList.emplace(*opt);
 				else
 					lines.erase(line);
 				found = true;

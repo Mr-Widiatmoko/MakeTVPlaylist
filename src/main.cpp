@@ -792,7 +792,6 @@ namespace fs = std::filesystem;
 #if 0
 #define directory_iterator(x, y)	fs::directory_iterator(x)
 #else
-#define directory_iterator(x, y)	directory_iterator(x, y)
 
 #include <dirent.h>
 func directory_iterator(const fs::path& path, const unsigned char type)
@@ -2496,7 +2495,7 @@ func listDir(const fs::path& ori, std::vector<fs::directory_entry>* const out,
 	if (fs::is_symlink(ori)) {
 		std::error_code ec;
 		path = fs::read_symlink(ori, ec);
-		if (ec)
+		if (ec or not fs::is_directory(path))
 			return;
 	}
 

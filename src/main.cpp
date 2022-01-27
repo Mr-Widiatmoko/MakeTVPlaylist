@@ -789,12 +789,13 @@ func containInts(const std::string& s, std::vector<MAXNUM>* const out)
 
 namespace fs = std::filesystem;
 
-#define INTERNAL = 1
+#if 0
+#define directory_iterator(x, y)	fs::directory_iterator(x)
+#else
+#define directory_iterator(x, y)	directory_iterator(x, y)
 
-#if defined(INTERNAL) == 1
 #include <dirent.h>
 func directory_iterator(const fs::path& path, const unsigned char type)
-	-> std::vector<fs::directory_entry>
 {
 	std::vector<fs::directory_entry> result;
 	
@@ -815,6 +816,27 @@ func directory_iterator(const fs::path& path, const unsigned char type)
 					fs::path path_name { std::move(name) };
 					auto d { fs::directory_entry(std::move(path_name)) };
 					d.refresh();
+					if (((d.status().permissions() & ( fs::perms::owner_read
+													| fs::perms::group_read
+													| fs::perms::others_read))
+							== fs::perms::none)
+						or (state[OPT_EXCLHIDDEN] == "true"
+							and entry->d_name[0] == '.'))
+						continue;
+					if (d.is_symlink()) {
+						const auto ori { fs::directory_entry(std::move(fs::read_symlink(d.path()))) };
+						if (ori.path().empty() or not ori.exists()) {
+							if (
+								((type & DT_DIR) == DT_DIR and not ori.is_directory())
+								or
+								((type & DT_REG) == DT_REG and not ori.is_regular_file())
+								)
+							continue;
+						}
+						d.assign(ori);
+						d.refresh();
+					}
+					
 					result.emplace_back(std::move(d));
 				}
 			}
@@ -823,9 +845,6 @@ func directory_iterator(const fs::path& path, const unsigned char type)
 	closedir(folder);
 	return result;
 }
-#define directory_iterator(x, y)	directory_iterator(x, y)
-#else
-#define directory_iterator(x, y)	fs::directory_iterator(x)
 #endif
 
 
@@ -2109,7 +2128,7 @@ public:
 #undef property
 
 std::unordered_set<std::string> EXCLUDE_EXT;
-std::unordered_set<std::string> DEFAULT_EXT { /// Could be improved using std::unordered_set
+std::unordered_set<std::string> DEFAULT_EXT {
 	".mp4",  ".mkv", ".mov", ".m4v",  ".mpeg", ".mpg",  ".mts", ".ts",
 	".webm", ".flv", ".wmv", ".avi",  ".divx", ".xvid", ".dv",  ".3gp",
 	".tmvb", ".rm",  ".mpg4",".mqv",  ".ogm",  ".qt",
@@ -2467,74 +2486,23 @@ func isValid(const fs::path& path) -> bool
 	);
 }
 
-func listDir(const fs::path& path, std::vector<fs::directory_entry>* const out,
+func listDir(const fs::path& ori, std::vector<fs::directory_entry>* const out,
 			bool sorted=true, bool includeRegularFiles = false)
 {
 	if (not out)
 		return;
-	if (fs::is_symlink(path)) {
+	
+	auto path { std::move(ori) };
+	if (fs::is_symlink(ori)) {
 		std::error_code ec;
-		auto ori = fs::read_symlink(path, ec);
+		path = fs::read_symlink(ori, ec);
 		if (ec)
 			return;
 	}
-//	try {
-		for (auto& child : directory_iterator(path, (includeRegularFiles
+
+	for (auto& child : directory_iterator(path, (includeRegularFiles
 				? (DT_DIR | DT_REG) : DT_DIR)))
-		{
-			if (/*child.path().filename().string() == ".DS_Store"*/
-				//or child.is_symlink()
-				/*or*/ (child.status().permissions()
-					& (fs::perms::owner_read
-					   | fs::perms::group_read
-					   | fs::perms::others_read)) == fs::perms::none)
-				continue;
-			else if (child.is_symlink()) {
-				if (const auto ori { fs::read_symlink(child.path()) };
-					ori.empty() or not fs::exists(ori) or not fs::is_directory(ori))
-					continue;
-			} else if (child.path().empty())
-				continue;
-			/*else if (not child.is_directory() and not includeRegularFiles)
-				continue;*/
-			
-			out->emplace_back(child);
-		}
-//	} catch (const std::overflow_error& e) {
-//		// this executes if f() throws std::overflow_error (same type rule)
-//		#ifndef DEBUG
-//		if (state[OPT_VERBOSE] == "all")
-//		#else
-//			std::cout << "OVERFLOW ERROR‼️ listDir: " << path << '\n';
-//		#endif
-//			std::cout << e.what() << '\n';
-//	} catch (const std::runtime_error& e) {
-//		// this executes if f() throws std::underflow_error (base class rule)
-//		#ifndef DEBUG
-//		if (state[OPT_VERBOSE] == "all")
-//		#else
-//			std::cout << "RUNTIME ERROR‼️ listDir: " << path << '\n';
-//		#endif
-//			std::cout << e.what() << '\n';
-//	} catch (const std::exception& e) {
-//		// this executes if f() throws std::logic_error (base class rule)
-//		#ifndef DEBUG
-//		if (state[OPT_VERBOSE] == "all")
-//		#else
-//			std::cout << "EXCEPTION‼️ listDir: " << path << '\n';
-//		#endif
-//			std::cout << e.what() << '\n';
-//	} catch (const fs::filesystem_error& e) {
-//		#ifndef DEBUG
-//		if (state[OPT_VERBOSE] == "all")
-//		#else
-//			std::cout << "filesystem::directory_iterator()‼️ listDir: " << path << '\n';
-//		#endif
-//			std::cout << "Code: " << e.code() << '\n'
-//			<< "path1: \"" << e.path1() << "\"\n"
-//			<< "path2: \"" << e.path2() << "\"\n"
-//			<< e.what() << '\n';
-//	}
+		out->emplace_back(child);
 	
 	if (sorted and out->size() > 1)
 		std::sort(out->begin(), out->end(), [](const fs::directory_entry& a,
@@ -5182,14 +5150,6 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 	}};
 	
 	auto filterChildFiles{ [&records](const fs::path& dir, bool recurive=false) {
-		auto filter{ [](const fs::directory_entry& f) -> bool {
-			if (/*not fs::is_regular_file(f.path())
-				or*/ not isValid(f.path()))
-					return false;
-			
-			return isValidFile(f.path());
-		}};
-		
 		std::vector<fs::path> bufferFiles;
 		
 		auto putToRecord{[&bufferFiles, &dir, &records](bool wantToSort) {
@@ -5204,90 +5164,48 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 										   ));
 		}};
 		
-//		try {
-			if (recurive) {
-				std::vector<fs::path> dirs;
-				listDirRecursively(dir, &dirs, false);
-				std::sort(dirs.begin(), dirs.end());
+		if (recurive) {
+			std::vector<fs::path> dirs;
+			listDirRecursively(dir, &dirs, false);
+			std::sort(dirs.begin(), dirs.end());
+			
+			for (auto& d : dirs) {
+				std::vector<fs::path> tmp;
 				
-				for (auto& d : dirs) {
-					std::vector<fs::path> tmp;
-					
-					for (auto& f : directory_iterator(d, DT_REG))
-						if (filter(f)) {
-							std::vector<fs::path> list;
-							loadPlaylist(f.path().string(), &list);
-							if (list.empty())
-								tmp.emplace_back(f);
-							else
-								for (auto& p : list)
-									if (isValid(p) and isValidFile(p))
-										tmp.emplace_back(std::move(p));
-						}
-					
-					sortFiles(&tmp);
-					
-					for (auto& f : tmp)
-						bufferFiles.emplace_back(std::move(f));
-				}
+				for (auto& f : directory_iterator(d, DT_REG))
+					if (isValidFile(f.path())) {
+						std::vector<fs::path> list;
+						loadPlaylist(f.path().string(), &list);
+						if (list.empty())
+							tmp.emplace_back(std::move(f));
+						else
+							for (auto& p : list)
+								if (fs::is_regular_file(p) and isValid(p) and isValidFile(p))
+									tmp.emplace_back(std::move(p));
+					}
 				
-				putToRecord(false);
+				sortFiles(&tmp);
+				
+				for (auto& f : tmp)
+					bufferFiles.emplace_back(std::move(f));
 			}
 			
-			for (auto& f : directory_iterator(dir, DT_REG))
-				if (filter(f)) {
-					std::vector<fs::path> list;
-						  loadPlaylist(f.path().string(), &list);
-						  if (list.empty())
-							  bufferFiles.emplace_back(f);
-						  else
-							  for (auto& p : list)
-								  if (isValid(p) and isValidFile(p))
-									  bufferFiles.emplace_back(std::move(p));
-				}
-			
-			putToRecord(true);
-			
-//		} catch (const std::overflow_error& e) {
-//			// this executes if f() throws std::overflow_error (same type rule)
-//			#ifndef DEBUG
-//			if (state[OPT_VERBOSE] == "all")
-//			#else
-//				std::cout << "OVERFLOW ERROR‼️ filterChildFiles(" << dir
-//				<< ", recursive: " << recurive << '\n';
-//			#endif
-//				std::cout << e.what() << '\n';
-//		} catch (const std::runtime_error& e) {
-//			// this executes if f() throws std::underflow_error (base class rule)
-//			#ifndef DEBUG
-//			if (state[OPT_VERBOSE] == "all")
-//			#else
-//				std::cout << "RUNTIME ERROR‼️ filterChildFiles(" << dir
-//				<< ", recursive: " << recurive << '\n';
-//			#endif
-//				std::cout << e.what() << '\n';
-//		} catch (const std::exception& e) {
-//			// this executes if f() throws std::logic_error (base class rule)
-//			#ifndef DEBUG
-//			if (state[OPT_VERBOSE] == "all")
-//			#else
-//				std::cout << "EXCEPTION‼️ filterChildFiles(" << dir
-//				<< ", recursive: " << recurive << '\n';
-//			#endif
-//				std::cout << e.what() << '\n';
-//
-//		} catch (const fs::filesystem_error& e) {
-//			#ifndef DEBUG
-//			if (state[OPT_VERBOSE] == "all")
-//			#else
-//				std::cout << "filesystem::directory_iterator()‼️ filterChildFiles(" << dir
-//					<< ", recursive: " << recurive << '\n';
-//			#endif
-//				std::cout << "Code: " << e.code() << '\n'
-//				<< "path1: \"" << e.path1() << "\"\n"
-//				<< "path2: \"" << e.path2() << "\"\n"
-//				<< e.what() << '\n';
-//		}
+			putToRecord(false);
+		}
+		
+		for (auto& f : directory_iterator(dir, DT_REG))
+			if (isValidFile(f.path())) {
+				std::vector<fs::path> list;
+				loadPlaylist(f.path().string(), &list);
+				if (list.empty())
+					bufferFiles.emplace_back(std::move(f));
+				else
+					for (auto& p : list)
+						if (fs::is_regular_file(p) and isValid(p) and isValidFile(p))
+							bufferFiles.emplace_back(std::move(p));
+			}
+		
+		putToRecord(true);
 	}};
 					   
 					   

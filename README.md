@@ -6,8 +6,11 @@ As the name suggests, this is a small utility to create playlist from various se
 
 ## Overview:
 This is a utility to create playlist file with extension .m3u8 (by default) that contains sequence per episode per Title (by default) of multiple Title TV program or Folder. To do that, you have two option:
-1. By selecting folders or files, then Right-Click choose "Quick Actions" -> "Make TV Playlist". Then "mpv" (by default, if you have one) or your default video player will be automatically used to play the playlist file.
-	This workflow implemented using zsh script, so the performace to create playlist is very, very, very ... slugish. To upgrade performace for more than 1000% and have bunch of bells and whistles you need to download [tvplaylist](https://github.com/Mr-Widiatmoko/MakeTVPlaylist/Release/tvplaylist)(for macOS Intel!, another platform need to be compiled, see Installation).
+1. By selecting folders or files, then Right-Click choose "Quick Actions" -> "Make TV Playlist". 
+	
+	Then "mpv" (by default, if you have one) or your default video player will be automatically used to play the playlist file.
+	
+	This workflow implemented using zsh script, so the performace to create playlist is very, very, very ... slugish. To upgrade performace for more than 1000% and have bunch of bells and whistles you need to download [tvplaylist](https://github.com/Mr-Widiatmoko/MakeTVPlaylist/Release/tvplaylist)(for macOS Intel!) or For others platform, you need to compile by your self, see Installation).
 		
 2. By using Terminal.app and type "tvplaylist" press SPACE then drag folders or files from Finder to Terminal, then press ENTER. the program will display full path of playlist file.
 
@@ -24,16 +27,18 @@ For Apple Silicon, Windows, Linux, and POSIX users, you just need to compile [ma
 - [LICENSE.txt](https://github.com/Mr-Widiatmoko/MakeTVPlaylist/LICENSE.txt) license file for this software.
 
 ## Installation:
-At least you need to download (Only for macOS) [Make TV Playlist.workflow](https://raw.githubusercontent.com/Mr-Widiatmoko/MakeTVPlaylist/master/Release/Make%20TV%20Playlist.workflow.zip), then Double-Click on Finder to install (as Finder Quick Action Extension), that's it, your done!.
+At least you need to download [Make TV Playlist.workflow](https://raw.githubusercontent.com/Mr-Widiatmoko/MakeTVPlaylist/master/Release/Make%20TV%20Playlist.workflow.zip) (Only for macOS), then Double-Click it on Finder to install as Finder Quick Action Extension, that's it, your done!.
 
-But, if you need blasting super speed for processing, you may want to download  [tvplaylist](https://raw.githubusercontent.com/Mr-Widiatmoko/MakeTVPlaylist/master/Release/tvplaylist) just by put this file into: 
+But, if you need more features and blasting super speed for processing, you may want to download  [tvplaylist](https://raw.githubusercontent.com/Mr-Widiatmoko/MakeTVPlaylist/master/Release/tvplaylist) and put this file into: 
 - Inside "/usr/local/bin" folder (PREFERED) or
 - Home folder (eg: /Users/[YOU]) or 
 - Download folder (eg: /Users/[YOU]/Downloads).
 
-Thats it, and "Make TV Playlist" will automatically call "tvplaylist" for processing.
+Thats it, and "Make TV Playlist" will automatically use "tvplaylist" for processing.
 
-To build "tvplaylist" on macOS Apple Silicon, Windows, Linux, or another platforms, first you must have modern C++ compiler (and/or cmake) installed. Inside "MakeTVPlaylist" folder (or folder containing CMakeLists.txt) copy below and paste on the Terminal:
+To build "tvplaylist" on macOS Apple Silicon, Windows, Linux, or another platforms, first you must have modern C++ compiler (and/or cmake) installed. 
+
+To build using cmake, inside "MakeTVPlaylist" folder (or folder containing CMakeLists.txt) copy below and paste on the Terminal:
 
 	mkdir Release
 	cd Release

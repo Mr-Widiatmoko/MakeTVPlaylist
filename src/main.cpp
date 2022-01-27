@@ -26,10 +26,17 @@
 #include <sys/stat.h> // TODO: I dont know in Windows, should change to use FileAttribute?
 #include <fstream>
 #include <random>
-
+constexpr auto TRUE_FALSE = {"true", "false"};
 std::unordered_map<std::string, std::string> state;
 constexpr auto OPT_SHOWCONFIG		{"show-config"};
+constexpr auto OPT_SHOWCONFIG_ALTERNATIVE = {"show-defaults",
+	"display-config", "display-defaults", "print-config", "print-defaults",
+};
 constexpr auto OPT_WRITEDEFAULTS	{"write-defaults"};			// W
+constexpr auto OPT_WRITEDEFAULTS_ALTERNATIVE = {"write-config"};
+constexpr auto OPT_WRITEDEFAULTS_ARGS = {"new", "edit", "remove", "reset", "add"
+};
+
 constexpr auto OPT_LOADCONFIG		{"load-config"};			// L
 constexpr auto OPT_ARRANGEMENT 		{"arrangement"};			// w
 constexpr auto OPT_ARRANGEMENT_DEFAULT		{"default"};
@@ -56,7 +63,13 @@ constexpr auto OPT_EXECUTION_THREAD			{"thread"};
 constexpr auto OPT_EXECUTION_ASYNC			{"async"};
 constexpr auto OPT_EXCLHIDDEN		{"exclude-hidden"};			// n
 constexpr auto OPT_REGEXSYNTAX		{"regex-syntax"};			// X
+constexpr auto OPT_REGEXSYNTAX_ARGS = {"ecma", "basic", "extended", "awk",
+	"grep", "egrep"
+};
 constexpr auto OPT_CASEINSENSITIVE	{"make-case-insensitive"};	// N
+constexpr auto OPT_CASEINSENSITIVE_ALTERNATIVE = {"case-insensitive",
+	"caseinsensitive", "ignore-case", "ignorecase"
+};
 
 constexpr auto OPT_SEARCH			{"search"};					// q
 
@@ -91,6 +104,7 @@ constexpr auto OPT_DEXCLACCESSED	{"exclude-accessed"};		// A
 constexpr auto OPT_DEXCLCHANGED		{"exclude-changed"};		// G
 
 constexpr auto OPT_DEBUG			{"debug"};                  // B
+constexpr auto OPT_DEBUG_ARGS = 	{"date", "args", "id3"};
 
 #if defined(_WIN32) || defined(_WIN64)
 #define CONFIG_PATH	"C:\\ProgramData\\tvplaylist.conf"
@@ -533,12 +547,13 @@ func trim(const std::string& s) -> std::string
 	return s.substr(start, end);
 }
 
-enum IgnoreCase { none, both, left, right };
+enum class IgnoreCase { None, Both, Left, Right };
 
 /// Is left contains right
 /// Parameters:
 /// - ignoreChar usage, for example for {'.', ' '} -> "La.la.Li" equal "La La Li"
-func isContains(const std::string& l, const std::string& r, IgnoreCase ic = none,
+func isContains(const std::string& l, const std::string& r,
+				IgnoreCase ic = IgnoreCase::None,
 				const std::pair<char, char>* const ignoreChar = nullptr)
 {
 	if (r.size() > l.size()) return std::string::npos;
@@ -555,13 +570,13 @@ func isContains(const std::string& l, const std::string& r, IgnoreCase ic = none
 				)};
 			if (not match)
 				switch (ic) {
-					case both:
+					case IgnoreCase::Both:
 						match = std::tolower(l[i]) == std::tolower(r[k]);
 						break;
-					case left:
+					case IgnoreCase::Left:
 						match = std::tolower(l[i]) == r[k];
 						break;
-					case right:
+					case IgnoreCase::Right:
 						match = l[i] == std::tolower(r[k]);
 						break;
 					default:
@@ -578,7 +593,8 @@ func isContains(const std::string& l, const std::string& r, IgnoreCase ic = none
 	return k == r.size() ? i - k + 1 : std::string::npos;
 }
 
-func isEqual(const char* const l, const char* const r, IgnoreCase ic = none)
+func isEqual(const char* const l, const char* const r,
+			 IgnoreCase ic = IgnoreCase::None)
 {
 	if (not l or not r) return false;
 	auto sz1 { std::strlen(l) };
@@ -589,15 +605,15 @@ func isEqual(const char* const l, const char* const r, IgnoreCase ic = none)
 	const char*_r = r;
 	while (sz1-- > 0) {
 		switch (ic){
-			case both:
+			case IgnoreCase::Both:
 				if (std::tolower(*_l) != std::tolower(*_r))
 					return false;
 				break;
-			case left:
+			case IgnoreCase::Left:
 				if (std::tolower(*_l) != *_r)
 					return false;
 				break;
-			case right:
+			case IgnoreCase::Right:
 				if (*_l != std::tolower(*_r))
 					return false;
 				break;
@@ -611,7 +627,8 @@ func isEqual(const char* const l, const char* const r, IgnoreCase ic = none)
 	return true;
 }
 
-func isEqual(const std::string& l, const std::string& r, IgnoreCase ic = none,
+func isEqual(const std::string& l, const std::string& r,
+			 IgnoreCase ic = IgnoreCase::None,
 			 unsigned long start = 0,
 			 unsigned long end = 0)
 {
@@ -619,15 +636,15 @@ func isEqual(const std::string& l, const std::string& r, IgnoreCase ic = none,
 	
 	for (auto i{ start }; i< (end > 0 and start < end ? end : l.size()); ++i)
 		switch (ic){
-			case both:
+			case IgnoreCase::Both:
 				if (std::tolower(l[i]) != std::tolower(r[i]))
 					return false;
 				break;
-			case left:
+			case IgnoreCase::Left:
 				if (std::tolower(l[i]) != r[i])
 					return false;
 				break;
-			case right:
+			case IgnoreCase::Right:
 				if (l[i] != std::tolower(r[i]))
 					return false;
 				break;
@@ -641,7 +658,7 @@ func isEqual(const std::string& l, const std::string& r, IgnoreCase ic = none,
 inline
 func isEqual(const char* const source,
 			 const std::initializer_list<const char*>& list,
-			 IgnoreCase ic = none,
+			 IgnoreCase ic = IgnoreCase::None,
 			 unsigned long start = 0,
 			 unsigned long end = 0) {
 	for (auto& s : list) {
@@ -654,7 +671,7 @@ func isEqual(const char* const source,
 template <template <class ...> class Container, class ... Args>
 func isEqual(const std::string& source,
 			 const Container<std::string, Args ...>* args,
-			 IgnoreCase ic = none,
+			 IgnoreCase ic = IgnoreCase::None,
 			 unsigned long start = 0,
 			 unsigned long end = 0) -> bool
 {
@@ -736,7 +753,8 @@ func printHelp(const char* const arg = nullptr)
 						for (auto h { 0 }; ; ++h) {
 							if (h >= (sizeof(ALL_HELPS)/sizeof(ALL_HELPS[0])) - 2)
 								break;
-							if (isContains(*ALL_HELPS[h], arg, both) not_eq std::string::npos)
+							if (isContains(*ALL_HELPS[h], arg, IgnoreCase::Both)
+								not_eq std::string::npos)
 								foundIndexes.emplace_back(h);
 						}
 					}
@@ -755,7 +773,8 @@ func printHelp(const char* const arg = nullptr)
 					if (foundIndexes.empty() and not found.empty()) {
 						std::cout << ", do you mean ";
 						for (auto k{0}; k<found.size(); ++k)
-							std::cout << '\"' << found[k] << '\"' << (k + 1 == found.size() ? "." : " or ");
+							std::cout << '\"' << found[k] << '\"'
+							<< (k + 1 == found.size() ? "." : " or ");
 					}
 				}
 				std::cout << '\n';
@@ -1166,7 +1185,7 @@ public:
 	Date(const std::string& s): year{0}, month{0}, day{0}, weekday{0},
 								hour{0}, minute{0}, second{0}
 	{
-		if (isEqual(s.c_str(), {"now", "today"}, left)) {
+		if (isEqual(s.c_str(), {"now", "today"}, IgnoreCase::Left)) {
 			const std::chrono::time_point<std::chrono::system_clock> now =
 					std::chrono::system_clock::now();
 			const std::time_t t = std::chrono::system_clock::to_time_t(now);
@@ -1556,13 +1575,15 @@ struct ID3
 			if (keyVal->first == "id3") {
 				for (auto& tag : l.tags)
 					if (isContains(	tag.second, keyVal->second,
-									l.isCaseInsensitive ? both : none)
+									l.isCaseInsensitive ? IgnoreCase::Both
+									: IgnoreCase::None)
 						!= std::string::npos)
 						return true;
 			} else
 				return isContains(l.tags.at(keyVal->first),
 								  keyVal->second,
-								  l.isCaseInsensitive ? both : none)
+								  l.isCaseInsensitive ? IgnoreCase::Both
+								  : IgnoreCase::None)
 						!= std::string::npos;
 		}
 		
@@ -1731,7 +1752,7 @@ private:
 	}
 public:
 	
-	func write(const char* a_path = nullptr) const {
+	func write(const char* a_path = nullptr) {
 		if (not path and not a_path)
 			return;
 		std::fstream file;
@@ -1743,7 +1764,16 @@ public:
 		file.seekp(end - 128);
 		int pos = int(file.tellp());
 		
-		auto set{[&file, &pos](const char* val, int size) {
+		func set{[&file, &pos](ID3* const id3,
+							   const char* const key,
+							   const int size,
+							   const char* const value = nullptr) {
+			if (key and id3->tags.find(key) == id3->tags.end())
+				id3->tags.emplace(std::make_pair(key, value ? value : ""));
+			
+			auto val { key ? (value ? value : (id3->tags.at(key).empty() ? nullptr
+							  : id3->tags.at(key).c_str())) : nullptr };
+			
 			if (val) {
 				if (size == 1) {
 					char ONE[1];
@@ -1756,25 +1786,26 @@ public:
 			file.seekp(pos);
 		}};
 		
-		set(nullptr, 3);
-		set(tags.at("title").c_str(), 30);
-		set(tags.at("artist").c_str(), 30);
-		set(tags.at("album").c_str(), 30);
-		set(tags.at("year").c_str(), 4);
-		set(tags.at("comment").c_str(),  28);
-		set(nullptr, 1);
-		set(tags.at("track").empty() ? nullptr : tags.at("track").c_str(), 1);
+		set(this, nullptr, 3);
+		set(this, "title", 30);
+		set(this, "artist", 30);
+		set(this, "album", 30);
+		set(this, "year", 4);
+		set(this, "comment",  28);
+		set(this, nullptr, 1);
+		set(this, "track", 1);
 		
-		for (auto i{0}; auto& g : GENRES) {
-			if (tags.at("genre") == g) {
-				set(std::to_string(i).c_str(), 1);
-				break;
+		if (tags.find("genre") != tags.end())
+			for (auto i{0}; auto& g : GENRES) {
+				if (tags.at("genre") == g) {
+					set(this, "genre", 1, std::to_string(i).c_str());
+					break;
+				}
+				i++;
 			}
-			i++;
-		}
 		
 		file.seekp(0);
-		
+		// TODO: Write v2.x
 		
 		file.close();
 	}
@@ -1838,7 +1869,7 @@ public:
 				auto isv24 { tag.major_version == 4 };
 				auto isv23 { tag.major_version == 3 };
 				
-				auto offset{ 0 };
+				auto offset{ tag.extended_header_size };
 				
 				while (offset < tag.tag_size)
 				{
@@ -1909,13 +1940,17 @@ public:
 							tags.emplace(std::make_pair("bpm", frame.data));
 						else if (isEqual(frame.id, "TCOM"))
 							tags.emplace(std::make_pair("composer", frame.data));
-						else if (isEqual(frame.id, "TCON"))
+						else if (isEqual(frame.id, "TCON") and not frame.data.empty())
 						{
-							int index;
-							if (auto [p, ec] = std::from_chars(
-								frame.data.c_str(),
-								frame.data.c_str()+frame.data.size(), index);
-								ec == std::errc())
+							int index = -1;
+							
+							if (frame.data[0] == '(')
+								index = std::stoi(frame.data.substr(
+												1, frame.data.size() - 2));
+							else if (isInt(frame.data))
+								index = std::stoi(frame.data);
+							
+							if (index > -1)
 								tags.emplace(std::make_pair("genre", GENRES[index]));
 						}
 						else if (isEqual(frame.id, "TCOP"))
@@ -2297,7 +2332,9 @@ func isValidFile(const fs::path& path) -> bool
 					found = id3 % keyword;
 				
 				if (not handled and isContains(filename, keyword,
-						isCaseInsensitive ? left : none) not_eq std::string::npos) {
+					isCaseInsensitive ? IgnoreCase::Both : IgnoreCase::None)
+					not_eq std::string::npos)
+				{
 					found = true;
 					break;
 				}
@@ -2315,8 +2352,8 @@ func isValidFile(const fs::path& path) -> bool
 					return false;
 			}
 			
-			if (not handled and isContains(filename, keyword,
-						isCaseInsensitive ? left : none) not_eq std::string::npos)
+			if (not handled and isContains(filename, keyword, isCaseInsensitive
+				? IgnoreCase::Both : IgnoreCase::None) not_eq std::string::npos)
 				return false;
 		}
 	}
@@ -2454,14 +2491,14 @@ func isDirNameValid(const fs::path& dir)
 	const auto filename { dir.filename().string() };
 	const auto ignoreCase { state[OPT_CASEINSENSITIVE] == "true" };
 	for (auto& keyword : listFindDir)
-		if (isContains(filename, keyword,
-					   ignoreCase ? left : none) not_eq std::string::npos)
+		if (isContains(filename, keyword, ignoreCase ? IgnoreCase::Left
+					   : IgnoreCase::None) not_eq std::string::npos)
 			return true;
 	
 	auto result { true };
 	for (auto& keyword : listExclFindDir)
-		if (isContains(filename, keyword,
-					   ignoreCase ? left : none) not_eq std::string::npos)
+		if (isContains(filename, keyword, ignoreCase ? IgnoreCase::Left
+					   : IgnoreCase::None) not_eq std::string::npos)
 		{
 			result = false;
 			break;
@@ -2649,8 +2686,10 @@ func findSubtitleFile(const fs::path& original,
 					/*and*/ isValid(f)
 					//and fs::is_regular_file(f)
 					and f.path().string().size() >= original.string().size()
-					and isEqual(f.path().extension().string(), &SUBTITLES_EXT, left)
-					and isContains(f.path().filename().string(), noext, both, &FILENAME_IGNORE_CHAR) not_eq std::string::npos)
+					and isEqual(f.path().extension().string(), &SUBTITLES_EXT,
+								IgnoreCase::Left)
+					and isContains(f.path().filename().string(), noext,
+					IgnoreCase::Both, &FILENAME_IGNORE_CHAR) not_eq std::string::npos)
 
 					result->emplace_back(std::move(f));
 	}
@@ -2758,10 +2797,10 @@ func getBytes(const std::string& s) -> uintmax_t
 	if (v <= 0)
 		return result;
 	
-	if (isEqual(unit.c_str(), "kb", left)) {
+	if (isEqual(unit.c_str(), "kb", IgnoreCase::Left)) {
 		if (v <= (INT_MAX / 1000))
 			result = v * 1000;
-	} else if (isEqual(unit.c_str(), "gb", left)) {
+	} else if (isEqual(unit.c_str(), "gb", IgnoreCase::Left)) {
 		if (v <= (INT_MAX / 1000000000))
 			result = v * 1000000000;
 	} else {
@@ -2820,7 +2859,8 @@ func expandArgs(const int argc, char* const argv[],
 	}};
 	
 	const bool isMultiLine{
-		std::string(argv[startAt]).find("\x0a") not_eq std::string::npos
+		startAt < argc
+		and std::string(argv[startAt]).find("\x0a") not_eq std::string::npos
 	};
 	for (int i{startAt}; i<argc; ++i) {
 		auto arg { argv[i] };
@@ -3151,7 +3191,7 @@ func parseKeyValue(std::string* const s, bool isExclude) {
    }
    else if (0 != std::strlen(keyword)) {
 		state[OPT_CASEINSENSITIVE] = value;
-		if (isEqual(value, "true", left)) {
+		if (isEqual(value, "true", IgnoreCase::Left)) {
 			for (auto& k : listFindDir) k = tolower(k);
 			for (auto& k : listExclFindDir) k = tolower(k);
 			for (auto& k : listFind) k = tolower(k);
@@ -3279,8 +3319,8 @@ func writeConfig(const std::vector<std::string>* const args,
 				{
 					if (auto next { i + 1 < args->size() ? (*args)[i + 1] : "" };
 						OPT_WRITEDEFAULTS
-						and not isEqual(next.c_str(),
-										{"add", "new", "reset", "edit", "remove"}, left))
+						and not isEqual(next.c_str(), OPT_WRITEDEFAULTS_ARGS,
+										IgnoreCase::Left))
 						;
 					else
 						i++;
@@ -3666,7 +3706,9 @@ func loadPlaylist(const fs::path& path, std::vector<fs::path>* const outPaths)
 //						& to  &amp;
 						if (value.find('&') != std::string::npos)
 							for (auto w { 0 }; w<sizeof(XML_CHARS_ALIAS) /sizeof(XML_CHARS_ALIAS[0]); ++w)
-								if (isContains(value, XML_CHARS_ALIAS[w], left) not_eq std::string::npos) {
+								if (isContains(value, XML_CHARS_ALIAS[w],
+									IgnoreCase::Left) not_eq std::string::npos)
+								{
 									replace_all(value, XML_CHARS_ALIAS[w], XML_CHARS_NORMAL[w]);
 								}
 						push(value);
@@ -3715,21 +3757,21 @@ func loadPlaylist(const fs::path& path, std::vector<fs::path>* const outPaths)
 	}};
 	
 	const auto ext { path.extension().string() };
-	if (isEqual(ext.c_str(), {".m3u8", ".m3u", ".ram"}, left))
+	if (isEqual(ext.c_str(), {".m3u8", ".m3u", ".ram"}, IgnoreCase::Left))
 		m3u();
-	else if (isEqual(ext, ".pls", left))
+	else if (isEqual(ext, ".pls", IgnoreCase::Left))
 		pls();
-	else if (isEqual(ext, ".xspf", left))
+	else if (isEqual(ext, ".xspf", IgnoreCase::Left))
 		xml({"<location>file://"}, {"</location>"});
-	else if (isEqual(ext, ".wpl", left))
+	else if (isEqual(ext, ".wpl", IgnoreCase::Left))
 		xml({"<media src=\""}, {"\""});
-	else if (isEqual(ext, ".b4s", left))
+	else if (isEqual(ext, ".b4s", IgnoreCase::Left))
 		xml({"<entry Playstring=\"file:"}, {"\""});
-	else if (isEqual(ext, ".smil", left))
+	else if (isEqual(ext, ".smil", IgnoreCase::Left))
 		xml({"<audio src=\""}, {"\""});
-	else if (isEqual(ext.c_str(), {".asx", ".wax", ".wvx"}, left))
+	else if (isEqual(ext.c_str(), {".asx", ".wax", ".wvx"}, IgnoreCase::Left))
 		xml({"<ref href=\""}, {"\""});
-	else if (isEqual(ext, ".xml", left))
+	else if (isEqual(ext, ".xml", IgnoreCase::Left))
 		xml({"<key>Location</key><string>file://"}, {"</string>"});
 	
 	//rdf		{"<dc:identifier>"}, {"</dc:identifier>"}
@@ -3782,12 +3824,12 @@ int main(const int argc, char *argv[]) {
 				and args[i][1] == '-')
 			{
 				auto lower { args[i].substr(2) };
-				result = isEqual(lower, with, left);
+				result = isEqual(lower, with, IgnoreCase::Left);
 				
 				if (not result)
 					for (auto& other : others)
 						if (isEqual(lower, other[0] == '-' and other[1] == '-'
-									? other + 2 : other, left))
+									? other + 2 : other, IgnoreCase::Left))
 						{
 							if (other[0] == '-' and other[1] == '-')
 								args[i] = with;
@@ -3828,41 +3870,51 @@ int main(const int argc, char *argv[]) {
 			}
 			else if (isMatch(OPT_DEBUG, 		'B', true)) {
 				if (i + 1 < args.size() and
-					(args[i + 1] == "args" or args[i + 1] == "id3"
-					 or args[i + 1] == "date"))
+					isEqual(args[i + 1].c_str(), OPT_DEBUG_ARGS))
 				{
 					i++;
 					state[OPT_DEBUG] = args[i];
 					if (args[i] == "id3")
 					{
-						if (i + 2 == args.size() and isEqual(
-							fs::path(args[i + 1]).extension().string().c_str(),
-							".mp3", left))
-						{
-							ID3 id3(args[i + 1].c_str());
-							std::cout << id3.string() << '\n';
-							i++;
-						}
-						else if (i + 3 < args.size() and isEqual(
-							fs::path(args[i + 3]).extension().string().c_str(),
-							".mp3", left))
-						{
-							ID3 id3(args[i + 3].c_str());
-							std::cout << id3.string() << '\n';
-
-							auto key { args[i + 1] };
-							auto val { args[i + 2] };
-							auto isOk { true };
-							id3.tags.at(key) = val;
-							
-							if (isOk) {
-								id3.write();
-								
-								ID3 rw(args[i + 3].c_str());
-								std::cout << rw.string() << '\n';
+						if (i + 1 == args.size())
+							std::cout << "Usage: --debug=id3 key[=]value [key[=]value ...] *.mp3 [*.mp3 ...]\n";
+						std::unordered_map<std::string, std::string> keyVals;
+						std::vector<fs::path> files;
+						while (++i < args.size()) {
+							if (auto path { fs::path(args[i]) };
+								fs::exists(path)
+								and isEqual(path.extension().string().c_str(),
+											".mp3", IgnoreCase::Left))
+								files.emplace_back(std::move(path));
+							else {
+								if (auto pos { args[i].find('=') };
+									pos not_eq std::string::npos)
+									keyVals.emplace(std::make_pair(
+													args[i].substr(0, pos),
+													args[i].substr(pos + 1)));
+								else {
+									keyVals.emplace(std::make_pair(args[i], args[i + 1]));
+									i++;
+								}
 							}
-							i += 3;
 						}
+						
+						for (auto& file : files) {
+							auto mp3{ ID3(file.string().c_str()) };
+							for (auto& keyVal : keyVals) {
+								if (auto pos { mp3.tags.find(keyVal.first) };
+									pos == mp3.tags.end())
+									mp3.tags.emplace(std::make_pair(
+												keyVal.first, keyVal.second));
+								else
+									mp3.tags.at(keyVal.first) = keyVal.second;
+							}
+							if (not keyVals.empty())
+								mp3.write();
+							std::cout << "File " << file.filename() << ":\n"
+							<< mp3.string() << '\n';
+						}
+						
 						return RETURN_VALUE
 					}
 					if (args[i] == "date") {
@@ -3885,19 +3937,16 @@ int main(const int argc, char *argv[]) {
 					}
 				}
 			}
-			else if (isMatch(OPT_SHOWCONFIG, '\0', true,
-			{ "show-defaults", "display-config", "display-defaults",
-			  "print-config", "print-defaults",
-			}));
-			else if (isMatch(OPT_WRITEDEFAULTS, 'W', true, {"write-config"})) {
+			else if (isMatch(OPT_SHOWCONFIG, '\0', true, OPT_SHOWCONFIG_ALTERNATIVE));
+			else if (isMatch(OPT_WRITEDEFAULTS, 'W', true, OPT_WRITEDEFAULTS_ALTERNATIVE)) {
 				if (i + 1 < args.size()) {
-					if (isEqual(args[i + 1], "reset", left)) {
+					if (isEqual(args[i + 1], "reset", IgnoreCase::Left)) {
 						fs::remove(CONFIG_PATH);
 						state[OPT_WRITEDEFAULTS].clear();
 						i++;
 					}
 					else if (isEqual(args[i + 1].c_str(),
-									 {"edit", "add", "new", "remove"}, left)) {
+									 OPT_WRITEDEFAULTS_ARGS, IgnoreCase::Left)) {
 						i++;
 						state[OPT_WRITEDEFAULTS] = args[i];
 					}
@@ -3981,9 +4030,11 @@ int main(const int argc, char *argv[]) {
 				if (i + 1 < args.size())
 				{
 					i++;
-					if (isEqual(args[i + 1].c_str(), {"true", "yes"}, left))
+					if (isEqual(args[i + 1].c_str(), {"true", "yes"},
+								IgnoreCase::Left))
 						state[OPT_NOOUTPUTFILE] = "true";
-					else if (isEqual(args[i + 1].c_str(), {"false", "no"}, left))
+					else if (isEqual(args[i + 1].c_str(), {"false", "no"},
+									 IgnoreCase::Left))
 						state[OPT_NOOUTPUTFILE] = "false";
 					else
 						i--;
@@ -4020,12 +4071,11 @@ int main(const int argc, char *argv[]) {
 					std::cout << "⚠️ Expecting arrangement type. Please see --help "
 					<< args[i].substr(2) << "\n";
 			}
-			else if (isMatch(OPT_CASEINSENSITIVE, 'N', true,
-							 {	"case-insensitive", "caseinsensitive",
-								"ignore-case", "ignorecase"}))
+			else if (isMatch(OPT_CASEINSENSITIVE, 'N', true, OPT_CASEINSENSITIVE_ALTERNATIVE))
 			{
-				if (i + 1 < args.size() and (args[i + 1] == "true"
-											 or args[i + 1] == "false"))
+				if (i + 1 < args.size() and isEqual(args[i + 1].c_str(),
+													TRUE_FALSE,
+													IgnoreCase::Left))
 					state[OPT_CASEINSENSITIVE] = args[++i];
 				
 				if (state[OPT_CASEINSENSITIVE] == "true") {
@@ -4138,8 +4188,8 @@ int main(const int argc, char *argv[]) {
 			}
 			else if (isMatch(OPT_REGEXSYNTAX, 	'X')) {
 				if (auto found{ false }; i + 1 < args.size()) {
-					for (auto& s : {"ecma", "basic", "extended", "awk", "grep", "egrep"})
-						if (isEqual(args[i + 1].c_str(), s, left)) {
+					for (auto& s : OPT_REGEXSYNTAX_ARGS)
+						if (isEqual(args[i + 1].c_str(), s, IgnoreCase::Left)) {
 							state[OPT_REGEXSYNTAX] = s;
 							i++;
 							found = true;
@@ -4161,8 +4211,7 @@ int main(const int argc, char *argv[]) {
 					{
 						if (args[i + 1].substr(0, pos) == "type") {
 							auto value { args[i + 1].substr(pos + 1) };
-							for (auto& keyword : {"ecma", "basic", "extended",
-													"awk", "grep", "egrep"})
+							for (auto& keyword : OPT_REGEXSYNTAX_ARGS)
 								if (keyword == value) {
 									state[OPT_REGEXSYNTAX] = keyword;
 									i++;
@@ -4353,19 +4402,23 @@ DATE_NEEDED:	std::cout << "⚠️ Expecting date and/or time after \""
 							<< args[i].substr(2) << "\n";
 			}
 			else if (isMatch(OPT_OVERWRITE, 	'O', true)) {
-				if (i + 1 < args.size() and isEqual(args[i + 1].c_str(), {"true", "false"}, left))
+				if (i + 1 < args.size() and isEqual(args[i + 1].c_str(),
+													TRUE_FALSE, IgnoreCase::Left))
 					state[OPT_OVERWRITE] = args[++i];
 			}
 			else if (isMatch(OPT_BENCHMARK, 	'b', true)) {
-				if (i + 1 < args.size() and isEqual(args[i + 1].c_str(), {"true", "false"}, left))
+				if (i + 1 < args.size() and isEqual(args[i + 1].c_str(),
+													TRUE_FALSE, IgnoreCase::Left))
 					state[OPT_OVERWRITE] = args[++i];
 			}
 			else if (isMatch(OPT_SKIPSUBTITLE, 	'x', true)) {
-				if (i + 1 < args.size() and isEqual(args[i + 1].c_str(), {"true", "false"}, left))
+				if (i + 1 < args.size() and isEqual(args[i + 1].c_str(),
+													TRUE_FALSE, IgnoreCase::Left))
 					state[OPT_OVERWRITE] = args[++i];
 			}
 			else if (isMatch(OPT_EXCLHIDDEN, 	'n', true)) {
-				if (i + 1 < args.size() and isEqual(args[i + 1].c_str(), {"true", "false"}, left))
+				if (i + 1 < args.size() and isEqual(args[i + 1].c_str(),
+													TRUE_FALSE, IgnoreCase::Left))
 					state[OPT_OVERWRITE] = args[++i];
 			}
 			else if (isMatch(OPT_VERBOSE, 		'V', true)) {
@@ -4967,9 +5020,7 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 			"<dict>\n"\
 			"\t<key>Major Version</key><integer>1</integer>\n"\
 			"\t<key>Minor Version</key><integer>1</integer>\n"\
-			"\t<key>Date</key><date>";
-			outputFile << Date::now().string("%FT%T");
-			outputFile << "</date>\n"\
+			"\t<key>Date</key><date>" << Date::now().string("%FT%T") << "</date>\n"\
 			"\t<key>Application Version</key><string>1.1</string>\n"\
 			"\t<key>Tracks</key>\n"\
 			"\t<dict>"
@@ -5047,7 +5098,9 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 												 ".asx", ".wax", ".wvx"}))
 					{
 						for (auto w { 0 }; w<sizeof(XML_CHARS_ALIAS) /sizeof(XML_CHARS_ALIAS[0]); ++w)
-							if (isContains(fullPath, XML_CHARS_NORMAL[w], left) not_eq std::string::npos) {
+							if (isContains(fullPath, XML_CHARS_NORMAL[w],
+									IgnoreCase::Left) not_eq std::string::npos)
+							{
 								replace_all(fullPath, XML_CHARS_NORMAL[w], XML_CHARS_ALIAS[w]);
 								break;
 							}

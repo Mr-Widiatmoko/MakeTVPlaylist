@@ -6,9 +6,8 @@ As the name suggests, this is a small utility to create playlist from various se
 
 ## Overview:
 This is a utility to create playlist file with extension .m3u8 (by default) that contains sequence per episode per Title (by default) of multiple Title TV program or Folder. To do that, you have two option:
-1. By selecting folders or files, then Right-Click choose "Quick Actions" -> "Make TV Playlist". Then "MPV" (by default, if you have one) or your default video player will be automatically used to play the playlist file. After the player quit, the playlist file will be removed. If you need to save the playlist, use your player to save playlist as ..., or you can use [tvplaylist](https://github.com/Mr-Widiatmoko/MakeTVPlaylist/Release/tvplaylist) to do so (see below). This workflow implemented using zsh script, so the performace to create playlist is very, very, very ... slugish. To upgrade performace for more than 1000%, yes thats right MORE THAN 1000%, you need to download [tvplaylist](https://github.com/Mr-Widiatmoko/MakeTVPlaylist/Release/tvplaylist)(for macOS Intel!, other platform need to compile, see Installation) and put it into "HOME" or "Downloads" or "/usr/local/bin/" by copy or by alias. For example, to move file on "/usr/local/bin/" you can type:
-	
-		mv tvplaylist /usr/local/bin/
+1. By selecting folders or files, then Right-Click choose "Quick Actions" -> "Make TV Playlist". Then "mpv" (by default, if you have one) or your default video player will be automatically used to play the playlist file.
+	This workflow implemented using zsh script, so the performace to create playlist is very, very, very ... slugish. To upgrade performace for more than 1000% and have bunch of bells and whistles you need to download [tvplaylist](https://github.com/Mr-Widiatmoko/MakeTVPlaylist/Release/tvplaylist)(for macOS Intel!, another platform need to be compiled, see Installation).
 		
 2. By using Terminal.app and type "tvplaylist" press SPACE then drag folders or files from Finder to Terminal, then press ENTER. the program will display full path of playlist file.
 
@@ -45,12 +44,11 @@ To build "tvplaylist" on macOS Apple Silicon, Windows, Linux, or another platfor
 	
 Don't forget to [Press ENTER]. Thats it, you will get "tvplaylist" on "/usr/local/bin" directory.
 
-If you don't have cmake installed then, form 'src' directory on Terminal, paste following:
+If you don't have cmake installed then, from 'src' directory on Terminal, paste following:
 
     c++ main.cpp -std=c++2b -o /usr/local/bin/tvplaylist
 
 Don't forget to [Press ENTER]. Thats it, you will get "tvplaylist" on "/usr/local/bin/" directory.
-There was a bug in macOS on LLVM libc++ (from Xcode 13.2.1) for std::basic_string.substr() used in multiple times inside loops. So I encourage you to use libstdc++ (may be works) if you have one.
 
 If you need to build this as library file, then copy below and paste on the Terminal:
 

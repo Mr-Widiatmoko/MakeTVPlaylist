@@ -100,22 +100,26 @@ constexpr auto OPT_DEBUG			{"debug"};                  // B
 
 constexpr auto SHOW=\
 "--[show | display | print]-[config | defaults]\n\
-        Display options summary only, then quit.\n\
+        Display options summary and configuration file contents, then quit.\n\
         See also --verbose or --verbose=info or --debug=args or --benchmark.\n\
         Example: --print-defsult\n\
 ";
 constexpr auto WRITE=\
-"-W, --write-defaults [reset | edit | add]\n\
-     --write-config [reset | edit | add]\n\
+"-W, --write-defaults [new | reset | edit | add | remove]\n\
+     --write-config [new | reset | edit | add | remove]\n\
         Write anything you defined to \""\
         CONFIG_PATH\
-"\" as new default, instead executing it.\n\
+"\" as new defaults (if no argument passed), instead executing it.\n\
+        Argument \"new\" is used by default.\n\
+        Example: --write-config\n\
         To reset to factory default, pass \"reset\".\n\
         Example: --write-defaults reset\n\
-        To edit existing, pass \"edit\".\n\
+        To edit existing options, pass \"edit\".\n\
         Example: --ads-count=1-3:write-config=edit\n\
-        To add new option, pass \"add\".\n\
+        To add or append new options, pass \"add\".\n\
         Example: -W=add -D=/tmp/Downloads:D=/tmp/Backup\n\
+        To remove the exact pairs of options and values, pass \"remove\"\n\
+        Example: --debug=args --write-config=remove\n\
 ";
 constexpr auto LOAD=\
 "-L, --load-config 'custom file'\n\
@@ -135,6 +139,8 @@ constexpr auto LOAD=\
             ads-dir   = \"D:\\Videos\\Funny Advertise Collections\"\n\
             ads-dir   = \"D:\\Downloads\\Trailers 2022\"\n\
             ads-count = 2-10 # Single line Comment\n\
+        To set custom path for config file, use --write-defaults.\n\
+        Example: --write-defaults:load-config=/tmp/setting.txt\n\
 ";
 constexpr auto VERSION=\
 "tvplaylist version 1.1 (Early 2022)\nTM and (C) 2022 Widiatmoko. \
@@ -366,7 +372,7 @@ constexpr auto NOOUTPUTFILE=\
 ";
 constexpr auto HELP_REST=\
 "\n\
-Arguments can be surrounded by \"\" (eg. \"--verbose;benchmark\") to enable using character ';' or anothers that belongs to Terminal or shell. To view how arguments was deduced you can pass option --debug=args.\n\
+Arguments can be surrounded by \"\" (eg. \"--verbose;benchmark\") to enable using character ';' or <ENTER> as multiline or another characters that belongs to Terminal or shell. To view how arguments was deduced you can pass option --debug=args.\n\
 Options can be joined, and option assignment separator [SPACE] can be replaced with '=' \
 and options can be separated by ':' or ';' after assignment. For the example:\n\n\
   tvplaylist -hOVvc=async:xs<1.3gb:e=mp4,mkv:f=My-playlist.txt\n\n\
@@ -783,6 +789,46 @@ func containInts(const std::string& s, std::vector<MAXNUM>* const out)
 
 namespace fs = std::filesystem;
 
+#define INTERNAL = 1
+
+#if defined(INTERNAL) == 1
+#include <dirent.h>
+func directory_iterator(const fs::path& path, const unsigned char type)
+	-> std::vector<fs::directory_entry>
+{
+	std::vector<fs::directory_entry> result;
+	
+	DIR* folder = opendir(path.string().c_str());
+	if(auto i{ -2 }; folder) {
+		auto parentPath { path.string() + fs::path::preferred_separator };
+		struct dirent* entry;
+		while( (entry = readdir(folder)) ) {
+			if (++i > 0
+				and ((entry->d_type & type) == entry->d_type))
+			{
+				if (entry->d_type == DT_REG
+					and isEqual(entry->d_name, ".DS_Store"))
+					;
+				else {
+					std::string name = parentPath;
+					name += entry->d_name;
+					fs::path path_name { std::move(name) };
+					auto d { fs::directory_entry(std::move(path_name)) };
+					d.refresh();
+					result.emplace_back(std::move(d));
+				}
+			}
+		}
+	}
+	closedir(folder);
+	return result;
+}
+#define directory_iterator(x, y)	directory_iterator(x, y)
+#else
+#define directory_iterator(x, y)	fs::directory_iterator(x)
+#endif
+
+
 inline
 func excludeExtension(const fs::path& path) -> std::string
 {
@@ -867,7 +913,7 @@ struct Date
 		tm.tm_sec = (d ? d : this)->second;
 		if ((d ? d : this)->weekday > 0)
 			tm.tm_wday = (d ? d : this)->weekday;
-		return std::mktime(&tm); //std::time(nullptr);
+		return std::mktime(&tm);
 	}
 
 	func string(const char* const format = nullptr, bool UTC = false) const -> std::string {
@@ -2412,8 +2458,8 @@ func isDirNameValid(const fs::path& dir)
 inline
 func isValid(const fs::path& path) -> bool
 {
-	return (fs::is_regular_file(path) and path.filename().string() not_eq ".DS_Store")
-	or not (((fs::status(path).permissions() & (  fs::perms::owner_read
+	return /*(fs::is_regular_file(path) and path.filename().string() not_eq ".DS_Store")
+	or*/ not (((fs::status(path).permissions() & (  fs::perms::owner_read
 												| fs::perms::group_read
 												| fs::perms::others_read))
 			== fs::perms::none)
@@ -2432,11 +2478,13 @@ func listDir(const fs::path& path, std::vector<fs::directory_entry>* const out,
 		if (ec)
 			return;
 	}
-	try {
-		for (auto& child : fs::directory_iterator(path)) {
-			if (child.path().filename().string() == ".DS_Store"
+//	try {
+		for (auto& child : directory_iterator(path, (includeRegularFiles
+				? (DT_DIR | DT_REG) : DT_DIR)))
+		{
+			if (/*child.path().filename().string() == ".DS_Store"*/
 				//or child.is_symlink()
-				or (child.status().permissions()
+				/*or*/ (child.status().permissions()
 					& (fs::perms::owner_read
 					   | fs::perms::group_read
 					   | fs::perms::others_read)) == fs::perms::none)
@@ -2447,19 +2495,46 @@ func listDir(const fs::path& path, std::vector<fs::directory_entry>* const out,
 					continue;
 			} else if (child.path().empty())
 				continue;
-			else if (not child.is_directory() and not includeRegularFiles)
-				continue;
+			/*else if (not child.is_directory() and not includeRegularFiles)
+				continue;*/
 			
 			out->emplace_back(child);
 		}
-	} catch (fs::filesystem_error& e) {
-		#ifndef DEBUG
-		if (state[OPT_VERBOSE] == "all")
-		#else
-			std::cout << "listDir: " << path << '\n';
-		#endif
-			std::cout << e.what() << '\n';
-	}
+//	} catch (const std::overflow_error& e) {
+//		// this executes if f() throws std::overflow_error (same type rule)
+//		#ifndef DEBUG
+//		if (state[OPT_VERBOSE] == "all")
+//		#else
+//			std::cout << "OVERFLOW ERROR‼️ listDir: " << path << '\n';
+//		#endif
+//			std::cout << e.what() << '\n';
+//	} catch (const std::runtime_error& e) {
+//		// this executes if f() throws std::underflow_error (base class rule)
+//		#ifndef DEBUG
+//		if (state[OPT_VERBOSE] == "all")
+//		#else
+//			std::cout << "RUNTIME ERROR‼️ listDir: " << path << '\n';
+//		#endif
+//			std::cout << e.what() << '\n';
+//	} catch (const std::exception& e) {
+//		// this executes if f() throws std::logic_error (base class rule)
+//		#ifndef DEBUG
+//		if (state[OPT_VERBOSE] == "all")
+//		#else
+//			std::cout << "EXCEPTION‼️ listDir: " << path << '\n';
+//		#endif
+//			std::cout << e.what() << '\n';
+//	} catch (const fs::filesystem_error& e) {
+//		#ifndef DEBUG
+//		if (state[OPT_VERBOSE] == "all")
+//		#else
+//			std::cout << "filesystem::directory_iterator()‼️ listDir: " << path << '\n';
+//		#endif
+//			std::cout << "Code: " << e.code() << '\n'
+//			<< "path1: \"" << e.path1() << "\"\n"
+//			<< "path2: \"" << e.path2() << "\"\n"
+//			<< e.what() << '\n';
+//	}
 	
 	if (sorted and out->size() > 1)
 		std::sort(out->begin(), out->end(), [](const fs::directory_entry& a,
@@ -2600,15 +2675,15 @@ func findSubtitleFile(const fs::path& original,
 {
 	if (auto parentPath{original.parent_path()}; not parentPath.empty()) {
 		auto noext{excludeExtension(original.filename())};
-		std::vector<fs::path> list;
-		listDirRecursively(parentPath, &list, true);
-			for (auto& f : list)
-				if (not fs::is_directory(f)
-					and isValid(f)
-					and fs::is_regular_file(f)
-					and f.string().size() >= original.string().size()
-					and isEqual(f.extension().string(), &SUBTITLES_EXT, left)
-					and isContains(f.filename().string(), noext, both, &FILENAME_IGNORE_CHAR) not_eq std::string::npos)
+		//std::vector<fs::path> list;
+		//listDirRecursively(parentPath, &list, true);
+			for (auto& f : directory_iterator(parentPath, DT_REG))
+				if (//not fs::is_directory(f)
+					/*and*/ isValid(f)
+					//and fs::is_regular_file(f)
+					and f.path().string().size() >= original.string().size()
+					and isEqual(f.path().extension().string(), &SUBTITLES_EXT, left)
+					and isContains(f.path().filename().string(), noext, both, &FILENAME_IGNORE_CHAR) not_eq std::string::npos)
 
 					result->emplace_back(std::move(f));
 	}
@@ -2776,8 +2851,17 @@ func expandArgs(const int argc, char* const argv[],
 		if (newFull)
 			newFull = false;
 	}};
+	
+	const bool isMultiLine{
+		std::string(argv[startAt]).find("\x0a") not_eq std::string::npos
+	};
 	for (int i{startAt}; i<argc; ++i) {
 		auto arg { argv[i] };
+		
+		if (isMultiLine)
+			while (arg[0] == 0x0a or arg[0] == 0x0d)
+				arg++;
+		
 		auto len { std::strlen(arg) };
 		auto isMnemonic{ len > 1 and arg[0] == '-'
 			and (std::isalpha(arg[1]) or arg[1] == ARG_SEP or arg[1] == ';' ) };
@@ -2845,15 +2929,24 @@ func expandArgs(const int argc, char* const argv[],
 						last = index + 1;
 					}
 					equalOpCount++;
-				} else if ((arg[index] == ARG_SEP or arg[index] == ';')
+				} else if (auto foundEnter { arg[index] == 0x0a };
+						   ((arg[index] == ARG_SEP or arg[index] == ';')
 						   and (index + 1 == std::strlen(arg) or
-								(index + 1 < std::strlen(arg) and std::isalpha(arg[index + 1])))) {
+								(index + 1 < std::strlen(arg) and std::isalpha(arg[index + 1])))
+						   )
+						   or foundEnter)
+				{
 					lastOptCode = 1;
 					push(arg, index, last);
 					last = -1;
+					
+					if (foundEnter and arg[index + 1] == 0x0d)
+						index++;
+
 					if (isFull) {
 						lastOptCode = 2;
-						newFull = index + 1 < std::strlen(arg) and std::isalpha(arg[index + 1]);
+						newFull = foundEnter ? false :
+						index + 1 < std::strlen(arg) and std::isalpha(arg[index + 1]);
 					}
 					equalOpCount = 0;
 				} else if (isFull and last > 0 and (arg[index] == '<' or arg[index] == '>')) {
@@ -3178,55 +3271,130 @@ func getLines(std::basic_istream<T>* const inputStream,
 	push();
 }
 
-enum WriteMode { New, Edit, Add };
+constexpr auto ARGS_SEPARATOR {"\x0a\x0aARGS-SEPARATOR\x0a\x0a"};
+
+enum class WriteConfigMode { New, Edit, Add, Remove };
 
 func writeConfig(const std::vector<std::string>* const args,
-				   const WriteMode mode)
+				   const WriteConfigMode mode)
 {
-	std::fstream file(CONFIG_PATH, std::ios::out);
-	#define DATE_FORMAT	"%A, %d %B %Y at %I:%M:%S %p"
-	if (mode == New )
-		file << "# Configuration made in " << Date::now().string(DATE_FORMAT) << '\n';
-	else
-		file << "# Edited on " << Date::now().string(DATE_FORMAT) << '\n';
-	#undef DATE_FORMAT
-	
-	std::vector<std::string> lines;
-	std::string buffer;
-	
-	for (unsigned i { 0 }; i<args->size(); ++i) {
-		const auto s = (*args)[i];
-		unsigned offset = 0;
-		auto isOpt { s.starts_with("--") };
-		if (isOpt)
-			offset = 2;
-		else if (isOpt = s.size() >= 2 and s[0] == '-' and std::isalpha(s[1])
-				 and (s.size() == 2 or (s[2] == '=' or s[2] == ' '));
-				 isOpt)
-			offset = 1;
-		if (isOpt) {
-			if ((offset == 2 and isEqual(s.c_str() + offset, { OPT_WRITEDEFAULTS/*, OPT_LOAD*/ }))
-				or (offset == 1 and (s[1] == 'W' /*or s[1] == 'L'*/)))
+	enum class ReadDirection { All, Old, Current };
+	func argsToLines{[&args](std::vector<std::string>* const lines,
+							 ReadDirection direction,
+							 bool removeOptPrefix = false)
+	{
+		std::string buffer;
+		auto foundSep { false };
+		for (unsigned i { 0 }; i<args->size(); ++i) {
+			const auto s = (*args)[i];
+			if (s == ARGS_SEPARATOR)
 			{
-				if (auto next { i + 1 < args->size() ? (*args)[i + 1] : "" };
-					OPT_WRITEDEFAULTS and not isEqual(next.c_str(), {"reset", "edit"}))
-					;
+				foundSep = true;
+				if (direction == ReadDirection::Old)
+					break;
 				else
-					i++;
+					continue;
+			} else if (direction == ReadDirection::Current and not foundSep)
 				continue;
+			
+			unsigned offset = 0;
+			auto isOpt { s.starts_with("--") };
+			if (isOpt)
+				offset = 2;
+			else if (isOpt = s.size() >= 2 and s[0] == '-' and std::isalpha(s[1])
+					 and (s.size() == 2 or (s[2] == '=' or s[2] == ' '));
+					 isOpt)
+				offset = 1;
+			if (isOpt) {
+				if ((offset == 2 and isEqual(s.c_str() + offset,
+						{OPT_WRITEDEFAULTS, OPT_SHOWCONFIG}))
+					or (offset == 1 and (s[1] == 'W')))
+				{
+					if (auto next { i + 1 < args->size() ? (*args)[i + 1] : "" };
+						OPT_WRITEDEFAULTS
+						and not isEqual(next.c_str(),
+										{"add", "new", "reset", "edit", "remove"}, left))
+						;
+					else
+						i++;
+					continue;
+				}
+				if (not buffer.empty())
+					lines->emplace_back(std::move(buffer));
+				buffer.clear();
+			} else
+				buffer += ' ';
+			if (removeOptPrefix)
+				buffer += s.c_str() + (isOpt ? offset : 0);
+			else
+				buffer += s;
+		}
+		if (not buffer.empty())
+			lines->emplace_back(std::move(buffer));
+	}};
+	
+	std::unordered_set<std::string> definedList;
+	std::vector<std::string> lines;
+	if (	mode == WriteConfigMode::Edit
+		or 	mode == WriteConfigMode::Remove)
+	{
+		std::vector<std::string> newLines;
+		argsToLines(&lines, ReadDirection::Old, false);
+		argsToLines(&newLines, ReadDirection::Current, false);
+	
+		if (mode == WriteConfigMode::Remove) {
+			for (auto line = lines.begin(); line<lines.end();) {
+				auto found { false };
+				for (auto& opt : newLines)
+					if (found = *line == opt; found) {
+						lines.erase(line);
+						break;
+					}
+				if (not found)
+					line++;
 			}
-			if (not buffer.empty())
-				lines.emplace_back(std::move(buffer));
-			buffer.clear();
-		} else
-			buffer += ' ';
-		buffer += s.c_str() + (isOpt ? offset : 0);
+		} else {
+			for (auto line = newLines.begin(); line<newLines.end(); ++line)
+				if (bool isOpt {
+					(line->size() > 3 and line->starts_with("--")
+						and std::isalpha((*line)[2]) and std::isalpha((*line)[3]))
+					or
+					(line->size() >= 2 and (*line)[0] == '-' and std::isalpha((*line)[1])
+						and (line->size() == 2 or ((*line)[2] == '=' or (*line)[2] == ' ')))
+				};
+					
+					isOpt)
+				{
+					auto pos { line->find('=') };
+					if (pos == std::string::npos)
+						pos = line->find(' ');
+					
+					if (pos not_eq std::string::npos)
+						definedList.emplace(line->substr(0, pos));
+				}
+			
+			for (auto line = lines.begin(); line<lines.end();) {
+				auto found { false };
+				for (auto& opt : definedList)
+					if (found = line->starts_with(opt); found) {
+						lines.erase(line);
+						break;
+					}
+				if (not found)
+					line++;
+			}
+			
+			
+			for (auto& line : newLines)
+				lines.emplace_back(std::move(line));
+		}
+		
+		definedList.clear();
 	}
-	if (not buffer.empty())
-		lines.emplace_back(std::move(buffer));
+	else
+		argsToLines(&lines, ReadDirection::All, true);
 	
 	/// Remove duplication
-	std::unordered_set<std::string> definedList;
 	for (auto line = lines.end() - 1; line>=lines.begin(); --line) {
 		auto found { false };
 		for (auto& opt : SINGLE_VALUE_OPT)
@@ -3249,10 +3417,17 @@ func writeConfig(const std::vector<std::string>* const args,
 		}
 	}
 	
+	std::fstream file(CONFIG_PATH, std::ios::out);
+	#define DATE_FORMAT	"%A, %d %B %Y at %I:%M:%S %p"
+	if (mode == WriteConfigMode::New )
+		file << "# Configuration made in " << Date::now().string(DATE_FORMAT) << '\n';
+	else
+		file << "# Edited on " << Date::now().string(DATE_FORMAT) << '\n';
+	#undef DATE_FORMAT
+	
 	for (auto& line : lines)
 		file << line << '\n';
 	
-	file << '\n';
 	file.flush();
 	
 	file.close();
@@ -3622,7 +3797,7 @@ int main(const int argc, char *argv[]) {
 	state[OPT_LOADCONFIG] = CONFIG_PATH ;
 	
 	loadConfig(&args);
-
+	args.emplace_back(ARGS_SEPARATOR);
 	expandArgs(argc, argv, ARGS_START_INDEX, &args);
 	
 	unsigned long fileCountPerTurn{ 1 };
@@ -3644,8 +3819,15 @@ int main(const int argc, char *argv[]) {
 				
 				if (not result)
 					for (auto& other : others)
-						if (isEqual(lower, other, left))
+						if (isEqual(lower, other[0] == '-' and other[1] == '-'
+									? other + 2 : other, left))
 						{
+							if (other[0] == '-' and other[1] == '-')
+								args[i] = with;
+							else {
+								args[i] = "--";
+								args[i] += with;
+							}
 							result = true;
 							break;
 						}
@@ -3664,7 +3846,9 @@ int main(const int argc, char *argv[]) {
 					state[with] = "true";
 			}
 			return result;
-		} }; isMatch(OPT_HELP, 'h') or isMatch(OPT_VERSION, 'v')) // MARK: Option Matching
+		} }; args[i] == ARGS_SEPARATOR)
+				continue;
+			else if (isMatch(OPT_HELP, 'h') or isMatch(OPT_VERSION, 'v')) // MARK: Option Matching
 			{
 				printHelp(i + 1 < args.size()
 						  ? (args[i + 1][0] == '-' and args[i + 1][1] == '-'
@@ -3740,16 +3924,17 @@ int main(const int argc, char *argv[]) {
 			}));
 			else if (isMatch(OPT_WRITEDEFAULTS, 'W', true, {"write-config"})) {
 				if (i + 1 < args.size()) {
-					if (args[i + 1] == "reset") {
+					if (isEqual(args[i + 1], "reset", left)) {
 						fs::remove(CONFIG_PATH);
 						state[OPT_WRITEDEFAULTS].clear();
 						i++;
 					}
-					else if (args[i + 1] == "edit" or args[i + 1] == "add") {
+					else if (isEqual(args[i + 1].c_str(),
+									 {"edit", "add", "new", "remove"}, left)) {
 						i++;
 						state[OPT_WRITEDEFAULTS] = args[i];
 					}
-				}
+				} else state[OPT_WRITEDEFAULTS] = "new";
 			}
 			else if (isMatch(OPT_LOADCONFIG, 'L')) {
 				if (i + 1 < args.size() and fs::exists(args[i + 1])) {
@@ -4475,21 +4660,27 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 	}
 	
 	#ifndef DEBUG
-	if (state[OPT_SHOWCONFIG] == "true" or
+	if (not state[OPT_SHOWCONFIG].empty() or
 		not invalidArgs.empty() or state[OPT_VERBOSE] == "all"
 		or state[OPT_VERBOSE] == "info" or state[OPT_BENCHMARK] == "true"
 		or state[OPT_DEBUG] == "true" or state[OPT_DEBUG] == "args")
 	#endif
 	{ // MARK: Options Summary
 		constexpr auto WIDTH{ 20 };
-		if (state[OPT_DEBUG] == "true" or state[OPT_DEBUG] == "args") {
+		#ifndef DEBUG
+		if (state[OPT_DEBUG] == "true" or state[OPT_DEBUG] == "args")
+		#endif
+		{
 			std::cout << "Original Arguments: ";
 			for (auto i{1}; i<argc; ++i)
 				std::cout << '"' << argv[i] << '"' << (i+1>=argc ? "" : ", ");
 			std::cout << '\n';
 			std::cout << "Parsed Arguments  : ";
-			for (auto i{0}; i<args.size(); ++i)
+			for (auto i{0}; i<args.size(); ++i) {
+				if (args[i] == ARGS_SEPARATOR)
+					continue;
 				std::cout << '"' << args[i] << '"' << (i+1>=args.size() ? "" : ", ");
+			}
 			std::cout << '\n';
 		}
 	#define PRINT_OPT(x)	(x.empty() ? "false" : x)
@@ -4600,13 +4791,33 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 	if (not invalidArgs.empty())
 		return RETURN_VALUE;
 					   
-	if (invalidArgs.empty() and not state[OPT_WRITEDEFAULTS].empty()) {
-		writeConfig(&args, state[OPT_WRITEDEFAULTS] == "edit" ? Edit
-				: state[OPT_WRITEDEFAULTS] == "add" ? Add : New);
-		return RETURN_VALUE;
-	}
+	if (const auto mode{ state[OPT_WRITEDEFAULTS] };
+		not mode.empty())
+		writeConfig(&args,
+					  mode == "edit" 	? WriteConfigMode::Edit
+					: mode == "add" 	? WriteConfigMode::Add
+					: mode == "remove" 	? WriteConfigMode::Remove
+					: WriteConfigMode::New);
 
-    if (state[OPT_SHOWCONFIG] == "true")
+	if (not state[OPT_SHOWCONFIG].empty()) {
+		auto displayFile{[](const char* const path) {
+			if (not fs::exists(fs::path(path)))
+				return;
+			
+			std::cout << "\nContent of file \"" << path << "\":\n";
+			std::ifstream file(path);
+			std::cout << file.rdbuf() << '\n';
+			file.close();
+		}};
+			
+		displayFile(CONFIG_PATH);
+		auto otherFile { state[OPT_LOADCONFIG].c_str() };
+		if (not isEqual(CONFIG_PATH, otherFile))
+			displayFile(otherFile);
+	}
+					   
+    if (	not state[OPT_SHOWCONFIG].empty()
+		or 	not state[OPT_WRITEDEFAULTS].empty())
         return RETURN_VALUE;
 
 	{///Clean up <key=val> dir=??? in listFind and listExclFind
@@ -4755,7 +4966,9 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 	unsigned long playlistCount{0};
 	std::string outExt;
 	#ifndef DEBUG
-	auto isVerbose { state[OPT_VERBOSE] == "true" or state[OPT_DEBUG] == "true" };
+	auto isVerbose { 	state[OPT_VERBOSE] == "all"
+					or 	state[OPT_VERBOSE] == "true"
+					or 	state[OPT_DEBUG] == "true" };
 	#endif
 	auto dontWrite { state[OPT_NOOUTPUTFILE] == "true" };
 					   
@@ -4970,8 +5183,8 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 	
 	auto filterChildFiles{ [&records](const fs::path& dir, bool recurive=false) {
 		auto filter{ [](const fs::directory_entry& f) -> bool {
-			if (not fs::is_regular_file(f.path())
-				or not isValid(f.path()))
+			if (/*not fs::is_regular_file(f.path())
+				or*/ not isValid(f.path()))
 					return false;
 			
 			return isValidFile(f.path());
@@ -4991,7 +5204,7 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 										   ));
 		}};
 		
-		try {
+//		try {
 			if (recurive) {
 				std::vector<fs::path> dirs;
 				listDirRecursively(dir, &dirs, false);
@@ -5000,12 +5213,12 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 				for (auto& d : dirs) {
 					std::vector<fs::path> tmp;
 					
-					for (auto& f : fs::directory_iterator(d))
+					for (auto& f : directory_iterator(d, DT_REG))
 						if (filter(f)) {
 							std::vector<fs::path> list;
 							loadPlaylist(f.path().string(), &list);
 							if (list.empty())
-								tmp.emplace_back(std::move(f));
+								tmp.emplace_back(f);
 							else
 								for (auto& p : list)
 									if (isValid(p) and isValidFile(p))
@@ -5021,12 +5234,12 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 				putToRecord(false);
 			}
 			
-			for (auto& f : fs::directory_iterator(dir))
+			for (auto& f : directory_iterator(dir, DT_REG))
 				if (filter(f)) {
 					std::vector<fs::path> list;
 						  loadPlaylist(f.path().string(), &list);
 						  if (list.empty())
-							  bufferFiles.emplace_back(std::move(f));
+							  bufferFiles.emplace_back(f);
 						  else
 							  for (auto& p : list)
 								  if (isValid(p) and isValidFile(p))
@@ -5035,15 +5248,46 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 			
 			putToRecord(true);
 			
-		} catch (fs::filesystem_error& e) {
-			#ifndef DEBUG
-			if (state[OPT_VERBOSE] == "all")
-			#else
-				std::cout << "filterChildFiles(" << dir
-					<< ", recursive: " << recurive << '\n';
-			#endif
-				std::cout << e.what() << '\n';
-		}
+//		} catch (const std::overflow_error& e) {
+//			// this executes if f() throws std::overflow_error (same type rule)
+//			#ifndef DEBUG
+//			if (state[OPT_VERBOSE] == "all")
+//			#else
+//				std::cout << "OVERFLOW ERROR‼️ filterChildFiles(" << dir
+//				<< ", recursive: " << recurive << '\n';
+//			#endif
+//				std::cout << e.what() << '\n';
+//		} catch (const std::runtime_error& e) {
+//			// this executes if f() throws std::underflow_error (base class rule)
+//			#ifndef DEBUG
+//			if (state[OPT_VERBOSE] == "all")
+//			#else
+//				std::cout << "RUNTIME ERROR‼️ filterChildFiles(" << dir
+//				<< ", recursive: " << recurive << '\n';
+//			#endif
+//				std::cout << e.what() << '\n';
+//		} catch (const std::exception& e) {
+//			// this executes if f() throws std::logic_error (base class rule)
+//			#ifndef DEBUG
+//			if (state[OPT_VERBOSE] == "all")
+//			#else
+//				std::cout << "EXCEPTION‼️ filterChildFiles(" << dir
+//				<< ", recursive: " << recurive << '\n';
+//			#endif
+//				std::cout << e.what() << '\n';
+//
+//		} catch (const fs::filesystem_error& e) {
+//			#ifndef DEBUG
+//			if (state[OPT_VERBOSE] == "all")
+//			#else
+//				std::cout << "filesystem::directory_iterator()‼️ filterChildFiles(" << dir
+//					<< ", recursive: " << recurive << '\n';
+//			#endif
+//				std::cout << "Code: " << e.code() << '\n'
+//				<< "path1: \"" << e.path1() << "\"\n"
+//				<< "path2: \"" << e.path2() << "\"\n"
+//				<< e.what() << '\n';
+//		}
 	}};
 					   
 					   

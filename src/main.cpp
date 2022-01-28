@@ -3918,32 +3918,65 @@ auto main(const int argc, char* const argv[]) -> int
 				#if defined(_WIN32) || defined(_WIN64)
 				// TODO: Windows
 				std::cout << "📢 Under construction.\n";
-				#else
-				if (not fs::exists(INSTALL_PATH "/git")
-					or (not fs::exists(INSTALL_PATH "/c++")
-						or not fs::exists(INSTALL_PATH "/cmake")))
-					continue;
 				
-				fs::current_path(fs::path("~/"));
-				auto dir { fs::path("~/.tvplaylist") };
+				if (0 != std::system("git.exe --version")
+					//or (0 != std::system("cl.exe"))
+					or (0 != std::system("cmake.exe --version"))) {
+					std::cout << "\"GIT\" and \"CMAKE\" required!.\n";
+					continue;
+				}
+				fs::current_path(fs::path("%userprofile%\\AppData\\Local"));
+				auto dir { fs::path("tvplaylist") };
 				if (not fs::exists(dir))
-					std::system("git clone --depth 1 https://github.com/Mr-Widiatmoko/MakeTVPlaylist .tvplaylist");
+					std::system("git.exe clone --depth 1 https://github.com/Mr-Widiatmoko/MakeTVPlaylist.git %userprofile%\\AppData\\Local\\tvplaylist");
 				fs::current_path(dir);
 				std::system("git pull");
-				dir = "Release";
+				dir = "Build";
+				if (not fs::exists(dir))
+					fs::create_directory(dir);
+				fs::current_path(dir);
+				
+				if (0 == std::system("cmake.exe --version") {
+					std::system("cmake %userprofile%\\AppData\\Local\tvplaylist");
+					std::system("make");
+					std::system("make install");
+					std::system("make clean");
+				//} else if (fs::exists(INSTALL_PATH "/c++")) {
+				//	if (fs::exists(path))
+				//		fs::remove(path);
+				//	std::system("cl.exe -std:c++latest ../src/main.cpp " INSTALL_FULLPATH);
+				}
+				std::cout << (fs::exists(path) ? "Updated" :
+							  "For some reason, update fail!") << ".\n";
+				#else
+				if (not fs::exists(INSTALL_PATH "/git")
+					or not fs::exists(INSTALL_PATH "/c++")
+						or not fs::exists(INSTALL_PATH "/cmake"))
+				{
+					std::cout << "\"GIT\" or \"CMAKE\" required!.\nTo install:\n\"brew install git\"\n\"brew install cmake\".\n";
+					continue;
+				}
+				
+				fs::current_path(fs::path("~"));
+				auto dir { fs::path(".tvplaylist") };
+				if (not fs::exists(dir))
+					std::system("git clone --depth 1 https://github.com/Mr-Widiatmoko/MakeTVPlaylist.git ~/.tvplaylist");
+				fs::current_path(dir);
+				std::system("git pull");
+				dir = "Build";
 				if (not fs::exists(dir))
 					fs::create_directory(dir);
 				fs::current_path(dir);
 				
 				if (fs::exists(INSTALL_PATH "/cmake")) {
-					std::system("cmake ..");
+					std::system("cmake ~/.tvplaylist");
 					std::system("make");
 					std::system("make install");
 					std::system("make clean");
 				} else if (fs::exists(INSTALL_PATH "/c++")) {
 					if (fs::exists(path))
 						fs::remove(path);
-					std::system("c++ -std=c++2b ../src/main.cpp " INSTALL_FULLPATH);
+					std::system("c++ -std=c++2b ~/.tvplaylist/src/main.cpp " INSTALL_FULLPATH);
 				}
 				std::cout << (fs::exists(path) ? "Updated" :
 							  "For some reason, update fail!") << ".\n";

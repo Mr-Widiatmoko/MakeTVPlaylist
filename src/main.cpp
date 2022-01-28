@@ -106,11 +106,36 @@ constexpr auto OPT_DEXCLCHANGED		{"exclude-changed"};		// G
 constexpr auto OPT_DEBUG			{"debug"};                  // B
 constexpr auto OPT_DEBUG_ARGS = 	{"date", "args", "id3"};
 
+
 #if defined(_WIN32) || defined(_WIN64)
 #define CONFIG_PATH	"C:\\ProgramData\\tvplaylist.conf"
+#define INSTALL_PATH "C:\\Windows"
+#define SEP_PATH "\\"
+#define PE_EXT ".exe"
 #else
 #define CONFIG_PATH	"/usr/local/etc/tvplaylist.conf"
+#define INSTALL_PATH "/usr/local/bin"
+#define SEP_PATH "/"
+#define PE_EXT
 #endif
+#define INSTALL_FULLPATH	INSTALL_PATH SEP_PATH "tvplaylist" PE_EXT
+
+constexpr auto OPT_INSTALL			{"install"};
+constexpr auto INSTALL=\
+"--install\n\
+        Install tvplaylist into \"" INSTALL_PATH "\".\n\
+";
+constexpr auto OPT_UNINSTALL		{"uninstall"};
+constexpr auto UNINSTALL=\
+"--uninstall\n\
+        Uninstall tvplaylist from \"" INSTALL_PATH "\".\n\
+";
+constexpr auto OPT_UPDATE			{"update"};
+constexpr auto UPDATE=\
+"--update\n\
+--upgrade\n\
+        Update tvplaylist.\n\
+";
 
 constexpr auto SHOW=\
 "--[show | display | print]-[config | defaults]\n\
@@ -435,7 +460,7 @@ constexpr const char* const* OPTS[] = { &OPT_VERSION, &OPT_HELP, &OPT_ARRANGEMEN
 	&OPT_EXECUTION, &OPT_LOADCONFIG, &OPT_WRITEDEFAULTS, &OPT_SHOWCONFIG, &OPT_FIXFILENAME,
 	&OPT_NOOUTPUTFILE, &OPT_SIZE, &OPT_EXCLSIZE, &OPT_EXT, &OPT_EXCLEXT,
 	&OPT_FIND, &OPT_EXCLFIND, &OPT_REGEX, &OPT_EXCLREGEX, &OPT_EXCLHIDDEN,
-	
+	&OPT_INSTALL, &OPT_UNINSTALL, &OPT_UPDATE,
 	&OPT_DATE, &OPT_EXCLDATE,
 	&OPT_DCREATED, &OPT_DMODIFIED, &OPT_DACCESSED, &OPT_DCHANGED,
 	&OPT_DEXCLCREATED, &OPT_DEXCLMODIFIED, &OPT_DEXCLACCESSED, &OPT_DEXCLCHANGED,
@@ -451,7 +476,7 @@ constexpr const char* const* HELPS[] = { &VERSION, &HELP, &ARRANGEMENT,
 	&EXECUTION, &LOAD, &WRITE, &SHOW, &FIXFILENAME,
 	&NOOUTPUTFILE, &SIZE, &SIZE, &EXT, &EXT,
 	&FIND, &FIND, &REGEX, &REGEX, &EXCLHIDDEN,
-	
+	&INSTALL, &UNINSTALL, &UPDATE,
 	&DATE, &DATE,
 	&CREATED, &MODIFIED, &ACCESSED, &CHANGED,
 	&CREATED, &MODIFIED, &ACCESSED, &CHANGED,
@@ -483,6 +508,8 @@ constexpr const char* const* ALL_HELPS[] = {
 	
 	&SIZE, &EXT, &FIND, &REGEX, &DATE, &CREATED, &MODIFIED, &ACCESSED, &CHANGED,
 	
+	&INSTALL, &UNINSTALL, &UPDATE,
+
 	&HELP_REST, &HELP_DATE_REST
 };
 
@@ -494,7 +521,7 @@ constexpr const char* const* ALL_HELPS[] = {
 
 #define func auto
 
-func tolower(std::string s) -> std::string
+func tolower(std::string s)
 {
 	std::transform(s.begin(), s.end(), s.begin(),
 				// static_cast<int(*)(int)>(std::tolower)         // wrong
@@ -505,7 +532,7 @@ func tolower(std::string s) -> std::string
 	return s;
 }
 
-func transformWhiteSpace(std::string s) -> std::string
+func transformWhiteSpace(std::string s)
 {
 	std::transform(s.begin(), s.end(), s.begin(), [](unsigned char c) {
 		return std::isspace(c) ? ' ' : c;
@@ -513,7 +540,7 @@ func transformWhiteSpace(std::string s) -> std::string
 	return s;
 }
 
-func groupNumber(std::string number) -> std::string
+func groupNumber(std::string number)
 {
 	long long i = number.find_last_of('.');
 	if (i == std::string::npos) {
@@ -531,7 +558,7 @@ func groupNumber(std::string number) -> std::string
 	return number;
 }
 
-func trim(const std::string& s) -> std::string
+func trim(const std::string& s)
 {
 	unsigned long start{0}, end{s.size()};
 	for (auto i{0}; i<end; ++i)
@@ -553,7 +580,7 @@ enum class IgnoreCase { None, Both, Left, Right };
 /// Parameters:
 /// - ignoreChar usage, for example for {'.', ' '} -> "La.la.Li" equal "La La Li"
 func isContains(const std::string& l, const std::string& r,
-				IgnoreCase ic = IgnoreCase::None,
+				const IgnoreCase ic = IgnoreCase::None,
 				const std::pair<char, char>* const ignoreChar = nullptr)
 {
 	if (r.size() > l.size()) return std::string::npos;
@@ -594,7 +621,7 @@ func isContains(const std::string& l, const std::string& r,
 }
 
 func isEqual(const char* const l, const char* const r,
-			 IgnoreCase ic = IgnoreCase::None)
+			 const IgnoreCase ic = IgnoreCase::None)
 {
 	if (not l or not r) return false;
 	auto sz1 { std::strlen(l) };
@@ -628,9 +655,9 @@ func isEqual(const char* const l, const char* const r,
 }
 
 func isEqual(const std::string& l, const std::string& r,
-			 IgnoreCase ic = IgnoreCase::None,
-			 unsigned long start = 0,
-			 unsigned long end = 0)
+			 const IgnoreCase ic = IgnoreCase::None,
+			 const unsigned long start = 0,
+			 const unsigned long end = 0)
 {
 	if ((start not_eq 0 or end not_eq 0) and l.size() != r.size()) return false;
 	
@@ -658,9 +685,10 @@ func isEqual(const std::string& l, const std::string& r,
 inline
 func isEqual(const char* const source,
 			 const std::initializer_list<const char*>& list,
-			 IgnoreCase ic = IgnoreCase::None,
-			 unsigned long start = 0,
-			 unsigned long end = 0) {
+			 const IgnoreCase ic = IgnoreCase::None,
+			 const unsigned long start = 0,
+			 const unsigned long end = 0)
+{
 	for (auto& s : list) {
 		if (isEqual(source, s, ic, start, end))
 			return true;
@@ -671,9 +699,9 @@ func isEqual(const char* const source,
 template <template <class ...> class Container, class ... Args>
 func isEqual(const std::string& source,
 			 const Container<std::string, Args ...>* args,
-			 IgnoreCase ic = IgnoreCase::None,
-			 unsigned long start = 0,
-			 unsigned long end = 0) -> bool
+			 const IgnoreCase ic = IgnoreCase::None,
+			 const unsigned long start = 0,
+			 const unsigned long end = 0)
 {
 	for (auto& check : *args)
 		if (isEqual(source, check, ic, start, end))
@@ -682,7 +710,7 @@ func isEqual(const std::string& source,
 	return false;
 }
 
-func isInt(const std::string& s, int* const value = nullptr) -> bool
+func isInt(const std::string& s, int* const value = nullptr)
 {
 	int result;
 	if (auto [p, ec] = std::from_chars(s.c_str(), s.c_str()+s.size(), result);
@@ -696,7 +724,8 @@ func isInt(const std::string& s, int* const value = nullptr) -> bool
 }
 
 inline
-func getLikely(const std::string_view& src, const std::string_view& with) {
+func getLikely(const std::string_view& src, const std::string_view& with)
+{
 	auto first { src.begin() }, last { src.end() };
 	auto d_first { with.begin() };
 	float score = 0, scoreOpenent = 0;
@@ -867,15 +896,16 @@ func directory_iterator(const fs::path& path, const unsigned char type)
 
 
 inline
-func excludeExtension(const fs::path& path) -> std::string
+func excludeExtension(const fs::path& path)
 {
-	return path.string().substr(0, path.string().size() - path.extension().string().size());
+	return path.string().substr(0,
+					path.string().size() - path.extension().string().size());
 }
 
 /// Automatically lower case in result
 template <template <class ...> class Container, class ... Args>
 func parseExtCommaDelimited(const std::string& literal,
-							Container<std::string, Args...>* result)
+							Container<std::string, Args...>* const result)
 {
 	std::string buffer;
 	for (auto& c : literal) {
@@ -894,37 +924,44 @@ func parseExtCommaDelimited(const std::string& literal,
 	}
 }
 
+#define property
+
 struct Date
 {
-	unsigned short weekday;
-	unsigned short year;
-	unsigned short month;
-	unsigned short day;
-	unsigned short hour;
-	unsigned short minute;
-	unsigned short second;
+	property unsigned short weekday;
+	property unsigned short year;
+	property unsigned short month;
+	property unsigned short day;
+	property unsigned short hour;
+	property unsigned short minute;
+	property unsigned short second;
 	
-	friend bool operator < (const Date& l, const Date& r) {
+	friend
+	func operator < (const Date& l, const Date& r) -> bool {
 		auto ull { Date::get_ull(l, r) };
 		return ull.first < ull.second;
 	}
 	
-	friend bool operator > (const Date& l, const Date& r) {
+	friend
+	func operator > (const Date& l, const Date& r) -> bool {
 		auto ull { Date::get_ull(l, r) };
 		return ull.first > ull.second;
 	}
 	
-	friend bool operator <= (const Date& l, const Date& r) {
+	friend
+	func operator <= (const Date& l, const Date& r) -> bool {
 		auto ull { Date::get_ull(l, r) };
 		return ull.first <= ull.second;
 	}
 	
-	friend bool operator >= (const Date& l, const Date& r) {
+	friend
+	func operator >= (const Date& l, const Date& r) -> bool {
 		auto ull { Date::get_ull(l, r) };
 		return ull.first >= ull.second;
 	}
 	
-	friend bool operator == (const Date& l, const Date& r) {
+	friend
+	func operator == (const Date& l, const Date& r) -> bool {
 		#define is_equal(x, y) (x != 0 and y != 0 ? x == y : true)
 		return (is_equal(l.year, r.year)
 			and is_equal(l.month, r.month)
@@ -953,7 +990,7 @@ struct Date
 		return std::mktime(&tm);
 	}
 
-	func string(const char* const format = nullptr, bool UTC = false) const -> std::string {
+	func string(const char* const format = nullptr, const bool UTC = false) const {
 		std::string s;
 		if (format and std::strlen(format) > 0) {
 			std::tm tm{};
@@ -1036,7 +1073,8 @@ private:
 	/*zh_CN.UTF-8:*/ "一月", "二月", "三月", "四月", "五月", "六月", "七月", "八月", "九月", "十月", "十一月", "十二月",
 	};
 public:
-	static func getWeekDayName(unsigned short index, const char* const locale = nullptr)
+	static
+	func getWeekDayName(const unsigned short index, const char* const locale = nullptr)
 		-> std::string
 	{
 		if (index >= 1 or index <= 7) {
@@ -1051,10 +1089,11 @@ public:
 			if (std::strftime(mbstr, sizeof(mbstr), "%A", std::localtime(&t)))
 				return std::string(mbstr);
 		}
-		return std::string("");
+		return std::string();
 	}
 	
-	static func getWeekDayNames(const char* result[7], const char* const locale = nullptr) {
+	static
+	func getWeekDayNames(const char* result[7], const char* const locale = nullptr) {
 		for (auto i{9}, k{0}; i<16; ++i, ++k) {
 			std::tm tm{};
 			tm.tm_year = 2020-1900; // 2020
@@ -1069,10 +1108,11 @@ public:
 		}
 	}
 
-	static func getWeekDayIndex(int aYear = 0,
-					unsigned short aMonth = 0,
-					unsigned short aDay = 0,
-					unsigned short expectedWeekDay = 0)
+	static
+	func getWeekDayIndex(const int aYear = 0,
+						 const unsigned short aMonth = 0,
+						 const unsigned short aDay = 0,
+						 const unsigned short expectedWeekDay = 0)
 	{
 		for (int Y{ aYear > 0 ? aYear : 1970 };
 			 Y <= aYear > 0 ? aYear : 1970; ++Y)
@@ -1102,11 +1142,13 @@ public:
 	}
 	
 private:
-	static func get_ull(const Date& l, const Date& r)
+	static
+	func get_ull(const Date& l, const Date& r)
 					-> std::pair<unsigned long long, unsigned long long>
 	{
 		std::string sleft, sright;
-		auto go{[&sleft, &sright](const unsigned short& x, const unsigned short& y) {
+		func go{[&sleft, &sright](const unsigned short& x, const unsigned short& y)
+		{
 			if (x == 0 or y == 0) return;
 			
 			auto sx { std::to_string(x) };
@@ -1127,7 +1169,9 @@ private:
 		
 		return std::make_pair(std::stoull(sleft), std::stoull(sright));
 	}
-	func fold() const -> unsigned long long {
+	
+	func fold() const
+	{
 		auto Y = std::to_string(year);
 		auto m = std::to_string(month);
 		if (m.size() not_eq 2) m.insert(0, 1, '0');
@@ -1154,7 +1198,8 @@ private:
 			weekday = aweekday.iso_encoding();
 	}
 public:
-	static func now() -> Date
+	static
+	func now()
 	{
 		const std::chrono::time_point<std::chrono::system_clock> now =
 				std::chrono::system_clock::now();
@@ -1164,21 +1209,21 @@ public:
 		return date;
 	}
 	
-	func set(const std::time_t* t, bool UTC = false)
+	func set(const std::time_t* t, const bool UTC = false)
 	{
 		char a[5];
-		unsigned short * property[] = {&year, &month, &day, &hour, &minute, &second};
+		unsigned short * unit[] = {&year, &month, &day, &hour, &minute, &second};
 		for (unsigned short i{ 0 }; auto& f : {"%Y", "%m", "%d", "%H", "%M", "%S"}) {
 			std::strftime(a, sizeof(a), f,
 						  UTC ? std::gmtime(t) : std::localtime(t));
-			*property[i++] = std::stoi(a);
+			*unit[i++] = std::stoi(a);
 		}
 		
 		// Just not trust weekday returned from strftime("%u")
 		setWeekday();
 	}
 	
-	Date(const std::time_t* const t, bool UTC = false) {
+	Date(const std::time_t* const t, const bool UTC = false) {
 		set(t, UTC);
 	}
 		
@@ -1199,7 +1244,7 @@ public:
 			return;
 		}
 			
-		auto isDigit{[](const std::string& s) -> bool
+		func isDigit{[](const std::string& s)
 		{
 			for (auto i{0}; i<s.size(); ++i)
 				if (not isdigit(s[i]))
@@ -1207,7 +1252,8 @@ public:
 			return s not_eq "";
 		}};
 		
-		auto isPM{[](const std::string& get) -> int {
+		func isPM{[](const std::string& get)
+		{
 			if (get.size() == 2 and std::tolower(get[1]) == 'm') {
 				if (std::tolower(get[0]) == 'a')
 					return -1;
@@ -1377,13 +1423,13 @@ public:
 				std::cout << "⚠️ Invalid Weekday was defined for " << string("%B %d %Y") << "!\n";
 		}
 			
-		unsigned short* property[] = {&hour, &minute, &second };
+		unsigned short* unit[] = {&hour, &minute, &second };
 		auto hasPM{ false };
 		for (auto i { 0 }; auto& t : time)
 			if (t < 0) {
 				hasPM = t == -2;
-			} else if (i < sizeof(property)/sizeof(property[0]))
-				*property[i++] = t;
+			} else if (i < sizeof(unit)/sizeof(unit[0]))
+				*unit[i++] = t;
 			else
 				std::cout << "⚠️ Invalid unit time on "
 					<< hour << ':'<< minute << ':' << second << '\n';
@@ -1405,7 +1451,6 @@ public:
 
 };
 
-#define property
 struct ID3
 {
 	
@@ -1560,16 +1605,18 @@ struct ID3
 		return nullptr;
 	}
 	
-	func getValue(const std::string& tag) const -> std::string
+	func getValue(const std::string& tag) const
 	{
 		auto found { setTags.find(tag) };
 		if (found != setTags.end())
 			return *found;
 		else
-			return "";
+			return std::string();
 	}
 
-	friend bool operator % (const ID3& l, const std::string& keyword) {
+	friend
+	func operator % (const ID3& l, const std::string& keyword) -> bool
+	{
 		auto keyVal { l.parseInput(keyword) };
 		if (keyVal) {
 			if (keyVal->first == "id3") {
@@ -1596,7 +1643,8 @@ private:
 	
 	std::unordered_set<std::string> setTags;
 	
-	static unsigned int btoi(const char* bytes, int size, int offset)
+	static
+	func btoi(const char* bytes, const int size, const int offset)
 	{
 		unsigned int result = 0x00;
 		int i = 0;
@@ -1609,7 +1657,8 @@ private:
 		return result;
 	}
 	
-//	static char* itob(int integer)
+//	static
+//	func itob(const int integer)
 //	{
 //		int i;
 //		int size = 4;
@@ -1625,7 +1674,8 @@ private:
 //		return result;
 //	}
 	
-//	static int syncint_encode(int value)
+//	static
+//	func syncint_encode(const int value)
 //	{
 //		int out, mask = 0x7F;
 //
@@ -1640,7 +1690,8 @@ private:
 //		return out;
 //	}
 	
-	static int syncint_decode(int value)
+	static
+	func syncint_decode(const int value)
 	{
 		unsigned int a, b, c, d, result = 0x0;
 		a = value & 0xFF;
@@ -1673,7 +1724,7 @@ private:
 		property int 	tag_size,
 						extended_header_size;
 		
-		V2(const char* buffer) :
+		V2(const char* const buffer) :
 			major_version{0x0}, minor_version{0x0}, flags{0x0},
 			tag_size{0}, extended_header_size{0}
 		{
@@ -1717,7 +1768,7 @@ private:
 				return size != 0;
 			}
 			
-			Frame(const char* const raw, int offset, int major_version) :
+			Frame(const char* const raw, int offset, const int major_version) :
 				size{0}
 			{
 				std::memcpy(id, raw + offset, SZ_ID);
@@ -1745,14 +1796,16 @@ private:
 		#endif
 	};
 	
-	func initSet() {
+	func initSet()
+	{
 		if (setTags.empty())
 			for (auto& tag : TAGS)
 				setTags.emplace(tag);
 	}
 public:
 	
-	func write(const char* a_path = nullptr) {
+	func write(const char* const a_path = nullptr)
+	{
 		if (not path and not a_path)
 			return;
 		std::fstream file;
@@ -1767,7 +1820,8 @@ public:
 		func set{[&file, &pos](ID3* const id3,
 							   const char* const key,
 							   const int size,
-							   const char* const value = nullptr) {
+							   const char* const value = nullptr)
+		{
 			if (key and id3->tags.find(key) == id3->tags.end())
 				id3->tags.emplace(std::make_pair(key, value ? value : ""));
 			
@@ -1810,7 +1864,8 @@ public:
 		file.close();
 	}
 	
-	func string() const -> std::string {
+	func string() const
+	{
 		std::string s;
 		
 		for (auto& tag : tags)
@@ -1826,8 +1881,10 @@ public:
 		
 		return s;
 	}
+	
 	ID3() { initSet(); }
-	ID3(const char* const path, bool case_insensitive = false)
+	
+	ID3(const char* const path, const bool case_insensitive = false)
 	{
 		initSet();
 		this->path = path;
@@ -1856,15 +1913,6 @@ public:
 				+ (tag.minor_version > 0
 					? "." + std::to_string(tag.minor_version)
 					: "");
-				
-				//unsigned bytes_index { 0 };
-				//skip header
-				//offset += 10;
-				//if (tag.extended_header_size)
-					//extended header exists?, skip
-				//offset += tag.extended_header_size + 4;
-				//char raw[tag.tag_size];
-				//std::memcpy(raw, bytes + bytes_index, tag.tag_size);
 				
 				auto isv24 { tag.major_version == 4 };
 				auto isv23 { tag.major_version == 3 };
@@ -2093,13 +2141,11 @@ public:
 						break;
 				}
 			}
-			#if 0
-			std::cout << string() << '\n';
-			#endif
 		}
 		else
 		{
-			func get{[&file](int size, bool isGenre = false) -> std::string {
+			func get{[&file](const int size, const bool isGenre = false) -> std::string
+			{
 				char buffer[size + 1];
 				buffer[size] = '\0';
 				for(int i = 0; i < size; ++i)
@@ -2183,7 +2229,7 @@ std::vector<std::pair<std::uintmax_t, std::uintmax_t>> listSize, listExclSize;
 
 std::vector<std::string> listFindDir, listExclFindDir;
 
-func isValidFile(const fs::path& path) -> bool
+func isValidFile(const fs::path& path)
 {
 	if (not fs::exists(path))
 		return false;
@@ -2400,8 +2446,9 @@ func isValidFile(const fs::path& path) -> bool
 	return true;
 }
 
-func getAvailableFilename(const fs::path& original, const std::string& prefix = " #",
-						  const std::string& suffix = "") -> std::string
+func getAvailableFilename(const fs::path& original,
+						  const std::string& prefix = " #",
+						  const std::string& suffix = "")
 {
 	if (fs::exists(original)) {
 		auto s{original.string()};
@@ -2511,7 +2558,7 @@ func isDirNameValid(const fs::path& dir)
 }
 
 inline
-func isValid(const fs::path& path) -> bool
+func isValid(const fs::path& path)
 {
 	return /*(fs::is_regular_file(path) and path.filename().string() not_eq ".DS_Store")
 	or*/ not (((fs::status(path).permissions() & (  fs::perms::owner_read
@@ -2523,7 +2570,7 @@ func isValid(const fs::path& path) -> bool
 }
 
 func listDir(const fs::path& ori, std::vector<fs::directory_entry>* const out,
-			bool sorted=true, bool includeRegularFiles = false)
+			 const bool sorted=true, const bool includeRegularFiles = false)
 {
 	if (not out)
 		return;
@@ -2550,8 +2597,7 @@ func listDir(const fs::path& ori, std::vector<fs::directory_entry>* const out,
 template <template <class ...> class Container, class ... Args>
 func listDirRecursively(const fs::path& path,
 						Container<fs::path, Args...>* const out,
-						bool includeRegularFiles)
-	-> void
+						const bool includeRegularFiles)
 {
 	if (not out or path.empty())
 		return;
@@ -2566,10 +2612,12 @@ func listDirRecursively(const fs::path& path,
 	std::vector<std::future<void>> asyncs;
 	
 	
-	auto emplace{[&list, &out]() {
+	func emplace{[&list, &out]()
+	{
 		for (auto& d : list)
 			std::fill_n(std::inserter(*out, out->end()), 1, std::move(d.path()));
 	}};
+	
 	do {
 		do {
 			list.clear();
@@ -2624,7 +2672,8 @@ func listDirRecursively(const fs::path& path,
 	} while(list.size() > 0);
 }
 
-func isContainsSeasonDirs(const fs::path& path) -> bool {
+func isContainsSeasonDirs(const fs::path& path)
+{
 	if (path.empty())
 		return false;
 	
@@ -2679,19 +2728,15 @@ func findSubtitleFile(const fs::path& original,
 {
 	if (auto parentPath{original.parent_path()}; not parentPath.empty()) {
 		auto noext{excludeExtension(original.filename())};
-		//std::vector<fs::path> list;
-		//listDirRecursively(parentPath, &list, true);
-			for (auto& f : directory_iterator(parentPath, DT_REG))
-				if (//not fs::is_directory(f)
-					/*and*/ isValid(f)
-					//and fs::is_regular_file(f)
-					and f.path().string().size() >= original.string().size()
-					and isEqual(f.path().extension().string(), &SUBTITLES_EXT,
-								IgnoreCase::Left)
-					and isContains(f.path().filename().string(), noext,
-					IgnoreCase::Both, &FILENAME_IGNORE_CHAR) not_eq std::string::npos)
+		for (auto& f : directory_iterator(parentPath, DT_REG))
+			if (isValid(f)
+				and f.path().string().size() >= original.string().size()
+				and isEqual(f.path().extension().string(), &SUBTITLES_EXT,
+							IgnoreCase::Left)
+				and isContains(f.path().filename().string(), noext,
+				IgnoreCase::Both, &FILENAME_IGNORE_CHAR) not_eq std::string::npos)
 
-					result->emplace_back(std::move(f));
+				result->emplace_back(std::move(f));
 	}
 }
 
@@ -2707,7 +2752,8 @@ func insertTo(Container* const out, const T& path)
 	return isFound;
 }
 
-func checkForSeasonDir(const fs::path& path) -> void {
+func checkForSeasonDir(const fs::path& path) -> void
+{
 	if (not path.empty()) {
 		auto hasDir{false};
 		
@@ -2715,7 +2761,8 @@ func checkForSeasonDir(const fs::path& path) -> void {
 		std::vector<MAXNUM> lastNum;
 		std::vector<fs::path> bufferNum;
 		
-		auto pullFromBufferNum{ [&bufferNum, &isNum]() {
+		func pullFromBufferNum{ [&bufferNum, &isNum]()
+		{
 			isNum = false;
 			for (auto& child : bufferNum) {
 				insertTo(&regularDirs, child);
@@ -2779,7 +2826,7 @@ func checkForSeasonDir(const fs::path& path) -> void {
 	}
 }
 
-func getBytes(const std::string& s) -> uintmax_t
+func getBytes(const std::string& s)
 {
 	std::string unit{"mb"};
 	std::string value{s};
@@ -2838,7 +2885,8 @@ func expandArgs(const int argc, char* const argv[],
 	unsigned lastOptCode{ 0 };
 	func push{ [&newFull, &args](const char* const arg,
 								 const unsigned index,
-								 const int last) {
+								 const int last)
+	{
 		if (last < 0 or index - last <= 0) return;
 				
 		unsigned size = index - last;
@@ -2983,7 +3031,7 @@ func expandArgs(const int argc, char* const argv[],
 
 func timeLapse(std::chrono::system_clock::time_point& start,
 			   const std::string& msg,
-			   bool resetStart=false)
+			   const bool resetStart=false)
 {
 	auto value { (std::chrono::system_clock::now() - start).count() };
 	unsigned inc{ 0 };
@@ -3007,7 +3055,8 @@ func timeLapse(std::chrono::system_clock::time_point& start,
 		start = std::chrono::system_clock::now();
 }
 
-func parseKeyValue(std::string* const s, bool isExclude) {
+func parseKeyValue(std::string* const s, const bool isExclude)
+{
 	if (not s or s->empty())
 		return;
 		
@@ -3202,6 +3251,7 @@ func parseKeyValue(std::string* const s, bool isExclude) {
 	if (isKeyValue and 0 != std::strlen(keyword))
 		s->insert(0, 1, char(1));
 }
+
 template <typename  T>
 func getLines(std::basic_istream<T>* const inputStream,
 			  std::vector<std::string>* const lines,
@@ -3212,14 +3262,16 @@ func getLines(std::basic_istream<T>* const inputStream,
 	std::string buff;
 	T c;
 		
-	func push{[&lines, &buff]() {
+	func push{[&lines, &buff]()
+	{
 		if (buff.empty())
 			return;
 		lines->emplace_back(buff);
 		buff.clear();
 	}};
 	
-	func hasPrefix{[&c, &inputStream, &excludePrefix]() {
+	func hasPrefix{[&c, &inputStream, &excludePrefix]()
+	{
 		unsigned i { 0 };
 		for (const auto& s : excludePrefix) {
 			if (c == s[i]) {
@@ -3283,12 +3335,12 @@ constexpr auto ARGS_SEPARATOR {"\x0a\x0aARGS-SEPARATOR\x0a\x0a"};
 enum class WriteConfigMode { New, Edit, Add, Remove };
 
 func writeConfig(const std::vector<std::string>* const args,
-				   const WriteConfigMode mode)
+				 const WriteConfigMode mode)
 {
 	enum class ReadDirection { All, Old, Current };
 	func argsToLines{[&args](std::vector<std::string>* const lines,
-							 ReadDirection direction,
-							 bool removeOptPrefix = false)
+							 const ReadDirection direction,
+							 const bool removeOptPrefix = false)
 	{
 		std::string buffer;
 		auto foundSep { false };
@@ -3314,7 +3366,8 @@ func writeConfig(const std::vector<std::string>* const args,
 				offset = 1;
 			if (isOpt) {
 				if ((offset == 2 and isEqual(s.c_str() + offset,
-						{OPT_WRITEDEFAULTS, OPT_SHOWCONFIG}))
+						{OPT_WRITEDEFAULTS, OPT_SHOWCONFIG,
+						OPT_INSTALL, OPT_UNINSTALL, OPT_UPDATE}))
 					or (offset == 1 and (s[1] == 'W')))
 				{
 					if (auto next { i + 1 < args->size() ? (*args)[i + 1] : "" };
@@ -3541,7 +3594,8 @@ const std::string XML_CHARS_ALIAS[] = {"&quot", "&apos", "&lt", "&gt", "&amp"};
 const std::string XML_CHARS_NORMAL[] = {"\"", "\\", "<", "<", "&"};
 constexpr auto NETWORK_PROTOCOLS = {"http:", "https:", "ftp:", "ftps:", "rtsp:", "mms:"};
 
-func replace_all(std::string& inout, std::string_view what, std::string_view with)
+func replace_all(std::string& inout,
+				 const std::string_view what, const std::string_view with)
 {
 	std::size_t count{};
 	for (std::string::size_type pos{};
@@ -3781,12 +3835,14 @@ func loadPlaylist(const fs::path& path, std::vector<fs::path>* const outPaths)
 #if MAKE_LIB
 #define RETURN_VALUE	;
 #define ARGS_START_INDEX	0
-void process(int argc, char *argv[], int *outc, char *outs[], unsigned long *maxLength) {
+void process(int argc, char *argv[], int *outc, char *outs[], unsigned long *maxLength)
+{
 	state[OPT_NOOUTPUTFILE] = "true";
 #else
 #define RETURN_VALUE	EXIT_SUCCESS;
 #define ARGS_START_INDEX	1
-int main(const int argc, char *argv[]) {
+auto main(const int argc, char* const argv[]) -> int
+{
 #endif
 
 	std::vector<fs::path> bufferDirs;
@@ -3857,6 +3913,72 @@ int main(const int argc, char *argv[]) {
 			return result;
 		} }; args[i] == ARGS_SEPARATOR)
 				continue;
+			else if (isMatch(OPT_UPDATE, '\0', false, {"upgrade"})) {
+				const auto path { fs::path(INSTALL_FULLPATH) };
+				#if defined(_WIN32) || defined(_WIN64)
+				// TODO: Windows
+				std::cout << "📢 Under construction.\n";
+				#else
+				if (not fs::exists(INSTALL_PATH "/git")
+					or (not fs::exists(INSTALL_PATH "/c++")
+						or not fs::exists(INSTALL_PATH "/cmake")))
+					continue;
+				
+				fs::current_path(fs::path("~/"));
+				auto dir { fs::path("~/.tvplaylist") };
+				if (not fs::exists(dir))
+					std::system("git clone --depth 1 https://github.com/Mr-Widiatmoko/MakeTVPlaylist .tvplaylist");
+				fs::current_path(dir);
+				std::system("git pull");
+				dir = "Release";
+				if (not fs::exists(dir))
+					fs::create_directory(dir);
+				fs::current_path(dir);
+				
+				if (fs::exists(INSTALL_PATH "/cmake")) {
+					std::system("cmake ..");
+					std::system("make");
+					std::system("make install");
+					std::system("make clean");
+				} else if (fs::exists(INSTALL_PATH "/c++")) {
+					if (fs::exists(path))
+						fs::remove(path);
+					std::system("c++ -std=c++2b ../src/main.cpp " INSTALL_FULLPATH);
+				}
+				std::cout << (fs::exists(path) ? "Updated" :
+							  "For some reason, update fail!") << ".\n";
+				#endif
+			}
+			else if (isMatch(OPT_INSTALL, '\0')) {
+				const auto path { fs::path(INSTALL_FULLPATH) };
+				
+				if (not isEqual(argv[0], path)) {
+					#if defined(_WIN32) || defined(_WIN64)
+					if (fs::exists(path))
+						fs::remove(path);
+					auto cmd { std::string("copy \"") };
+					#else
+					auto cmd { std::string("cp -f \"") };
+					#endif
+					cmd += argv[0];
+					cmd += "\" ";
+					cmd += path;
+					std::system(cmd.c_str());
+					std::cout << (fs::exists(path) ? "Installed" :
+								  "For some reason, install fail!") << ".\n";
+				}
+			}
+			else if (isMatch(OPT_UNINSTALL, '\0')) {
+				const auto path { fs::path(INSTALL_FULLPATH) };
+				if (fs::exists(path))
+				#if defined(_WIN32) || defined(_WIN64)
+					std::system("del " INSTALL_FULLPATH);
+				#else
+					std::system("rm -f " INSTALL_FULLPATH);
+				#endif
+				std::cout << (not fs::exists(path) ? "Uninstalled" :
+							  "For some reason, uninstall fail!") << ".\n";
+			}
 			else if (isMatch(OPT_HELP, 'h') or isMatch(OPT_VERSION, 'v')) // MARK: Option Matching
 			{
 				printHelp(i + 1 < args.size()
@@ -4809,7 +4931,7 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 	} // END Info
 					   
 	if (not invalidArgs.empty())
-		return RETURN_VALUE;
+		return RETURN_VALUE
 					   
 	if (const auto mode{ state[OPT_WRITEDEFAULTS] };
 		not mode.empty())
@@ -4838,7 +4960,7 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 					   
     if (	not state[OPT_SHOWCONFIG].empty()
 		or 	not state[OPT_WRITEDEFAULTS].empty())
-        return RETURN_VALUE;
+        return RETURN_VALUE
 
 	{///Clean up <key=val> dir=??? in listFind and listExclFind
 		auto cleanUp{[](std::vector<std::string>* list) -> void {
@@ -5463,3 +5585,7 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 	}
 }
 #undef CONFIG_PATH
+#undef INSTALL_PATH
+#undef SEP_PATH
+#undef PE_EXT
+#undef INSTALL_FULLPATH

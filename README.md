@@ -29,10 +29,14 @@ For Apple Silicon, Windows, Linux, and POSIX users, you just need to compile [ma
 ## Installation:
 At least you need to download [Make TV Playlist.workflow](https://raw.githubusercontent.com/Mr-Widiatmoko/MakeTVPlaylist/master/Release/Make%20TV%20Playlist.workflow.zip) (Only for macOS), then Double-Click it on Finder to install as Finder Quick Action Extension, that's it, your done!.
 
-But, if you need more features and blasting super speed for processing, you may want to download  [tvplaylist](https://raw.githubusercontent.com/Mr-Widiatmoko/MakeTVPlaylist/master/Release/tvplaylist) and put this file into: 
+But, if you need more features and blasting super speed for processing, you may want to download  [tvplaylist](https://raw.githubusercontent.com/Mr-Widiatmoko/MakeTVPlaylist/master/Release/tvplaylist) and put this file manually into: 
 - Inside "/usr/local/bin" folder (PREFERED) or
 - Home folder (eg: /Users/[YOU]) or 
 - Download folder (eg: /Users/[YOU]/Downloads).
+
+Or pass argument "install" to automatically install into "/usr/local/bin". For the example: 
+
+	tvplaylist --install
 
 Thats it, and "Make TV Playlist" will automatically use "tvplaylist" for processing.
 
@@ -54,6 +58,10 @@ If you don't have cmake installed then, from 'src' directory on Terminal, paste 
     c++ main.cpp -std=c++2b -o /usr/local/bin/tvplaylist
 
 Don't forget to [Press ENTER]. Thats it, you will get "tvplaylist" on "/usr/local/bin/" directory.
+
+If you already have "tvplaylist", then you can use "install" or "uninstall" or "update" argument to do automation, for the example, to update to the newest version: 
+
+	tvplaylist --update
 
 If you need to build this as library file, then copy below and paste on the Terminal:
 

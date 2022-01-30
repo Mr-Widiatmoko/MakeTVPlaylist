@@ -26,15 +26,18 @@
 #include <sys/stat.h> // TODO: I dont know in Windows, should change to use FileAttribute?
 #include <fstream>
 #include <random>
+
 constexpr auto TRUE_FALSE = {"true", "false"};
 std::unordered_map<std::string, std::string> state;
-constexpr auto OPT_SHOWCONFIG		{"show-config"};
+
+constexpr auto OPT_SHOWCONFIG				{"show-config"};
 constexpr auto OPT_SHOWCONFIG_ALTERNATIVE = {"show-defaults",
 	"display-config", "display-defaults", "print-config", "print-defaults",
 };
-constexpr auto OPT_WRITEDEFAULTS	{"write-defaults"};			// W
-constexpr auto OPT_WRITEDEFAULTS_ALTERNATIVE = {"write-config"};
-constexpr auto OPT_WRITEDEFAULTS_ARGS = {"new", "edit", "remove", "reset", "add"
+constexpr auto OPT_WRITEDEFAULTS				{"write-defaults"};	// W
+constexpr auto OPT_WRITEDEFAULTS_ALTERNATIVE = 	{"write-config"};
+constexpr auto OPT_WRITEDEFAULTS_ARGS = 		{
+	"new", "edit", "remove", "reset", "add"
 };
 
 constexpr auto OPT_LOADCONFIG		{"load-config"};			// L
@@ -62,11 +65,11 @@ constexpr auto OPT_EXECUTION		{"execution"};				// c
 constexpr auto OPT_EXECUTION_THREAD			{"thread"};
 constexpr auto OPT_EXECUTION_ASYNC			{"async"};
 constexpr auto OPT_EXCLHIDDEN		{"exclude-hidden"};			// n
-constexpr auto OPT_REGEXSYNTAX		{"regex-syntax"};			// X
-constexpr auto OPT_REGEXSYNTAX_ARGS = {"ecma", "basic", "extended", "awk",
+constexpr auto OPT_REGEXSYNTAX			{"regex-syntax"};		// X
+constexpr auto OPT_REGEXSYNTAX_ARGS = 	{"ecma", "basic", "extended", "awk",
 	"grep", "egrep"
 };
-constexpr auto OPT_CASEINSENSITIVE	{"make-case-insensitive"};	// N
+constexpr auto OPT_CASEINSENSITIVE				 {"make-case-insensitive"};	// N
 constexpr auto OPT_CASEINSENSITIVE_ALTERNATIVE = {"case-insensitive",
 	"caseinsensitive", "ignore-case", "ignorecase"
 };
@@ -138,10 +141,15 @@ constexpr auto UPDATE=\
 ";
 
 constexpr auto SHOW=\
-"--[show | display | print]-[config | defaults]\n\
+"--show-defaults\n\
+--show-config\n\
+--display-defaults\n\
+--display-config\n\
+--print-defaults\n\
+--print-config\n\
         Display options summary and configuration file contents, then quit.\n\
         See also --verbose or --verbose=info or --debug=args or --benchmark.\n\
-        Example: --print-defsult\n\
+        Example: --print-defaults\n\
 ";
 constexpr auto WRITE=\
 "-W, --write-defaults [new | reset | edit | add | remove]\n\
@@ -847,12 +855,13 @@ func directory_iterator(const fs::path& path, const unsigned char type)
 	std::vector<fs::directory_entry> result;
 	
 	DIR* folder = opendir(path.string().c_str());
-	if(auto i{ -2 }; folder) {
+	if(folder) {
 		auto parentPath { path.string() + fs::path::preferred_separator };
 		struct dirent* entry;
+		readdir(folder);
+		readdir(folder);
 		while( (entry = readdir(folder)) ) {
-			if (++i > 0
-				and ((entry->d_type & type) == entry->d_type))
+			if ((entry->d_type & type) == entry->d_type)
 			{
 				if (entry->d_type == DT_REG
 					and isEqual(entry->d_name, ".DS_Store"))
@@ -3914,21 +3923,26 @@ auto main(const int argc, char* const argv[]) -> int
 		} }; args[i] == ARGS_SEPARATOR)
 				continue;
 			else if (isMatch(OPT_UPDATE, '\0', false, {"upgrade"})) {
+				#if defined(MAKE_LIB)
+				continue;
+				#endif
+				
 				const auto path { fs::path(INSTALL_FULLPATH) };
+				#define REPO_URI "https://github.com/Mr-Widiatmoko/MakeTVPlaylist.git"
 				#if defined(_WIN32) || defined(_WIN64)
 				// TODO: Windows
 				std::cout << "📢 Under construction.\n";
-				
+				#define CACHE_PATH "%userprofile%\\AppData\\Local"
 				if (0 != std::system("git.exe --version")
-					//or (0 != std::system("cl.exe"))
 					or (0 != std::system("cmake.exe --version"))) {
 					std::cout << "\"GIT\" and \"CMAKE\" required!.\n";
 					continue;
 				}
-				fs::current_path(fs::path("%userprofile%\\AppData\\Local"));
+				fs::current_path(fs::path(CACHE_PATH));
 				auto dir { fs::path("tvplaylist") };
 				if (not fs::exists(dir))
-					std::system("git.exe clone --depth 1 https://github.com/Mr-Widiatmoko/MakeTVPlaylist.git %userprofile%\\AppData\\Local\\tvplaylist");
+					std::system(
+					"git.exe clone --depth 1 " REPO_URI " " CACHE_PATH  "\\tvplaylist");
 				fs::current_path(dir);
 				std::system("git pull");
 				dir = "Build";
@@ -3937,30 +3951,25 @@ auto main(const int argc, char* const argv[]) -> int
 				fs::current_path(dir);
 				
 				if (0 == std::system("cmake.exe --version") {
-					std::system("cmake %userprofile%\\AppData\\Local\tvplaylist");
+					std::system("cmake " CACHE_PATH "\\tvplaylist");
 					std::system("make");
-					std::system("make install");
+					std::system("copy tvplaylist.exe " INSTALL_PATH);
 					std::system("make clean");
-				//} else if (fs::exists(INSTALL_PATH "/c++")) {
-				//	if (fs::exists(path))
-				//		fs::remove(path);
-				//	std::system("cl.exe -std:c++latest ../src/main.cpp " INSTALL_FULLPATH);
 				}
-				std::cout << (fs::exists(path) ? "Updated" :
-							  "For some reason, update fail!") << ".\n";
+				#undef CACHE_PATH
 				#else
 				if (not fs::exists(INSTALL_PATH "/git")
 					or not fs::exists(INSTALL_PATH "/c++")
 						or not fs::exists(INSTALL_PATH "/cmake"))
 				{
-					std::cout << "\"GIT\" or \"CMAKE\" required!.\nTo install:\n\"brew install git\"\n\"brew install cmake\".\n";
+					std::cout << "\"GIT\" or \"CMAKE\" required!.\nTo install:\n\t\"brew install git\"\n\t\"brew install cmake\"\n";
 					continue;
 				}
 				
 				fs::current_path(fs::path("~"));
 				auto dir { fs::path(".tvplaylist") };
 				if (not fs::exists(dir))
-					std::system("git clone --depth 1 https://github.com/Mr-Widiatmoko/MakeTVPlaylist.git ~/.tvplaylist");
+					std::system("git clone --depth 1 " REPO_URI " ~/.tvplaylist");
 				fs::current_path(dir);
 				std::system("git pull");
 				dir = "Build";
@@ -3978,11 +3987,17 @@ auto main(const int argc, char* const argv[]) -> int
 						fs::remove(path);
 					std::system("c++ -std=c++2b ~/.tvplaylist/src/main.cpp " INSTALL_FULLPATH);
 				}
+				#endif
+				#undef REPO_URI
 				std::cout << (fs::exists(path) ? "Updated" :
 							  "For some reason, update fail!") << ".\n";
-				#endif
+				return RETURN_VALUE
 			}
 			else if (isMatch(OPT_INSTALL, '\0')) {
+				#if defined(MAKE_LIB)
+				continue;
+				#endif
+					
 				const auto path { fs::path(INSTALL_FULLPATH) };
 				
 				if (not isEqual(argv[0], path)) {
@@ -4002,6 +4017,10 @@ auto main(const int argc, char* const argv[]) -> int
 				}
 			}
 			else if (isMatch(OPT_UNINSTALL, '\0')) {
+				#if defined(MAKE_LIB)
+				continue;
+				#endif
+					
 				const auto path { fs::path(INSTALL_FULLPATH) };
 				if (fs::exists(path))
 				#if defined(_WIN32) || defined(_WIN64)

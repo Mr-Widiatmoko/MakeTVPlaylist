@@ -1603,7 +1603,7 @@ struct ID3
 		
 		if (found) {
 			auto selectedTag { keyword.substr(0, pos) };
-			found = setTags.find(selectedTag) != setTags.end();
+			found = internal_SetOfTags.find(selectedTag) != internal_SetOfTags.end();
 			if (found) {
 				std::string val { keyword.substr(pos + 1) };
 				return std::make_shared<std::pair<std::string,
@@ -1614,13 +1614,41 @@ struct ID3
 		return nullptr;
 	}
 	
-	func getValue(const std::string& tag) const
+	func get(const std::string& tag) const
 	{
-		auto found { setTags.find(tag) };
-		if (found != setTags.end())
-			return *found;
+		auto found { tags.find(tag) };
+		if (found != tags.end())
+			return found->second;
 		else
 			return std::string();
+	}
+	
+	func set(const std::string& tag, const std::string& value)
+	{
+		auto found { tags.find(tag) };
+		if (found == tags.end()) {
+			tags.emplace(std::make_pair(tag, value));
+			found = tags.find(tag);
+		}
+		
+		found->second = value;
+	}
+	
+//	func operator [](const std::string& tag) -> std::string&
+//	{
+//		auto found { tags.find(tag) };
+//		if (found != tags.end())
+//			return found->second;
+//		else {
+//			auto newItem { std::make_pair(tag, "") };
+//			tags.emplace(std::move(newItem));
+//			return tags.find(tag)->second;
+//		}
+//	}
+	
+	func operator [](const std::string& tag) const -> const std::string
+	{
+		return get(tag);
 	}
 
 	friend
@@ -1636,8 +1664,7 @@ struct ID3
 						!= std::string::npos)
 						return true;
 			} else
-				return isContains(l.tags.at(keyVal->first),
-								  keyVal->second,
+				return isContains(l[keyVal->first], keyVal->second,
 								  l.isCaseInsensitive ? IgnoreCase::Both
 								  : IgnoreCase::None)
 						!= std::string::npos;
@@ -1650,7 +1677,7 @@ private:
 	const char* path;
 	bool isCaseInsensitive;
 	
-	std::unordered_set<std::string> setTags;
+	std::unordered_set<std::string> internal_SetOfTags;
 	
 	static
 	func btoi(const char* bytes, const int size, const int offset)
@@ -1807,9 +1834,9 @@ private:
 	
 	func initSet()
 	{
-		if (setTags.empty())
+		if (internal_SetOfTags.empty())
 			for (auto& tag : TAGS)
-				setTags.emplace(tag);
+				internal_SetOfTags.emplace(tag);
 	}
 public:
 	
@@ -2370,7 +2397,7 @@ func isValidFile(const fs::path& path)
 	
 	if (not listFind.empty() or not listExclFind.empty()) // MARK: Find statement
 	{
-		auto ismp3 { isEqual(fileExt, ".mp3") };
+		auto ismp3 { isEqual(fileExt.c_str(), {".mp3", ".aac", ".m4a"}) };
 		auto filename { excludeExtension(tmp.filename()) };
 		auto isCaseInsensitive { state[OPT_CASEINSENSITIVE] == "true" };
 		
@@ -4051,7 +4078,7 @@ auto main(const int argc, char* const argv[]) -> int
 					if (args[i] == "id3")
 					{
 						if (i + 1 == args.size())
-							std::cout << "Usage: --debug=id3 key[=]value [key[=]value ...] *.mp3 [*.mp3 ...]\n";
+							std::cout << "Usage: --debug=id3 [key[=]value ...] file [file ...]\n";
 						std::unordered_map<std::string, std::string> keyVals;
 						std::vector<fs::path> files;
 						while (++i < args.size()) {
@@ -4075,14 +4102,9 @@ auto main(const int argc, char* const argv[]) -> int
 						
 						for (auto& file : files) {
 							auto mp3{ ID3(file.string().c_str()) };
-							for (auto& keyVal : keyVals) {
-								if (auto pos { mp3.tags.find(keyVal.first) };
-									pos == mp3.tags.end())
-									mp3.tags.emplace(std::make_pair(
-												keyVal.first, keyVal.second));
-								else
-									mp3.tags.at(keyVal.first) = keyVal.second;
-							}
+							for (auto& keyVal : keyVals)
+								mp3.set(keyVal.first, keyVal.second);
+							
 							if (not keyVals.empty())
 								mp3.write();
 							std::cout << "File " << file.filename() << ":\n"
@@ -4092,7 +4114,9 @@ auto main(const int argc, char* const argv[]) -> int
 						return RETURN_VALUE
 					}
 					if (args[i] == "date") {
-						if (i + 1 < args.size()) {
+						if (i + 1 == args.size())
+							std::cout << "Usage: --debug=date 'date or/and time' ['format']\n";
+						else {
 							i++;
 							auto input { args[i] };
 							

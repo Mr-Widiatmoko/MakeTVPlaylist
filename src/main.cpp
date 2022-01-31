@@ -501,6 +501,8 @@ constexpr const char* const* SINGLE_VALUE_OPT[] = {&OPT_LOADCONFIG, &OPT_SHOWCON
 	&OPT_VERBOSE, &OPT_BENCHMARK, &OPT_OVERWRITE, &OPT_SKIPSUBTITLE,
 	&OPT_OUTDIR, &OPT_ADSCOUNT, &OPT_EXECUTION, &OPT_FIXFILENAME, &OPT_EXCLHIDDEN,
 	&OPT_EXT, &OPT_EXCLEXT};
+
+[[maybe_unused]]
 constexpr const char* const* MULTI_VALUE_OPT[] = {
 	&OPT_ADSDIR,
 	&OPT_SIZE, &OPT_EXCLSIZE,
@@ -1463,8 +1465,7 @@ public:
 struct ID3
 {
 	
-	property std::unordered_map<std::string_view, std::string> tags;
-	// TODO: There was tags that can be defined multiple times, and should be stored in new variable with type unordered_multimap.
+	property std::unordered_multimap<std::string_view, std::string> tags;
 
 	static constexpr auto TAGS = {
 		"id3",
@@ -1626,12 +1627,15 @@ struct ID3
 	func set(const std::string& tag, const std::string& value)
 	{
 		auto found { tags.find(tag) };
-		if (found == tags.end()) {
+		if (found != tags.end())
+			found->second = value;
+		else
 			tags.emplace(std::make_pair(tag, value));
-			found = tags.find(tag);
-		}
-		
-		found->second = value;
+	}
+	
+	func add(const std::string& tag, const std::string& value)
+	{
+		tags.emplace(std::make_pair(tag, value));
 	}
 	
 //	func operator [](const std::string& tag) -> std::string&
@@ -1676,7 +1680,6 @@ struct ID3
 private:
 	const char* path;
 	bool isCaseInsensitive;
-	
 	std::unordered_set<std::string> internal_SetOfTags;
 	
 	static
@@ -1858,11 +1861,14 @@ public:
 							   const int size,
 							   const char* const value = nullptr)
 		{
+			const char* currVal { nullptr };
 			if (key and id3->tags.find(key) == id3->tags.end())
-				id3->tags.emplace(std::make_pair(key, value ? value : ""));
+				id3->add(key, value ? value : "");
+			else
+				currVal = id3->get(key).c_str();
 			
-			auto val { key ? (value ? value : (id3->tags.at(key).empty() ? nullptr
-							  : id3->tags.at(key).c_str())) : nullptr };
+			auto val { key ? (value ? value : (currVal ? currVal
+							  : nullptr)) : nullptr };
 			
 			if (val) {
 				if (size == 1) {
@@ -1885,9 +1891,10 @@ public:
 		set(this, nullptr, 1);
 		set(this, "track", 1);
 		
-		if (tags.find("genre") != tags.end())
+		if (auto genre { get("genre") };
+			not genre.empty())
 			for (auto i{0}; auto& g : GENRES) {
-				if (tags.at("genre") == g) {
+				if (genre == g) {
 					set(this, "genre", 1, std::to_string(i).c_str());
 					break;
 				}
@@ -1945,10 +1952,10 @@ public:
 				and file.read(bytes, tag.tag_size + 10))
 			{
 				
-				tags["version"] = "2." + std::to_string(tag.major_version)
+				add("version", "2." + std::to_string(tag.major_version)
 				+ (tag.minor_version > 0
 					? "." + std::to_string(tag.minor_version)
-					: "");
+					: ""));
 				
 				auto isv24 { tag.major_version == 4 };
 				auto isv23 { tag.major_version == 3 };
@@ -1963,67 +1970,67 @@ public:
 						offset += frame.size + 10;
 						
 						if (isEqual(frame.id, "AENC"))
-							tags.emplace(std::make_pair("audio_encryption", frame.data));
+							add("audio_encryption", frame.data);
 						else if (isEqual(frame.id, "APIC"))
-							tags.emplace(std::make_pair("attached_picture", frame.data));
+							add("attached_picture", frame.data);
 						else if (isEqual(frame.id, "ASPI") and isv24)
-							tags.emplace(std::make_pair("audio_seek_point_index", frame.data));
+							add("audio_seek_point_index", frame.data);
 						else if (isEqual(frame.id, "COMM"))
-							tags.emplace(std::make_pair("comment", frame.data));
+							add("comment", frame.data);
 						else if (isEqual(frame.id, "COMR"))
-							tags.emplace(std::make_pair("commercial_frame", frame.data));
+							add("commercial_frame", frame.data);
 						else if (isEqual(frame.id, "TSIZ") and isv23)
-							tags.emplace(std::make_pair("size", frame.data));
+							add("size", frame.data);
 						else if (isEqual(frame.id, "ENCR"))
-							tags.emplace(std::make_pair("encryption_method_registration", frame.data));
+							add("encryption_method_registration", frame.data);
 						else if (isEqual(frame.id, "EQU2") and isv24)
-							tags.emplace(std::make_pair("equalization", frame.data));
+							add("equalization", frame.data);
 						else if (isEqual(frame.id, "EQUA") and isv23)
-							tags.emplace(std::make_pair("equalization", frame.data));
+							add("equalization", frame.data);
 						else if (isEqual(frame.id, "ETCO"))
-							tags.emplace(std::make_pair("event_timing_codes", frame.data));
+							add("event_timing_codes", frame.data);
 						else if (isEqual(frame.id, "GEOB"))
-							tags.emplace(std::make_pair("general_encapsulation_object", frame.data));
+							add("general_encapsulation_object", frame.data);
 						else if (isEqual(frame.id, "GRID"))
-							tags.emplace(std::make_pair("group_identification_registration", frame.data));
+							add("group_identification_registration", frame.data);
 						else if (isEqual(frame.id, "LINK"))
-							tags.emplace(std::make_pair("linked_information", frame.data));
+							add("linked_information", frame.data);
 						else if (isEqual(frame.id, "MCDI"))
-							tags.emplace(std::make_pair("music_cd_identifier", frame.data));
+							add("music_cd_identifier", frame.data);
 						else if (isEqual(frame.id, "MLLT"))
-							tags.emplace(std::make_pair("mpeg_location_lookup_table", frame.data));
+							add("mpeg_location_lookup_table", frame.data);
 						else if (isEqual(frame.id, "OWNE"))
-							tags.emplace(std::make_pair("ownership_frame", frame.data));
+							add("ownership_frame", frame.data);
 						else if (isEqual(frame.id, "PCNT"))
-							tags.emplace(std::make_pair("play_counter", frame.data));
+							add("play_counter", frame.data);
 						else if (isEqual(frame.id, "POPM"))
-							tags.emplace(std::make_pair("popularimeter", frame.data));
+							add("popularimeter", frame.data);
 						else if (isEqual(frame.id, "POSS"))
-							tags.emplace(std::make_pair("position_sync_frame", frame.data));
+							add("position_sync_frame", frame.data);
 						else if (isEqual(frame.id, "PRIV"))
-							tags.emplace(std::make_pair("private_frame", frame.data));
+							add("private_frame", frame.data);
 						else if (isEqual(frame.id, "RBUF"))
-							tags.emplace(std::make_pair("recommended_buffer_size", frame.data));
+							add("recommended_buffer_size", frame.data);
 						else if (isEqual(frame.id, "RVA2") and isv24)
-							tags.emplace(std::make_pair("relative_volume_adjustment", frame.data));
+							add("relative_volume_adjustment", frame.data);
 						else if (isEqual(frame.id, "RVAD") and isv23)
-							tags.emplace(std::make_pair("relative_volume_adjustment", frame.data));
+							add("relative_volume_adjustment", frame.data);
 						else if (isEqual(frame.id, "RVRB"))
-							tags.emplace(std::make_pair("reverb", frame.data));
+							add("reverb", frame.data);
 						else if (isEqual(frame.id, "SEEK") and isv24)
-							tags.emplace(std::make_pair("seek_frame", frame.data));
+							add("seek_frame", frame.data);
 						else if (isEqual(frame.id, "SIGN") and isv24)
-							tags.emplace(std::make_pair("signature_frame", frame.data));
+							add("signature_frame", frame.data);
 						else if (isEqual(frame.id, "SYLT"))
-							tags.emplace(std::make_pair("sync_lyric", frame.data));
+							add("sync_lyric", frame.data);
 						else if (isEqual(frame.id, "SYTC"))
-							tags.emplace(std::make_pair("sync_tempo_codes", frame.data));
+							add("sync_tempo_codes", frame.data);
 						else if (isEqual(frame.id, "TALB"))
-							tags.emplace(std::make_pair("album", frame.data));
+							add("album", frame.data);
 						else if (isEqual(frame.id, "TBPM"))
-							tags.emplace(std::make_pair("bpm", frame.data));
+							add("bpm", frame.data);
 						else if (isEqual(frame.id, "TCOM"))
-							tags.emplace(std::make_pair("composer", frame.data));
+							add("composer", frame.data);
 						else if (isEqual(frame.id, "TCON") and not frame.data.empty())
 						{
 							int index = -1;
@@ -2035,139 +2042,139 @@ public:
 								index = std::stoi(frame.data);
 							
 							if (index > -1)
-								tags.emplace(std::make_pair("genre", GENRES[index]));
+								add("genre", GENRES[index]);
 						}
 						else if (isEqual(frame.id, "TCOP"))
-							tags.emplace(std::make_pair("copyright_message", frame.data));
+							add("copyright_message", frame.data);
 						else if (isEqual(frame.id, "TDEN") and isv24)
-							tags.emplace(std::make_pair("encoding_time", frame.data));
+							add("encoding_time", frame.data);
 						else if (isEqual(frame.id, "TDLY"))
-							tags.emplace(std::make_pair("playlist_delay", frame.data));
+							add("playlist_delay", frame.data);
 						else if (isEqual(frame.id, "TDOR") and isv24)
-							tags.emplace(std::make_pair("original_release_year", frame.data));
+							add("original_release_year", frame.data);
 						else if (isEqual(frame.id, "TORY") and isv23)
-							tags.emplace(std::make_pair("original_release_year", frame.data));
+							add("original_release_year", frame.data);
 						
 						else if (isEqual(frame.id, "TDAT") and isv23)
-							tags.emplace(std::make_pair("date", frame.data));
+							add("date", frame.data);
 						else if (isEqual(frame.id, "TRDA") and isv23)
-							tags.emplace(std::make_pair("recording_date", frame.data));
+							add("recording_date", frame.data);
 						else if (isEqual(frame.id, "TIME") and isv23)
-							tags.emplace(std::make_pair("time", frame.data));
+							add("time", frame.data);
 						else if (isEqual(frame.id, "TYER") and isv23)
-							tags.emplace(std::make_pair("year", frame.data));
+							add("year", frame.data);
 						
 						
 						else if (isEqual(frame.id, "TDRC") and isv24)
 						{
-							tags.emplace(std::make_pair("date", frame.data));
-							tags.emplace(std::make_pair("recording_date", frame.data));
-							tags.emplace(std::make_pair("recording_time", frame.data));
-							tags.emplace(std::make_pair("time", frame.data));
-							tags.emplace(std::make_pair("year", frame.data));
+							add("date", frame.data);
+							add("recording_date", frame.data);
+							add("recording_time", frame.data);
+							add("time", frame.data);
+							add("year", frame.data);
 						}
 						
 						else if (isEqual(frame.id, "TDRL") and isv24)
-							tags.emplace(std::make_pair("release_time", frame.data));
+							add("release_time", frame.data);
 						else if (isEqual(frame.id, "TDTG") and isv24)
-							tags.emplace(std::make_pair("tagging_time", frame.data));
+							add("tagging_time", frame.data);
 						else if (isEqual(frame.id, "TENC"))
-							tags.emplace(std::make_pair("encoder", frame.data));
+							add("encoder", frame.data);
 						else if (isEqual(frame.id, "TEXT"))
-							tags.emplace(std::make_pair("lyric", frame.data));
+							add("lyric", frame.data);
 						else if (isEqual(frame.id, "TFLT"))
-							tags.emplace(std::make_pair("file_type", frame.data));
+							add("file_type", frame.data);
 						else if (isEqual(frame.id, "TIPL") and isv24)
-							tags.emplace(std::make_pair("involved_people_list", frame.data));
+							add("involved_people_list", frame.data);
 						else if (isEqual(frame.id, "IPLS") and isv23)
-							tags.emplace(std::make_pair("involved_people_list", frame.data));
+							add("involved_people_list", frame.data);
 						
 						else if (isEqual(frame.id, "TIT1"))
-							tags.emplace(std::make_pair("content_group_description", frame.data));
+							add("content_group_description", frame.data);
 						else if (isEqual(frame.id, "TIT2"))
-							tags.emplace(std::make_pair("title", frame.data));
+							add("title", frame.data);
 						else if (isEqual(frame.id, "TIT3"))
-							tags.emplace(std::make_pair("subtitle_refinement", frame.data));
+							add("subtitle_refinement", frame.data);
 						else if (isEqual(frame.id, "TKEY"))
-							tags.emplace(std::make_pair("initial_key", frame.data));
+							add("initial_key", frame.data);
 						else if (isEqual(frame.id, "TLAN"))
-							tags.emplace(std::make_pair("language", frame.data));
+							add("language", frame.data);
 						else if (isEqual(frame.id, "TLEN"))
-							tags.emplace(std::make_pair("length", frame.data));
+							add("length", frame.data);
 						else if (isEqual(frame.id, "TMCL") and isv24)
-							tags.emplace(std::make_pair("musician_credits_list", frame.data));
+							add("musician_credits_list", frame.data);
 						else if (isEqual(frame.id, "TMED"))
-							tags.emplace(std::make_pair("media_type", frame.data));
+							add("media_type", frame.data);
 						else if (isEqual(frame.id, "TMOO") and isv24)
-							tags.emplace(std::make_pair("mood", frame.data));
+							add("mood", frame.data);
 						else if (isEqual(frame.id, "TOAL"))
-							tags.emplace(std::make_pair("original_album_title", frame.data));
+							add("original_album_title", frame.data);
 						else if (isEqual(frame.id, "TOFN"))
-							tags.emplace(std::make_pair("original_filename", frame.data));
+							add("original_filename", frame.data);
 						else if (isEqual(frame.id, "TOLY"))
-							tags.emplace(std::make_pair("original_lyricist_writer", frame.data));
+							add("original_lyricist_writer", frame.data);
 						else if (isEqual(frame.id, "TOPE"))
-							tags.emplace(std::make_pair("original_artist", frame.data));
+							add("original_artist", frame.data);
 						else if (isEqual(frame.id, "TOWN"))
-							tags.emplace(std::make_pair("file_license", frame.data));
+							add("file_license", frame.data);
 						else if (isEqual(frame.id, "TPE1"))
-							tags.emplace(std::make_pair("artist", frame.data));
+							add("artist", frame.data);
 						else if (isEqual(frame.id, "TPE2"))
-							tags.emplace(std::make_pair("band", frame.data));
+							add("band", frame.data);
 						else if (isEqual(frame.id, "TPE3"))
-							tags.emplace(std::make_pair("conductor_refinement", frame.data));
+							add("conductor_refinement", frame.data);
 						else if (isEqual(frame.id, "TPE4"))
-							tags.emplace(std::make_pair("remixed", frame.data));
+							add("remixed", frame.data);
 						else if (isEqual(frame.id, "TPOS"))
-							tags.emplace(std::make_pair("part_of_set", frame.data));
+							add("part_of_set", frame.data);
 						else if (isEqual(frame.id, "TPRO") and isv24)
-							tags.emplace(std::make_pair("produced_notice", frame.data));
+							add("produced_notice", frame.data);
 						else if (isEqual(frame.id, "TPUB"))
-							tags.emplace(std::make_pair("publisher", frame.data));
+							add("publisher", frame.data);
 						else if (isEqual(frame.id, "TRCK"))
-							tags.emplace(std::make_pair("track", frame.data));
+							add("track", frame.data);
 						else if (isEqual(frame.id, "TRSN"))
-							tags.emplace(std::make_pair("internet_radio_station_name", frame.data));
+							add("internet_radio_station_name", frame.data);
 						else if (isEqual(frame.id, "TPSO"))
-							tags.emplace(std::make_pair("internet_radio_station_owner", frame.data));
+							add("internet_radio_station_owner", frame.data);
 						else if (isEqual(frame.id, "TSOA") and isv24)
-							tags.emplace(std::make_pair("album_sort_order", frame.data));
+							add("album_sort_order", frame.data);
 						else if (isEqual(frame.id, "TSOP") and isv24)
-							tags.emplace(std::make_pair("performer_sort_order", frame.data));
+							add("performer_sort_order", frame.data);
 						else if (isEqual(frame.id, "TSOT") and isv24)
-							tags.emplace(std::make_pair("title_sort_order", frame.data));
+							add("title_sort_order", frame.data);
 						else if (isEqual(frame.id, "TSRC"))
-							tags.emplace(std::make_pair("isrc", frame.data));
+							add("isrc", frame.data);
 						else if (isEqual(frame.id, "TSSE"))
-							tags.emplace(std::make_pair("encoding_setting", frame.data));
+							add("encoding_setting", frame.data);
 						else if (isEqual(frame.id, "TSST") and isv24)
-							tags.emplace(std::make_pair("set_subtitle", frame.data));
+							add("set_subtitle", frame.data);
 						else if (isEqual(frame.id, "TXXX"))
-							tags.emplace(std::make_pair("user_defined_text_info_frame", frame.data));
+							add("user_defined_text_info_frame", frame.data);
 						else if (isEqual(frame.id, "UFID"))
-							tags.emplace(std::make_pair("unique_file_identifier", frame.data));
+							add("unique_file_identifier", frame.data);
 						else if (isEqual(frame.id, "USER"))
-							tags.emplace(std::make_pair("term_of_use", frame.data));
+							add("term_of_use", frame.data);
 						else if (isEqual(frame.id, "USLT"))
-							tags.emplace(std::make_pair("unsync_lyric_transcription", frame.data));
+							add("unsync_lyric_transcription", frame.data);
 						else if (isEqual(frame.id, "WCOM"))
-							tags.emplace(std::make_pair("commercial_information", frame.data));
+							add("commercial_information", frame.data);
 						else if (isEqual(frame.id, "WCOP"))
-							tags.emplace(std::make_pair("copyright_information", frame.data));
+							add("copyright_information", frame.data);
 						else if (isEqual(frame.id, "WOAF"))
-							tags.emplace(std::make_pair("official_audio_file_webpage", frame.data));
+							add("official_audio_file_webpage", frame.data);
 						else if (isEqual(frame.id, "WOAR"))
-							tags.emplace(std::make_pair("official_atist_webpage", frame.data));
+							add("official_atist_webpage", frame.data);
 						else if (isEqual(frame.id, "WOAS"))
-							tags.emplace(std::make_pair("official_audio_source_webpage", frame.data));
+							add("official_audio_source_webpage", frame.data);
 						else if (isEqual(frame.id, "WORS"))
-							tags.emplace(std::make_pair("official_internet_radio_station_homepage", frame.data));
+							add("official_internet_radio_station_homepage", frame.data);
 						else if (isEqual(frame.id, "WPAY"))
-							tags.emplace(std::make_pair("payment", frame.data));
+							add("payment", frame.data);
 						else if (isEqual(frame.id, "WPUB"))
-							tags.emplace(std::make_pair("publisher_official_webpage", frame.data));
+							add("publisher_official_webpage", frame.data);
 						else if (isEqual(frame.id, "WXXX"))
-							tags.emplace(std::make_pair("user_defined_url_link_frame", frame.data));
+							add("user_defined_url_link_frame", frame.data);
 						#if 0
 						std::cout << "Frame: " << frame.frame_id << " = " << frame.data << '\n';
 						
@@ -2207,31 +2214,31 @@ public:
 			file.seekg(end - 128);
 			if (get(3) == "TAG")
 			{
-				tags.emplace(std::make_pair("version", "1.0"));
-				tags.emplace(std::make_pair("title", get(30)));
-				tags.emplace(std::make_pair("artist", get(30)));
-				tags.emplace(std::make_pair("album", get(30)));
-				tags.emplace(std::make_pair("year", get(4)));
-				tags.emplace(std::make_pair("comment", get(28)));
+				add("version", "1.0");
+				add("title", get(30));
+				add("artist", get(30));
+				add("album", get(30));
+				add("year", get(4));
+				add("comment", get(28));
 				get(/*Zero Track*/ 1);
-				tags.emplace(std::make_pair("track", get(1)));
+				add("track", get(1));
 				auto genre { get(1, true) };
 				int index;
 				if (auto [p, ec] = std::from_chars(genre.c_str(),
 								genre.c_str()+genre.size(), index);
 					ec == std::errc())
-					tags.emplace(std::make_pair("genre", GENRES[index]));
+					add("genre", GENRES[index]);
 				
 				file.seekg(0, std::ios::end);
 				file.seekg(end - (128 + 227));
 				if (get(4) == "TAG+")
 				{
-					tags.emplace(std::make_pair("version", "1.1 Extended"));
-					tags.emplace(std::make_pair("title", get(60)));
-					tags.emplace(std::make_pair("artist", get(60)));
-					tags.emplace(std::make_pair("album", get(60)));
+					add("version", "1.1 Extended");
+					add("title", get(60));
+					add("artist", get(60));
+					add("album", get(60));
 					/*"Speed*/get(1);
-					tags.emplace(std::make_pair("genre", get(30)));
+					add("genre", get(30));
 					/*"Start*/get(6);
 					/*"End*/get(6);
 				}

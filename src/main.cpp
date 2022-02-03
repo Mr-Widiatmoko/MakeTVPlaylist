@@ -1401,7 +1401,7 @@ public:
 				}
 				continue;
 			} else
-				std::cout << "⚠️ Cannot understand literal \"" << s << "\"!.\n";
+				std::cout << "⚠️  Cannot understand literal \"" << s << "\"!.\n";
 		}
 		
 		
@@ -1444,7 +1444,7 @@ public:
 			}}.iso_encoding();
 			
 			if (weekDay > -1 and weekDay != weekday)
-				std::cout << "⚠️ Invalid Weekday was defined for " << string("%B %d %Y") << "!\n";
+				std::cout << "⚠️  Invalid Weekday was defined for " << string("%B %d %Y") << "!\n";
 		}
 			
 		unsigned short* unit[] = {&hour, &minute, &second };
@@ -1455,7 +1455,7 @@ public:
 			} else if (i < sizeof(unit)/sizeof(unit[0]))
 				*unit[i++] = t;
 			else
-				std::cout << "⚠️ Invalid unit time on "
+				std::cout << "⚠️  Invalid unit time on "
 					<< hour << ':'<< minute << ':' << second << '\n';
 		if (hasPM)
 			hour += 12;
@@ -3114,7 +3114,7 @@ func timeLapse(std::chrono::system_clock::time_point& start,
 func parseKeyValue(std::string* const s, const bool isExclude)
 {
 	if (not s or s->empty())
-		return;
+		return false;
 		
 	const char* keyword = "";
 	std::string value;
@@ -3122,7 +3122,9 @@ func parseKeyValue(std::string* const s, const bool isExclude)
 	for (auto& key : {"dir", OPT_EXT, OPT_EXCLEXT,
 		OPT_CASEINSENSITIVE, OPT_EXCLHIDDEN, OPT_SIZE, OPT_EXCLSIZE,
 		"case-insensitive", "caseinsensitive",
-		"ignore-case", "ignorecase"})
+		"ignore-case", "ignorecase", OPT_DATE, OPT_EXCLDATE, OPT_DCREATED,
+		OPT_DCHANGED, OPT_DACCESSED, OPT_DMODIFIED,
+   OPT_DEXCLCREATED, OPT_DEXCLCHANGED, OPT_DEXCLMODIFIED, OPT_DEXCLACCESSED})
 	{
 		const auto sz { std::strlen(key) };
 		
@@ -3306,6 +3308,8 @@ func parseKeyValue(std::string* const s, const bool isExclude)
 	
 	if (isKeyValue and 0 != std::strlen(keyword))
 		s->insert(0, 1, char(1));
+	
+	return 0 != std::strlen(keyword);
 }
 
 template <typename  T>
@@ -3649,7 +3653,7 @@ func loadConfig(std::vector<std::string>* const args)
 }
 
 const std::string XML_CHARS_ALIAS[] = {"&quot", "&apos", "&lt", "&gt", "&amp"};
-const std::string XML_CHARS_NORMAL[] = {"\"", "\\", "<", "<", "&"};
+const std::string XML_CHARS_NORMAL[] = {"\"", "\\", "<", ">", "&"};
 constexpr auto NETWORK_PROTOCOLS = {"http:", "https:", "ftp:", "ftps:", "rtsp:", "mms:"};
 
 func replace_all(std::string& inout,
@@ -3695,7 +3699,6 @@ func loadPlaylist(const fs::path& path, std::vector<fs::path>* const outPaths)
 				replace_all(buff, "%2D", "-");
 				replace_all(buff, "%3F", "?");
 				replace_all(buff, "%3B", ";");
-				replace_all(buff, "%25", "%");
 				replace_all(buff, "%4F", "@");
 				replace_all(buff, "%21", "!");
 				replace_all(buff, "%22", "\"");
@@ -3708,6 +3711,7 @@ func loadPlaylist(const fs::path& path, std::vector<fs::path>* const outPaths)
 				replace_all(buff, "%23", "#");
 				replace_all(buff, "%3C", "<");
 				replace_all(buff, "%3E", ">");
+				replace_all(buff, "%25", "%");
 				outPaths->emplace_back(fs::path(buff));
 				found = true;
 				break;
@@ -3999,7 +4003,7 @@ auto main(const int argc, char* const argv[]) -> int
 				#define CACHE_PATH "%userprofile%\\AppData\\Local"
 				if (0 != std::system("git.exe --version")
 					or (0 != std::system("cmake.exe --version"))) {
-					std::cout << "\"GIT\" and \"CMAKE\" required!.\n";
+					std::cout << "⚠️  \"GIT\" and \"CMAKE\" required!.\n";
 					continue;
 				}
 				fs::current_path(fs::path(CACHE_PATH));
@@ -4026,7 +4030,7 @@ auto main(const int argc, char* const argv[]) -> int
 					or not fs::exists(INSTALL_PATH "/c++")
 						or not fs::exists(INSTALL_PATH "/cmake"))
 				{
-					std::cout << "\"GIT\" or \"CMAKE\" required!.\nTo install:\n\t\"brew install git\"\n\t\"brew install cmake\"\n";
+					std::cout << "⚠️  \"GIT\" or \"CMAKE\" required!.\nTo install:\n\t\"brew install git\"\n\t\"brew install cmake\"\n";
 					continue;
 				}
 				
@@ -4054,7 +4058,7 @@ auto main(const int argc, char* const argv[]) -> int
 				#endif
 				#undef REPO_URI
 				std::cout << (fs::exists(path) ? "Updated" :
-							  "For some reason, update fail!") << ".\n";
+							  "⚠️  For some reason, update fail!") << ".\n";
 				return RETURN_VALUE
 			}
 			else if (isMatch(OPT_INSTALL, '\0')) {
@@ -4077,7 +4081,7 @@ auto main(const int argc, char* const argv[]) -> int
 					cmd += path;
 					std::system(cmd.c_str());
 					std::cout << (fs::exists(path) ? "Installed" :
-								  "For some reason, install fail!") << ".\n";
+								  "⚠️  For some reason, install fail!") << ".\n";
 				}
 			}
 			else if (isMatch(OPT_UNINSTALL, '\0')) {
@@ -4093,7 +4097,7 @@ auto main(const int argc, char* const argv[]) -> int
 					std::system("rm -f " INSTALL_FULLPATH);
 				#endif
 				std::cout << (not fs::exists(path) ? "Uninstalled" :
-							  "For some reason, uninstall fail!") << ".\n";
+							  "⚠️  For some reason, uninstall fail!") << ".\n";
 			}
 			else if (isMatch(OPT_HELP, 'h') or isMatch(OPT_VERSION, 'v')) // MARK: Option Matching
 			{
@@ -4196,7 +4200,7 @@ auto main(const int argc, char* const argv[]) -> int
 					continue;
 				}
 				
-				std::cout << "⚠️ Expecting config file path. Please see --help "
+				std::cout << "⚠️  Expecting config file path. Please see --help "
 				<< args[i].substr(2) << '\n';
 			}
 			else if (isMatch(OPT_ADSDIR, 'D')) {
@@ -4206,7 +4210,7 @@ auto main(const int argc, char* const argv[]) -> int
 					continue;
 				}
 				
-				std::cout << "⚠️ Expecting directory path. Please see --help "
+				std::cout << "⚠️  Expecting directory path. Please see --help "
 				<< args[i].substr(2) << '\n';
 			}
 			else if (isMatch(OPT_ADSCOUNT, 'C')) {
@@ -4221,7 +4225,7 @@ auto main(const int argc, char* const argv[]) -> int
 						i += 3;
 						continue;
 					}
-					std::cout << "⚠️ " << args[i] << " value range is up side down!. "
+					std::cout << "⚠️  " << args[i] << " value range is up side down!. "
 					<< range.first << " greater than " << range.second << '\n';
 				}
 				else if (auto push{[&args, &i] (unsigned long pos, unsigned long offset) {
@@ -4259,7 +4263,7 @@ auto main(const int argc, char* const argv[]) -> int
 						continue;
 					}
 				}
-				std::cout << "⚠️ Expecting number of advertise. Please see --help "
+				std::cout << "⚠️  Expecting number of advertise. Please see --help "
 				<< args[i].substr(2) << '\n';
 			}
 			else if (isMatch(OPT_NOOUTPUTFILE, 	'F', true)) {
@@ -4304,7 +4308,7 @@ auto main(const int argc, char* const argv[]) -> int
 					
 					state[OPT_ARRANGEMENT] = value;
 				} else
-					std::cout << "⚠️ Expecting arrangement type. Please see --help "
+					std::cout << "⚠️  Expecting arrangement type. Please see --help "
 					<< args[i].substr(2) << "\n";
 			}
 			else if (isMatch(OPT_CASEINSENSITIVE, 'N', true, OPT_CASEINSENSITIVE_ALTERNATIVE))
@@ -4363,7 +4367,7 @@ auto main(const int argc, char* const argv[]) -> int
 					if (last != -1)
 						push();
 				} else
-					std::cout << "⚠️ Expecting search keyword!\n";
+					std::cout << "⚠️  Expecting search keyword!\n";
 			}
 			else if (isMatch(OPT_FIND, 			'i')
 					 or isMatch(OPT_EXCLFIND, 	'I')) {
@@ -4372,19 +4376,17 @@ auto main(const int argc, char* const argv[]) -> int
 					const auto opt { args[i].substr(2) };
 					const auto isExclude { opt == OPT_EXCLFIND };
 					i++;
-					#if 0
-					parseKeyValue(&args[i], isExclude);
-					(isExclude ? listExclFind : listFind)
-						.emplace_back(state[OPT_CASEINSENSITIVE] == "true"
-									  ? tolower(args[i]) : args[i]);
-					state[opt] = "1";
-					#else
 					auto index{ -1 };
 					auto last{ 0 };
-					auto push{[&]() {
+					std::string buff;
+					auto lastIndex{ 0 };
+					auto push{[&](){
 						auto keyVal { args[i].substr(last, index) };
+						if (keyVal.empty())
+							return;
 						
-						parseKeyValue(&keyVal, keyVal.starts_with("exclude-"));
+						const auto isTrue { parseKeyValue(&keyVal,
+											keyVal.starts_with("exclude-")) };
 						
 						if (constexpr auto EXCL {"exclude="};
 							keyVal.starts_with(EXCL))
@@ -4397,10 +4399,14 @@ auto main(const int argc, char* const argv[]) -> int
 									.emplace_back(value);
 								state[opt] = "1";
 							}
-						} else if (not keyVal.empty()) {
-							(isExclude ? listExclFind : listFind)
-								.emplace_back(keyVal);
-							state[opt] = "1";
+						}
+						else if (not isTrue
+							and (lastIndex == 0 or last - lastIndex == 1))
+						{
+							if (not buff.empty())
+								buff.append(" ");
+							buff.append(keyVal);
+							lastIndex = index;
 						}
 					}};
 					while (++index < args[i].size()) {
@@ -4416,9 +4422,13 @@ auto main(const int argc, char* const argv[]) -> int
 					}
 					if (last != -1)
 						push();
-					#endif
+					
+					if (not buff.empty()) {
+						(isExclude ? listExclFind : listFind).emplace_back(buff);
+						state[opt] = "1";
+					}
 				} else
-					std::cout << "⚠️ Expecting keyword after \""
+					std::cout << "⚠️  Expecting keyword after \""
 					<< args[i] << "\" option. Please see --help "
 					<< args[i].substr(2) << "\n";
 			}
@@ -4434,7 +4444,7 @@ auto main(const int argc, char* const argv[]) -> int
 					if (found)
 						continue;
 				}
-				std::cout << "⚠️ Expecting regular expression syntax after \""
+				std::cout << "⚠️  Expecting regular expression syntax after \""
 							<< args[i] << "\" option. Please see --help "
 							<< args[i].substr(2) << "\n";
 			}
@@ -4475,7 +4485,7 @@ auto main(const int argc, char* const argv[]) -> int
 						i++;
 					}
 				} else
-					std::cout << "⚠️ Expecting regular expression after \""
+					std::cout << "⚠️  Expecting regular expression after \""
 								<< args[i] << "\" option. Please see --help "
 								<< args[i].substr(2) << "\n";
 			}
@@ -4552,7 +4562,7 @@ auto main(const int argc, char* const argv[]) -> int
 				{
 					auto push{[&](const Date& lower, const Date& upper) {
 						if (lower > upper) {
-							std::cout << "⚠️ Date range up side down!, "
+							std::cout << "⚠️  Date range up side down!, "
 							<< lower.string() << " greater than " << upper.string() << '\n';
 							return false;
 						}
@@ -4633,7 +4643,7 @@ auto main(const int argc, char* const argv[]) -> int
 						
 					}
 				}
-DATE_NEEDED:	std::cout << "⚠️ Expecting date and/or time after \""
+DATE_NEEDED:	std::cout << "⚠️  Expecting date and/or time after \""
 							<< args[i] << "\" option. Please see --help "
 							<< args[i].substr(2) << "\n";
 			}
@@ -4672,7 +4682,7 @@ DATE_NEEDED:	std::cout << "⚠️ Expecting date and/or time after \""
 					else
 						state[OPT_EXECUTION] = "Linear";
 				} else
-					std::cout << "⚠️ Expecting 'thread', 'async', or 'none' after \""
+					std::cout << "⚠️  Expecting 'thread', 'async', or 'none' after \""
 					<< args[i] << "\" option. Please see --help "
 					<< args[i].substr(2) << "\n";
 			} else if (isMatch(OPT_EXT, 	'e')
@@ -4695,7 +4705,7 @@ DATE_NEEDED:	std::cout << "⚠️ Expecting date and/or time after \""
 						state[OPT_OUTDIR] = fs::path(args[i]).parent_path().string();
 					}
 				} else
-					std::cout << "⚠️ Expecting file name after \""
+					std::cout << "⚠️  Expecting file name after \""
 					<< args[i] << "\" option (eg: \"my_playlist.m3u8\"). Please see --help "
 					<< args[i].substr(2) << "\n";
 			}
@@ -4707,7 +4717,7 @@ DATE_NEEDED:	std::cout << "⚠️ Expecting date and/or time after \""
 						tmp[tmp.size() - 1] not_eq fs::path::preferred_separator)
 						state[OPT_OUTDIR] += fs::path::preferred_separator;
 				} else
-					std::cout << "⚠️ Expecting directory after \""
+					std::cout << "⚠️  Expecting directory after \""
 					<< args[i] << "\" option (eg: \"Downloads/\"). Please see --help "
 					<< args[i].substr(2) << "\n";
 			}
@@ -4800,7 +4810,7 @@ DATE_NEEDED:	std::cout << "⚠️ Expecting date and/or time after \""
 						state[s_first] = first;
 
 						if (std::stoul(second) < std::stoul(first)) {
-							std::cout << "⚠️ Range is up side down! \""
+							std::cout << "⚠️  Range is up side down! \""
 								<< groupNumber(first) << " bytes greater than "
 								<< groupNumber(second) << " bytes\"\n";
 							state[s_first] = "0";
@@ -4811,7 +4821,7 @@ DATE_NEEDED:	std::cout << "⚠️ Expecting date and/or time after \""
 					}
 				}
 				else
-SIZE_NEEDED:		std::cout << "⚠️ Expecting operator '<' or '>' followed\
+SIZE_NEEDED:		std::cout << "⚠️  Expecting operator '<' or '>' followed\
 by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..to'\
  Please see --help " << OPT_SIZE << "\n";
 		} else if (fs::is_directory(args[i]))
@@ -4838,13 +4848,25 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 	if (not invalidArgs.empty()) {
 		std::string_view invalid_args[invalidArgs.size()];
 		std::move(invalidArgs.begin(), invalidArgs.end(), invalid_args);
-		std::cout << "\n⚠️ What " << (invalidArgs.size() > 1 ? "are these" : "is this") << "? :\n";
+		std::cout << "⚠️  What " << (invalidArgs.size() > 1 ? "are these" : "is this") << ":\n";
 		for (auto i{ 0 }; i<invalidArgs.size(); ++i) {
 			auto item { &invalid_args[i] };
 			std::string others;
-			if (item->size() >= 4 and item->starts_with("--")) {
+			if (item->size() > 4)
+			{
+				const auto isStartWithDoubleStrip { item->starts_with("--") };
 				std::vector<std::pair<float, std::string>> possible;
-				auto substr_item = std::move(item->substr(2));
+				const auto pos { item->find("=") };
+				std::string substr_item;
+				std::string substr_next;
+				if (pos == std::string::npos)
+					substr_item = std::move(item->substr(
+									isStartWithDoubleStrip ? 2 : 0));
+				else {
+					substr_item = std::move(item->substr(
+									isStartWithDoubleStrip ? 2 : 0, pos - 1));
+					substr_next = std::move(item->substr(pos));
+				}
 				for (auto& opt : OPTS)
 					if (auto percentage{ getLikely(substr_item, *opt) };
 						percentage > 80)
@@ -4857,16 +4879,19 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 					{
 						return a.first > b.first;
 					});
-					others = " do you mean: ";
+					others = " do you mean ";
 					for (auto k{0}; auto&& s : possible)
-						others.append("--" + s.second + (++k == possible.size() ? "." : " or "));
+						others.append("\"--" + s.second + substr_next + "\""
+									+ (++k == possible.size() ? "." : " or "));
 				}
 			}
 				
-			std::cout << '"' << *item << '"' << others << '\n';
+			std::cout << '"' << *item << '"' << (others.empty() ? " ❔" : others) << '\n';
 		}
 		std::cout << "\nFor more information, please try to type \""
 			<< fs::path(argv[0]).filename().string() << " --help ['keyword']\"\n\n";
+					
+		return RETURN_VALUE
 	}
 	
 	if (bufferDirs.empty() and selectFiles.empty())
@@ -5203,276 +5228,6 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 	
 	std::unordered_map<std::string, std::shared_ptr<std::vector<fs::path>>> records;
 	
-	std::ofstream outputFile;
-	fs::path outputName;
-	std::vector<std::string> outputArray;
-					   
-	if (state[OPT_NOOUTPUTFILE] != "true") {
-		outputName = state[OPT_OUTDIR] + fs::path::preferred_separator
-			+ state[OPT_FIXFILENAME];
-		if (fs::exists(outputName) and state[OPT_OVERWRITE] == "true")
-			fs::remove(outputName);
-		else
-			outputName = getAvailableFilename(outputName);
-			
-		outputFile = std::ofstream(outputName, std::ios::out);
-	}
-	
-	unsigned long indexFile{0};
-	unsigned long playlistCount{0};
-	std::string outExt;
-	#ifndef DEBUG
-	auto isVerbose { 	state[OPT_VERBOSE] == "all"
-					or 	state[OPT_VERBOSE] == "true"
-					or 	state[OPT_DEBUG] == "true" };
-	#endif
-	auto dontWrite { state[OPT_NOOUTPUTFILE] == "true" };
-					   
-	std::random_device rd;  //Will be used to obtain a seed for the random number engine
-	std::mt19937 mersenneTwisterEngine(rd()); //Standard mersenne_twister_engine seeded with rd()
-	std::uniform_int_distribution<> distrib;
-	std::uniform_int_distribution<> distribCount;
-	unsigned long adsCount[2] {0, 0};
-					   
-	if (state[OPT_NOOUTPUTFILE] != "true") {
-		outExt = tolower(outputName.extension().string());
-		
-		if (outExt == ".pls") {
-			outputFile << "[playlist]\n";
-		}
-		else if (outExt == ".m3u") {
-			outputFile << "#EXTM3U\n";
-		}
-		else if (outExt == ".xspf") {
-			outputFile << "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"\
-			"<playlist version=\"1\" xmlns=\"http://xspf.org/ns/0/\">\n"\
-			"\t<trackList>\n";
-		}
-		else if (outExt == ".xml") {
-			outputFile << "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"\
-			"<!DOCTYPE plist PUBLIC \"-//Apple Computer//DTD PLIST 1.0//EN\" "\
-			"\"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">\n"\
-			"<plist version=\"1.0\">\n"\
-			"<dict>\n"\
-			"\t<key>Major Version</key><integer>1</integer>\n"\
-			"\t<key>Minor Version</key><integer>1</integer>\n"\
-			"\t<key>Date</key><date>" << Date::now().string("%FT%T") << "</date>\n"\
-			"\t<key>Application Version</key><string>1.1</string>\n"\
-			"\t<key>Tracks</key>\n"\
-			"\t<dict>"
-			;
-		}
-		else if (outExt == ".wpl")
-		{
-			outputFile << "<?wpl version=\"1.0\"?>\n"\
-				"<smil>\n"\
-				"\t<head>\n"\
-				"\t\t<meta name=\"Generator\" content=\"tvplaylist -- 1.1\"/>\n"\
-				"\t\t<title>" << outputName.filename().string() << "</title>\n"\
-				"\t</head>\n"\
-				"\t<body>\n"\
-				"\t\t<seq>\n";
-		}
-		else if (outExt == ".smil") {
-			outputFile << "<?wpl version=\"1.0\"?>\n"\
-				"<smil>\n"\
-				"\t<body>\n"\
-				"\t\t<seq>\n";
-		}
-		else if (outExt == ".b4s") {
-			outputFile << "<?xml version=\"1.0\" standalone=\"yes\"?>\n"\
-			"<WindampXML>\n"\
-			"\t<playlist>\n";
-		}
-		else if (isEqual(outExt.c_str(), {".asx", ".wax", ".wvx"})) {
-			outputFile << "<asx version=\"3.0\"?>\n"\
-				"\t\t<title>" << outputName.filename().string() << "</title>\n";
-		}
-		else if (isEqual(outExt.c_str(), {".htm", ".html"})) {
-			outputFile << "<html xmlns=\"http://www.w3.org/1999/xhtml\" lang=\"en\">\n"\
-			"<head>\n"\
-			"\t<meta http-equiv=\"Content-Type\" content=\"text/html\" />\n"\
-			"\t<meta name=\"Generator\" content=\"tvplaylist -- 1.1\" />\n"\
-			"\t<meta name=\"description\" content=\"Playlist\" />\n"\
-			"\t<title>" << outputName.filename().string() << "</title>\n"\
-			"</head>\n"\
-			"</body>\n"\
-			"\t<table>\n";
-		}
-	}
-	
-	auto putIntoPlaylist{ [&](const fs::path& file) {
-		auto putIt{ [&](const fs::path& file, const char* title = nullptr) {
-			playlistCount++;
-			if (dontWrite) {
-				#if MAKE_LIB
-				if (outc)
-					*outc += 1;
-				if (maxLength) {
-					if (auto sz { fs::absolute(file).string().size() + 1 };
-						*maxLength < sz)
-						*maxLength = sz;
-				}
-				if (outs)
-					std::strcpy(outs[playlistCount - 1], fs::absolute(file).string().c_str());
-				#endif
-			}
-			
-			{
-				auto fullPath { file.string() };
-				auto needAboslute { true };
-				for (const char* const protocol : NETWORK_PROTOCOLS)
-					if (const auto isNetworkTransport { fullPath.starts_with(protocol) };
-						isNetworkTransport or isEqual(outExt.c_str(), {".htm", ".html"}))
-					{
-						replace_all(fullPath, " ", "%20");
-						replace_all(fullPath, "=", "%3D");
-						replace_all(fullPath, "+", "%2B");
-						replace_all(fullPath, "-", "%2D");
-						replace_all(fullPath, "?", "%3F");
-						replace_all(fullPath, ";", "%3B");
-						//replace_all(fullPath, "%", "%25");
-						replace_all(fullPath, "@" ,"%4F");
-						replace_all(fullPath, "!" ,"%21");
-						replace_all(fullPath, "\"","%22");
-						replace_all(fullPath, "'" ,"%27");
-						replace_all(fullPath, "," ,"%2C");
-						//replace_all(fullPath, "/" ,"%2F");
-						replace_all(fullPath, "\\","%5C");
-						replace_all(fullPath, "$" ,"%24");
-						replace_all(fullPath, "&" ,"%26");
-						replace_all(fullPath, "#" ,"%23");
-						replace_all(fullPath, "<" ,"%3C");
-						replace_all(fullPath, ">" ,"%3E");
-						
-						if (not isNetworkTransport)
-							fullPath.insert(0, "file://", 0, 7);
-						needAboslute = false;
-						break;
-					}
-				
-				if (needAboslute)
-					fullPath = fs::absolute(file).string();
-				
-				if (not dontWrite) {
-					std::string prefix;
-					std::string suffix;
-					std::string name;
-					if (isEqual(outExt.c_str(), {".wpl", ".b4s", ".smil",
-												 ".asx", ".wax", ".wvx"}))
-					{
-						for (auto w { 0 }; w<sizeof(XML_CHARS_ALIAS) /sizeof(XML_CHARS_ALIAS[0]); ++w)
-							if (isContains(fullPath, XML_CHARS_NORMAL[w],
-									IgnoreCase::Left) not_eq std::string::npos)
-							{
-								replace_all(fullPath, XML_CHARS_NORMAL[w], XML_CHARS_ALIAS[w]);
-								break;
-							}
-					
-						if (not isEqual(outExt.c_str(), {".wpl", ".smil"}))
-						{
-							fs::path tmp = fs::path(fullPath).filename();
-							name = tmp.string().substr(0,
-								tmp.string().size()
-								- tmp.extension().string().size());
-						}
-					}
-					
-					if (outExt == ".pls") {
-						auto indexString{ std::to_string(playlistCount) };
-						prefix = "File" + indexString + '=';
-						suffix = "\nTitle" + indexString + '=';
-						suffix += title;
-					}
-					else if (outExt == ".xspf") {
-						prefix = "\t\t<track>\n\t\t\t<title>";
-						prefix += title;
-						prefix += "</title>\n"\
-									"\t\t\t<location>file://";
-						suffix = "</location>\n\t\t</track>";
-						
-					}
-					else if (outExt == ".wpl") {
-						prefix = "\t\t\t<media src=\"";
-						suffix = "\"/>";
-					}
-					else if (outExt == ".b4s") {
-						prefix = "\t\t<entry Playstring=\"file:";
-						suffix = "\">\n\t\t\t<Name>"
-									+ name
-									+ "</Name>\n\t\t</entry>";
-					}
-					else if (outExt == ".smil") {
-						prefix = "\t\t\t<audio src=\"";
-						suffix = "\"/>";
-					}
-					else if (isEqual(outExt.c_str(), {".asx", ".wax", ".wvx"})) {
-						prefix = "\t<entry>\n\t\t<title>"
-									+ name
-									+ "</title>\t\t<ref href=\"";
-						suffix = "\"/>\n\t</entry>";
-					}
-					else if (outExt == ".xml") {
-						auto key = std::to_string(1000 - playlistCount);
-						prefix = "\t\t<key>" + key + "</key>\n"\
-								"\t\t<dict>\n"\
-								"\t\t\t<key>Track ID</key><integer>" + key + "</integer>\n"\
-								"\t\t\t<key>Name</key><string>" + name + "</string>\n"\
-								"\t\t\t<key>Location</key><string>file://";
-						suffix = "</string>\n\t\t</dict>";
-					}
-					else if (isEqual(outExt.c_str(), {".htm", ".html"})) {
-						prefix = "\t\t<tr>\n"\
-									"\t\t\t<td align=\"right\">"
-									+ std::to_string(playlistCount) + ".</td>\n"\
-									"\t\t\t<td width=\"100%\"><a href=\"";
-						suffix = "\">" + file.filename().string() + "</a></td>\n"\
-									"\t\t</tr>\n";
-					}
-					
-					outputFile 	<< prefix << fullPath << suffix << '\n';
-				}
-				
-				#ifndef DEBUG
-				if (isVerbose)
-				#endif
-					std::cout << fullPath << '\n';
-
-			}
-		}};
-		#if defined(_WIN32) || defined(_WIN64)
-		#define OS_NAME	"Windows"
-		#elif defined(__APPLE__)
-		#define OS_NAME	"macOS"
-		#else
-		#define OS_NAME	"Linux"
-		#endif
-		
-		putIt(file, OS_NAME\
-					" Path");
-			
-
-		if (state[OPT_SKIPSUBTITLE] != "true") {
-			std::vector<fs::path> subtitleFiles;
-			findSubtitleFile(file, &subtitleFiles);
-			for (auto& sf : subtitleFiles)
-				putIt(std::move(sf), 	"Subtitle Path on "\
-										OS_NAME);
-		}
-			
-		if (not listAdsDir.empty())
-			for (auto i{0}; i<(adsCount[1] == 0
-							   ? adsCount[0]
-							   : distribCount(mersenneTwisterEngine));
-				++i, ++playlistCount)
-				putIt(fs::absolute(
-							listAdsDir[distrib(mersenneTwisterEngine)]).string(),
-							"Ads path on "\
-							OS_NAME);
-		#undef OS_NAME
-
-	}};
-	
 	auto filterChildFiles{ [&records](const fs::path& dir, bool recurive=false) {
 		std::vector<fs::path> bufferFiles;
 		
@@ -5510,8 +5265,7 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 				
 				sortFiles(&tmp);
 				
-				for (auto& f : tmp)
-					bufferFiles.emplace_back(std::move(f));
+				std::move(tmp.begin(), tmp.end(), std::back_inserter(bufferFiles));
 			}
 			
 			putToRecord(false);
@@ -5561,6 +5315,298 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 		for (auto& a : asyncs)
 			a.wait();
 
+	std::ofstream outputFile;
+	fs::path outputName;
+	
+	const auto dontWrite { state[OPT_NOOUTPUTFILE] == "true" };
+	if (not dontWrite) {
+		outputName = state[OPT_OUTDIR] + fs::path::preferred_separator
+		   + state[OPT_FIXFILENAME];
+			
+		if (fs::exists(outputName) and state[OPT_OVERWRITE] == "true")
+		   fs::remove(outputName);
+		else
+		   outputName = getAvailableFilename(outputName);
+		   
+		outputFile = std::ofstream(outputName, std::ios::out);
+	}
+				  
+	std::string outExt;
+	if (not dontWrite) {
+		outExt = tolower(outputName.extension().string());
+
+		if (outExt == ".pls") {
+		   outputFile << "[playlist]\n";
+		}
+		else if (outExt == ".m3u") {
+		   outputFile << "#EXTM3U\n";
+		}
+		else if (outExt == ".xspf") {
+		   outputFile << "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"\
+		   "<playlist version=\"1\" xmlns=\"http://xspf.org/ns/0/\">\n"\
+		   "\t<trackList>\n";
+		}
+		else if (outExt == ".xml") {
+		   outputFile << "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"\
+		   "<!DOCTYPE plist PUBLIC \"-//Apple Computer//DTD PLIST 1.0//EN\" "\
+		   "\"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">\n"\
+		   "<plist version=\"1.0\">\n"\
+		   "<dict>\n"\
+		   "\t<key>Major Version</key><integer>1</integer>\n"\
+		   "\t<key>Minor Version</key><integer>1</integer>\n"\
+		   "\t<key>Date</key><date>" << Date::now().string("%FT%T") << "</date>\n"\
+		   "\t<key>Application Version</key><string>1.1</string>\n"\
+		   "\t<key>Tracks</key>\n"\
+		   "\t<dict>"
+		   ;
+		}
+		else if (outExt == ".wpl")
+		{
+		   outputFile << "<?wpl version=\"1.0\"?>\n"\
+			   "<smil>\n"\
+			   "\t<head>\n"\
+			   "\t\t<meta name=\"Generator\" content=\"tvplaylist -- 1.1\"/>\n"\
+			   "\t\t<title>" << outputName.filename().string() << "</title>\n"\
+			   "\t</head>\n"\
+			   "\t<body>\n"\
+			   "\t\t<seq>\n";
+		}
+		else if (outExt == ".smil") {
+		   outputFile << "<?wpl version=\"1.0\"?>\n"\
+			   "<smil>\n"\
+			   "\t<body>\n"\
+			   "\t\t<seq>\n";
+		}
+		else if (outExt == ".b4s") {
+		   outputFile << "<?xml version=\"1.0\" standalone=\"yes\"?>\n"\
+		   "<WindampXML>\n"\
+		   "\t<playlist>\n";
+		}
+		else if (isEqual(outExt.c_str(), {".asx", ".wax", ".wvx"})) {
+		   outputFile << "<asx version=\"3.0\"?>\n"\
+			   "\t\t<title>" << outputName.filename().string() << "</title>\n";
+		}
+		else if (isEqual(outExt.c_str(), {".htm", ".html", ".xhtml"})) {
+		   outputFile << "<html xmlns=\"http://www.w3.org/1999/xhtml\" lang=\"en\">\n"\
+		   "<head>\n"\
+		   "\t<meta http-equiv=\"Content-Type\" content=\"text/html\" />\n"\
+		   "\t<meta name=\"Generator\" content=\"tvplaylist -- 1.1\" />\n"\
+		   "\t<meta name=\"description\" content=\"Playlist\" />\n"\
+		   "\t<title>" << outputName.filename().string() << "</title>\n"\
+		   "</head>\n"\
+		   "</body>\n"\
+		   "\t<table>\n";
+		}
+		#if 0
+		else if (outExt == ".pdf") {
+			const auto date { Date::now().string("%Y%m%d%H%M%S") };
+			outputFile << "%PDF-1.7\n"\
+			"1 0 obj\n"\
+			"<</Creator (tvplaylist v1.1)\n"\
+			" /Producer (Skia/PDF m98)\n"\
+			" /CreationDate (D:" << date << "+00'00')\n"\
+			" /ModDate (D:" << date << "+00'00')>>\n"\
+			"endobj\n"\
+			"2 0 obj\n"\
+			"<</ca 1"\
+			" /BM /Normal>>\n"\
+			"endobj\n";
+		}
+		#endif
+	}
+
+	unsigned long playlistCount{0};
+	std::random_device rd;  //Will be used to obtain a seed for the random number engine
+	std::mt19937 mersenneTwisterEngine(rd()); //Standard mersenne_twister_engine seeded with rd()
+	std::uniform_int_distribution<> distrib;
+	std::uniform_int_distribution<> distribCount;
+	unsigned long adsCount[2] {0, 0};
+
+	#ifndef DEBUG
+	const auto isVerbose { 	state[OPT_VERBOSE]	== "all"
+						or 	state[OPT_VERBOSE]	== "true"
+						or 	state[OPT_DEBUG] 	== "true" };
+	#endif
+	auto putIntoPlaylist{ [&](const fs::path& file)
+	{
+		auto putIt{ [&](const fs::path& file, const char* title = nullptr)
+		{
+			playlistCount++;
+			if (dontWrite) {
+				#if MAKE_LIB
+				if (outc)
+					*outc += 1;
+				if (maxLength) {
+					if (auto sz { fs::absolute(file).string().size() + 1 };
+						*maxLength < sz)
+						*maxLength = sz;
+				}
+				if (outs)
+					std::strcpy(outs[playlistCount - 1],
+								fs::absolute(file).string().c_str());
+				#endif
+			}
+		   
+			auto fullPath { file.string() };
+			auto needAboslute { true };
+			for (const char* const protocol : NETWORK_PROTOCOLS)
+				if (const auto isNetworkTransport { fullPath.starts_with(protocol) };
+				   isNetworkTransport or isEqual(outExt.c_str(), {".htm", ".html"}))
+				{
+					replace_all(fullPath, " ", "%20");
+					replace_all(fullPath, "=", "%3D");
+					replace_all(fullPath, "+", "%2B");
+					replace_all(fullPath, "-", "%2D");
+					replace_all(fullPath, "?", "%3F");
+					replace_all(fullPath, ";", "%3B");
+					//replace_all(fullPath, "%", "%25");
+					replace_all(fullPath, "@" ,"%4F");
+					replace_all(fullPath, "!" ,"%21");
+					replace_all(fullPath, "\"","%22");
+					replace_all(fullPath, "'" ,"%27");
+					replace_all(fullPath, "," ,"%2C");
+					//replace_all(fullPath, "/" ,"%2F");
+					replace_all(fullPath, "\\","%5C");
+					replace_all(fullPath, "$" ,"%24");
+					replace_all(fullPath, "&" ,"%26");
+					replace_all(fullPath, "#" ,"%23");
+					replace_all(fullPath, "<" ,"%3C");
+					replace_all(fullPath, ">" ,"%3E");
+
+					if (not isNetworkTransport)
+						fullPath.insert(0, "file://", 0, 7);
+					needAboslute = false;
+					break;
+			   }
+
+			if (needAboslute)
+				fullPath = fs::absolute(file).string();
+
+			if (not dontWrite) {
+				std::string prefix;
+				std::string suffix;
+				std::string name;
+				if (isEqual(outExt.c_str(), {".wpl", ".b4s", ".smil",
+											".asx", ".wax", ".wvx"}))
+				{
+					for (auto w { 0 }; w <
+						 (sizeof(XML_CHARS_ALIAS) / sizeof(XML_CHARS_ALIAS[0])); ++w)
+					if (isContains(fullPath, XML_CHARS_NORMAL[w],
+						   IgnoreCase::Left) not_eq std::string::npos)
+					{
+						replace_all(fullPath, XML_CHARS_NORMAL[w], XML_CHARS_ALIAS[w]);
+						break;
+					}
+
+					if (not isEqual(outExt.c_str(), {".wpl", ".smil"}))
+					{
+						fs::path tmp = fs::path(fullPath).filename();
+						name = tmp.string().substr(0,
+							tmp.string().size() - tmp.extension().string().size());
+					}
+				}
+			   
+				if (outExt == ".pls") {
+					auto indexString{ std::to_string(playlistCount) };
+					prefix = "File" + indexString + '=';
+					suffix = "\nTitle" + indexString + '=';
+					suffix += title;
+				}
+				else if (outExt == ".xspf") {
+					prefix = "\t\t<track>\n\t\t\t<title>";
+					prefix += title;
+					prefix += "</title>\n"\
+						   "\t\t\t<location>file://";
+					suffix = "</location>\n\t\t</track>";
+				}
+				else if (outExt == ".wpl") {
+					prefix = "\t\t\t<media src=\"";
+					suffix = "\"/>";
+				}
+				else if (outExt == ".b4s") {
+					prefix = "\t\t<entry Playstring=\"file:";
+					suffix = "\">\n\t\t\t<Name>"
+						   + name
+						   + "</Name>\n\t\t</entry>";
+				}
+				else if (outExt == ".smil") {
+					prefix = "\t\t\t<audio src=\"";
+					suffix = "\"/>";
+				}
+				else if (isEqual(outExt.c_str(), {".asx", ".wax", ".wvx"})) {
+					prefix = "\t<entry>\n\t\t<title>"
+						   + name
+						   + "</title>\t\t<ref href=\"";
+					suffix = "\"/>\n\t</entry>";
+				}
+				else if (outExt == ".xml") {
+					auto key = std::to_string(1000 - playlistCount);
+					prefix = "\t\t<key>" + key + "</key>\n"\
+					   "\t\t<dict>\n"\
+					   "\t\t\t<key>Track ID</key><integer>" + key + "</integer>\n"\
+					   "\t\t\t<key>Name</key><string>" + name + "</string>\n"\
+					   "\t\t\t<key>Location</key><string>file://";
+					suffix = "</string>\n\t\t</dict>";
+				}
+				else if (isEqual(outExt.c_str(), {".htm", ".html", ".xhtml"})) {
+					prefix = "\t\t<tr>\n"\
+						   "\t\t\t<td align=\"right\">"
+						   + std::to_string(playlistCount) + ".</td>\n"\
+						   "\t\t\t<td width=\"100%\"><a href=\"";
+					suffix = "\">" + file.filename().string() + "</a></td>\n"\
+						   "\t\t</tr>\n";
+				}
+				#if 0
+				else if (outExt == ".pdf") {
+					prefix = std::to_string(playlistCount + 10) + " 0 obj\n"\
+								"\t<<\t/FS /URL\n"\
+								"\t\t/F (";
+					replace_all(fullPath, "(" ,"\\(");
+					replace_all(fullPath, ")" ,"\\)");
+					suffix = ")\n"\
+							"\t>>\n"\
+							"endobj";
+				}
+				#endif
+
+				outputFile 	<< prefix << fullPath << suffix << '\n';
+			}
+
+			#ifndef DEBUG
+			if (isVerbose)
+			#endif
+				std::cout << fullPath << '\n';
+		}};
+		
+		#if defined(_WIN32) || defined(_WIN64)
+		#define OS_NAME	"Windows"
+		#elif defined(__APPLE__)
+		#define OS_NAME	"macOS"
+		#else
+		#define OS_NAME	"Linux"
+		#endif
+
+		putIt(file, OS_NAME " Path");
+		   
+
+		if (state[OPT_SKIPSUBTITLE] != "true") {
+		   std::vector<fs::path> subtitleFiles;
+		   findSubtitleFile(file, &subtitleFiles);
+		   for (auto& sf : subtitleFiles)
+			   putIt(std::move(sf), "Subtitle Path on " OS_NAME);
+		}
+		   
+		if (not listAdsDir.empty())
+		   for (auto i{0}; i<(adsCount[1] == 0
+							  ? adsCount[0]
+							  : distribCount(mersenneTwisterEngine));
+			   ++i, ++playlistCount)
+			   putIt(fs::absolute(
+						   listAdsDir[distrib(mersenneTwisterEngine)]).string(),
+						   "Ads path on " OS_NAME);
+		#undef OS_NAME
+	}};
+					   
 	///Check if records has listAdsDir and equal
 	if (auto equal { true };
 	   listAdsDir.size() == records.size())
@@ -5608,15 +5654,13 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 					   
 	if (BY_PASS)
 	{
-		for (auto& d : seasonDirs)
-			regularDirs.emplace_back(std::move(d));
+		std::move(seasonDirs.begin(), seasonDirs.end(),
+					  std::back_inserter(regularDirs));
 		seasonDirs.clear();
 		
 		maxDirSize = regularDirs.size();
 		
 		std::sort(regularDirs.begin(), regularDirs.end());
-			
-		playlistCount += selectFiles.size();
 			
 		for (auto& dir : regularDirs) {
 			if (dir.empty())
@@ -5629,7 +5673,6 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 					
 				for (auto& f : *found)
 				{
-					playlistCount++;
 					if (state[OPT_ARRANGEMENT] == OPT_ARRANGEMENT_ASCENDING
 						or state[OPT_ARRANGEMENT] == OPT_ARRANGEMENT_DESCENDING
 						or state[OPT_ARRANGEMENT] == OPT_ARRANGEMENT_SHUFFLE)
@@ -5656,14 +5699,14 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 		for (auto& f : selectFiles)
 			putIntoPlaylist(std::move(f));
 	}
-	else {
-		std::vector<fs::path> bufferSort;
+	else
+	{
+		unsigned long indexFile{ 0 };
+
 		while (true) {
 			auto finish{true};
-			bufferSort.clear();
 			for (auto i{0}; i < maxDirSize; ++i)
 				for (auto& indexPass : {1, 2})
-					///pass 1 for regularDirs, pass 2 for seasonDirs
 				{
 					if ((indexPass == 1 and i >= regularDirs.size())
 						or (indexPass == 2 and i >= seasonDirs.size()))
@@ -5676,14 +5719,15 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 					else if (auto found { records[dir] }; found) {
 						if (state[OPT_ARRANGEMENT] == OPT_ARRANGEMENT_SHUFFLE_PERTITLE)
 						{
-							std::shuffle(found->begin(), found->end(), mersenneTwisterEngine);
+							std::shuffle(found->begin(), found->end(),
+										 mersenneTwisterEngine);
 							for (auto& f : *found)
 								putIntoPlaylist(std::move(f));
 							continue;
 						}
 						
 						if (indexFile ==0) {
-							if (state[OPT_ARRANGEMENT] == OPT_ARRANGEMENT_SHUFFLE_PERTITLE)
+							if (state[OPT_ARRANGEMENT] == OPT_ARRANGEMENT_SHUFFLE_DEFAULT)
 								std::shuffle(found->begin(), found->end(), mersenneTwisterEngine);
 							
 							else if (state[OPT_ARRANGEMENT] == OPT_ARRANGEMENT_DESCENDING_DEFAULT)
@@ -5694,21 +5738,18 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 							if (indexFile + c < found->size()) {
 								finish = false;
 
-								bufferSort.emplace_back((*found)[indexFile + c]);
+								putIntoPlaylist(std::move((*found)[indexFile + c]));
 							}
 					}
-				} //end pass loop
+				} ///end pass loop
 			
 			if (state[OPT_ARRANGEMENT] == OPT_ARRANGEMENT_SHUFFLE_PERTITLE)
 				break;
 			
 			if (indexFile < selectFiles.size())
-				bufferSort.emplace_back(std::move(selectFiles[indexFile]));
+				putIntoPlaylist(std::move(selectFiles[indexFile]));
 			
 			indexFile += fileCountPerTurn;
-			//if (bufferSort.size() > 1) std::sort(bufferSort.begin(), bufferSort.end());
-			for (auto& ok : bufferSort)
-				putIntoPlaylist(std::move(ok));
 			
 			if (finish and indexFile >= selectFiles.size())
 				break;
@@ -5720,47 +5761,56 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 	#endif
 		timeLapse(start, groupNumber(std::to_string(playlistCount)) + " valid files took ");
 					   
-	if (state[OPT_NOOUTPUTFILE] != "true") {
-		if (outExt == ".pls") {
-			outputFile << "\nNumberOfEntries=" << playlistCount
-				<< "\nVersion=2\n";
-		}
-		else if (outExt == ".b4s") {
-			outputFile << "\t</playlist>\n</WinampXML>\n";
-		}
-		else if (outExt == ".xspf") {
-			outputFile << "\t</trackList>\n</playlist>\n";
-		}
-		else if (isEqual(outExt.c_str(), {".wpl", ".smil"})) {
-			outputFile << "\t\t</seq>\n\t</body>\n</smil>\n";
-		}
-		else if (isEqual(outExt.c_str(), {".asx", ".wax", ".wvx"})) {
-			outputFile << "</asx>\n";
-		}
-		else if (outExt == ".xml") {
-			outputFile << "\t</dict>\n</dict>\n</plist>";
-		}
-		else if (isEqual(outExt.c_str(), {".htm", ".html"})) {
-			outputFile << "\t</table>\n</body>\n</html>";
-		}
-			
-		outputFile.flags();
-		if (outputFile.is_open())
-			outputFile.close();
-			
-		if (playlistCount == 0)
-			fs::remove(outputName);
-		else
-			std::cout << fs::absolute(outputName).string() << '\n';
-			
+	if (dontWrite)
+		return RETURN_VALUE
+					   
+	if (outExt == ".pls") {
+		outputFile << "\nNumberOfEntries=" << playlistCount
+			<< "\nVersion=2\n";
+	}
+	else if (outExt == ".b4s") {
+		outputFile << "\t</playlist>\n</WinampXML>\n";
+	}
+	else if (outExt == ".xspf") {
+		outputFile << "\t</trackList>\n</playlist>\n";
+	}
+	else if (isEqual(outExt.c_str(), {".wpl", ".smil"})) {
+		outputFile << "\t\t</seq>\n\t</body>\n</smil>\n";
+	}
+	else if (isEqual(outExt.c_str(), {".asx", ".wax", ".wvx"})) {
+		outputFile << "</asx>\n";
+	}
+	else if (outExt == ".xml") {
+		outputFile << "\t</dict>\n</dict>\n</plist>\n";
+	}
+	else if (isEqual(outExt.c_str(), {".htm", ".html", ".xhtml"})) {
+		outputFile << "\t</table>\n</body>\n</html>\n";
+	}
+	#if 0
+	else if (outExt == ".pdf") {
+		outputFile << "%%EOF\n";
+	}
+	#endif
+		
+	outputFile.flush();
+	if (outputFile.is_open())
+		outputFile.close();
+		
+	if (playlistCount == 0)
+		fs::remove(outputName);
+	else {
+		const auto outputFullpath { fs::absolute(outputName).string() };
+		std::cout << outputFullpath << '\n';
+		
 		if (state[OPT_OPEN] == "true")
 			#if defined(_WIN32) || defined(_WIN64)
 			std::cout << "📢 Under construction.\n";
 			#else
-			std::system(std::string("open \"" + outputName.string() + "\"").c_str());
+			std::system(std::string("open \"" + outputFullpath + "\"").c_str());
 			#endif
 	}
 }
+#undef RETURN_VALUE
 #undef CONFIG_PATH
 #undef INSTALL_PATH
 #undef SEP_PATH

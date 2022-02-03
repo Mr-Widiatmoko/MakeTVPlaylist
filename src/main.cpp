@@ -3927,18 +3927,24 @@ auto main(const int argc, char* const argv[]) -> int
 							  bool writeBoolean=false,
 							  const std::initializer_list<const char*>& others = {}) {
 			auto result { false };
+			const auto isWithStartWithDoubleStrip {
+				std::strlen(with) > 2 and with[0] == '-' and with[1] == '-' };
 			if (args[i].length() > 3
 				and args[i][0] == '-'
 				and args[i][1] == '-')
 			{
-				result = isEqual(args[i], with, IgnoreCase::Left, 2, 0);
+				result = isEqual(args[i], with, IgnoreCase::Left,
+								 isWithStartWithDoubleStrip ? 0 : 2);
 				
 				if (not result)
 					for (auto& other : others)
-						if (isEqual(args[i], other[0] == '-' and other[1] == '-'
-									? other + 2 : other, IgnoreCase::Left))
+						if (const auto isOtherStartWithDoubleStrip {
+							std::strlen(other) > 2 and
+							other[0] == '-' and other[1] == '-' };
+							isEqual(args[i], other, IgnoreCase::Left,
+									isOtherStartWithDoubleStrip ? 0 : 2))
 						{
-							if (other[0] == '-' and other[1] == '-')
+							if (isOtherStartWithDoubleStrip)
 								args[i] = with;
 							else {
 								args[i] = "--";
@@ -3955,8 +3961,9 @@ auto main(const int argc, char* const argv[]) -> int
 			}
 			if (result) {
 				if (args[i].length() == 2) { // convert mnemonic to full
-					args[i] = "--";
-					args[i].append(with);
+					args[i] = with;
+					if (not isWithStartWithDoubleStrip)
+						args[i].insert(0, "--");
 				}
 				if (writeBoolean)
 					state[with] = "true";

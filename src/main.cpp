@@ -30,6 +30,8 @@
 constexpr auto TRUE_FALSE = {"true", "false"};
 std::unordered_map<std::string, std::string> state;
 
+constexpr auto OPT_OPEN				{"open"};
+
 constexpr auto OPT_SHOWCONFIG				{"show-config"};
 constexpr auto OPT_SHOWCONFIG_ALTERNATIVE = {"show-defaults",
 	"display-config", "display-defaults", "print-config", "print-defaults",
@@ -140,6 +142,9 @@ constexpr auto UPDATE=\
         Update tvplaylist.\n\
 ";
 
+constexpr auto OPEN=\
+"--open  Open generated playlist file with default app\
+";
 constexpr auto SHOW=\
 "--show-defaults\n\
 --show-config\n\
@@ -411,7 +416,7 @@ constexpr auto FIXFILENAME=\
         first add playlist ext[s] and media file ext[s] you desired into --ext.\n\
             Example: --ext=mp4,pls,wpl,xspf another.pls another.wpl another.xspf\n\
         Here the example to convert from different type of playlist to another type:\n\
-            Example: --ext=mp3,m3u old_musics.m3u --out-filename=old_music.xspf\n\
+            Example: --ext=mp3,m3u old_musics.m3u --out-filename=old_music.html\n\
 ";
 constexpr auto NOOUTPUTFILE=\
 "-F, --no-ouput-file [yes | no]\n\
@@ -465,8 +470,9 @@ It will showing internal tvplaylist date time recognizer, with format \"Weekday 
 constexpr const char* const* OPTS[] = { &OPT_VERSION, &OPT_HELP, &OPT_ARRANGEMENT,
 	&OPT_SEARCH, &OPT_VERBOSE, &OPT_BENCHMARK, & OPT_OVERWRITE,
 	&OPT_SKIPSUBTITLE, &OPT_OUTDIR, &OPT_ADSDIR, &OPT_ADSCOUNT,
-	&OPT_EXECUTION, &OPT_LOADCONFIG, &OPT_WRITEDEFAULTS, &OPT_SHOWCONFIG, &OPT_FIXFILENAME,
-	&OPT_NOOUTPUTFILE, &OPT_SIZE, &OPT_EXCLSIZE, &OPT_EXT, &OPT_EXCLEXT,
+	&OPT_EXECUTION, &OPT_LOADCONFIG, &OPT_WRITEDEFAULTS, &OPT_SHOWCONFIG,
+	&OPT_FIXFILENAME, &OPT_NOOUTPUTFILE, &OPT_OPEN,
+	&OPT_SIZE, &OPT_EXCLSIZE, &OPT_EXT, &OPT_EXCLEXT,
 	&OPT_FIND, &OPT_EXCLFIND, &OPT_REGEX, &OPT_EXCLREGEX, &OPT_EXCLHIDDEN,
 	&OPT_INSTALL, &OPT_UNINSTALL, &OPT_UPDATE,
 	&OPT_DATE, &OPT_EXCLDATE,
@@ -482,7 +488,7 @@ constexpr const char* const* HELPS[] = { &VERSION, &HELP, &ARRANGEMENT,
 	&SEARCH, &VERBOSE, &BENCHMARK, & OVERWRITE,
 	&SKIPSUBTITLE, &OUTDIR, &ADSDIR, &ADSCOUNT,
 	&EXECUTION, &LOAD, &WRITE, &SHOW, &FIXFILENAME,
-	&NOOUTPUTFILE, &SIZE, &SIZE, &EXT, &EXT,
+	&NOOUTPUTFILE, &OPEN, &SIZE, &SIZE, &EXT, &EXT,
 	&FIND, &FIND, &REGEX, &REGEX, &EXCLHIDDEN,
 	&INSTALL, &UNINSTALL, &UPDATE,
 	&DATE, &DATE,
@@ -497,7 +503,7 @@ static_assert((sizeof(OPTS)/sizeof(OPTS[0])) - 1 == (sizeof(HELPS)/sizeof(HELPS[
 			  "Size need to be equal!, to be able accessed by index");
 
 constexpr const char* const* SINGLE_VALUE_OPT[] = {&OPT_LOADCONFIG, &OPT_SHOWCONFIG,
-	&OPT_ARRANGEMENT,
+	&OPT_ARRANGEMENT, &OPT_OPEN,
 	&OPT_VERBOSE, &OPT_BENCHMARK, &OPT_OVERWRITE, &OPT_SKIPSUBTITLE,
 	&OPT_OUTDIR, &OPT_ADSCOUNT, &OPT_EXECUTION, &OPT_FIXFILENAME, &OPT_EXCLHIDDEN,
 	&OPT_EXT, &OPT_EXCLEXT};
@@ -514,7 +520,7 @@ constexpr const char* const* MULTI_VALUE_OPT[] = {
 constexpr const char* const* ALL_HELPS[] = {
 	&VERSION, &HELP, &LOAD, &WRITE, &SHOW, &ARRANGEMENT, &SEARCH, &VERBOSE, &BENCHMARK,
 	&OVERWRITE, &SKIPSUBTITLE, &OUTDIR, &ADSDIR, &ADSCOUNT, &EXECUTION, &FIXFILENAME,
-	&NOOUTPUTFILE, &EXCLHIDDEN,
+	&NOOUTPUTFILE, &OPEN, &EXCLHIDDEN,
 	
 	&SIZE, &EXT, &FIND, &REGEX, &DATE, &CREATED, &MODIFIED, &ACCESSED, &CHANGED,
 	
@@ -3695,7 +3701,7 @@ func loadPlaylist(const fs::path& path, std::vector<fs::path>* const outPaths)
 				replace_all(buff, "%22", "\"");
 				replace_all(buff, "%27", "'");
 				replace_all(buff, "%2C", ",");
-				replace_all(buff, "%2F", "/");
+				//replace_all(buff, "%2F", "/");
 				replace_all(buff, "%5C", "\\");
 				replace_all(buff, "%24", "$");
 				replace_all(buff, "%26", "&");
@@ -3956,12 +3962,9 @@ auto main(const int argc, char* const argv[]) -> int
 							isEqual(args[i], other, IgnoreCase::Left,
 									isOtherStartWithDoubleStrip ? 0 : 2))
 						{
-							if (isOtherStartWithDoubleStrip)
-								args[i] = with;
-							else {
-								args[i] = "--";
-								args[i] += with;
-							}
+							args[i] = with;
+							if (not isOtherStartWithDoubleStrip)
+								args[i].insert(0, "--", 0, 2);
 							result = true;
 							break;
 						}
@@ -3975,7 +3978,7 @@ auto main(const int argc, char* const argv[]) -> int
 				if (args[i].length() == 2) { // convert mnemonic to full
 					args[i] = with;
 					if (not isWithStartWithDoubleStrip)
-						args[i].insert(0, "--");
+						args[i].insert(0, "--", 0, 2);
 				}
 				if (writeBoolean)
 					state[with] = "true";
@@ -4169,6 +4172,7 @@ auto main(const int argc, char* const argv[]) -> int
 					}
 				}
 			}
+			else if (isMatch(OPT_OPEN, '\0', true));
 			else if (isMatch(OPT_SHOWCONFIG, '\0', true, OPT_SHOWCONFIG_ALTERNATIVE));
 			else if (isMatch(OPT_WRITEDEFAULTS, 'W', true, OPT_WRITEDEFAULTS_ALTERNATIVE)) {
 				if (i + 1 < args.size()) {
@@ -5276,13 +5280,24 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 				"\t\t<seq>\n";
 		}
 		else if (outExt == ".b4s") {
-			outputFile << "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n"\
+			outputFile << "<?xml version=\"1.0\" standalone=\"yes\"?>\n"\
 			"<WindampXML>\n"\
 			"\t<playlist>\n";
 		}
 		else if (isEqual(outExt.c_str(), {".asx", ".wax", ".wvx"})) {
 			outputFile << "<asx version=\"3.0\"?>\n"\
 				"\t\t<title>" << outputName.filename().string() << "</title>\n";
+		}
+		else if (isEqual(outExt.c_str(), {".htm", ".html"})) {
+			outputFile << "<html xmlns=\"http://www.w3.org/1999/xhtml\" lang=\"en\">\n"\
+			"<head>\n"\
+			"\t<meta http-equiv=\"Content-Type\" content=\"text/html\" />\n"\
+			"\t<meta name=\"Generator\" content=\"tvplaylist -- 1.1\" />\n"\
+			"\t<meta name=\"description\" content=\"Playlist\" />\n"\
+			"\t<title>" << outputName.filename().string() << "</title>\n"\
+			"</head>\n"\
+			"</body>\n"\
+			"\t<table>\n";
 		}
 	}
 	
@@ -5307,26 +5322,31 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 				auto fullPath { file.string() };
 				auto needAboslute { true };
 				for (const char* const protocol : NETWORK_PROTOCOLS)
-					if (fullPath.starts_with(protocol)) {
+					if (const auto isNetworkTransport { fullPath.starts_with(protocol) };
+						isNetworkTransport or isEqual(outExt.c_str(), {".htm", ".html"}))
+					{
 						replace_all(fullPath, " ", "%20");
 						replace_all(fullPath, "=", "%3D");
 						replace_all(fullPath, "+", "%2B");
 						replace_all(fullPath, "-", "%2D");
 						replace_all(fullPath, "?", "%3F");
 						replace_all(fullPath, ";", "%3B");
-						replace_all(fullPath, "%", "%25");
+						//replace_all(fullPath, "%", "%25");
 						replace_all(fullPath, "@" ,"%4F");
 						replace_all(fullPath, "!" ,"%21");
 						replace_all(fullPath, "\"","%22");
 						replace_all(fullPath, "'" ,"%27");
 						replace_all(fullPath, "," ,"%2C");
-						replace_all(fullPath, "/" ,"%2F");
+						//replace_all(fullPath, "/" ,"%2F");
 						replace_all(fullPath, "\\","%5C");
 						replace_all(fullPath, "$" ,"%24");
 						replace_all(fullPath, "&" ,"%26");
 						replace_all(fullPath, "#" ,"%23");
 						replace_all(fullPath, "<" ,"%3C");
 						replace_all(fullPath, ">" ,"%3E");
+						
+						if (not isNetworkTransport)
+							fullPath.insert(0, "file://", 0, 7);
 						needAboslute = false;
 						break;
 					}
@@ -5400,6 +5420,14 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 								"\t\t\t<key>Name</key><string>" + name + "</string>\n"\
 								"\t\t\t<key>Location</key><string>file://";
 						suffix = "</string>\n\t\t</dict>";
+					}
+					else if (isEqual(outExt.c_str(), {".htm", ".html"})) {
+						prefix = "\t\t<tr>\n"\
+									"\t\t\t<td align=\"right\">"
+									+ std::to_string(playlistCount) + ".</td>\n"\
+									"\t\t\t<td width=\"100%\"><a href=\"";
+						suffix = "\">" + file.filename().string() + "</a></td>\n"\
+									"\t\t</tr>\n";
 					}
 					
 					outputFile 	<< prefix << fullPath << suffix << '\n';
@@ -5533,13 +5561,30 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 		for (auto& a : asyncs)
 			a.wait();
 
+	///Check if records has listAdsDir and equal
+	if (auto equal { true };
+	   listAdsDir.size() == records.size())
+	{
+	   for (auto& dir : listAdsDir)
+		   if (records.find(dir) == records.end()) {
+			   equal = false;
+			   break;
+		   }
+	   if (equal) /// Then consider there was no listAdsDir
+		   listAdsDir.clear();
+	}
+					   
 	if (not listAdsDir.empty()) {
 		std::vector<fs::path> list = std::move(listAdsDir);
+		
 		for (auto& dir : list)
 			if (not dir.empty())
 				if (const auto found { records[dir] }; found)
+				{
 					std::move(found->begin(), found->end(),
 							  std::back_inserter(listAdsDir));
+					records.erase(records.find(dir));
+				}
 		distrib = std::uniform_int_distribution<>(0, int(listAdsDir.size() - 1));
 			
 		if (auto count_s { state[OPT_ADSCOUNT] };
@@ -5695,6 +5740,9 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 		else if (outExt == ".xml") {
 			outputFile << "\t</dict>\n</dict>\n</plist>";
 		}
+		else if (isEqual(outExt.c_str(), {".htm", ".html"})) {
+			outputFile << "\t</table>\n</body>\n</html>";
+		}
 			
 		outputFile.flags();
 		if (outputFile.is_open())
@@ -5704,6 +5752,13 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 			fs::remove(outputName);
 		else
 			std::cout << fs::absolute(outputName).string() << '\n';
+			
+		if (state[OPT_OPEN] == "true")
+			#if defined(_WIN32) || defined(_WIN64)
+			std::cout << "📢 Under construction.\n";
+			#else
+			std::system(std::string("open \"" + outputName.string() + "\"").c_str());
+			#endif
 	}
 }
 #undef CONFIG_PATH

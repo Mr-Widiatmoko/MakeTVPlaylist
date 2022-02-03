@@ -3690,6 +3690,18 @@ func loadPlaylist(const fs::path& path, std::vector<fs::path>* const outPaths)
 				replace_all(buff, "%3F", "?");
 				replace_all(buff, "%3B", ";");
 				replace_all(buff, "%25", "%");
+				replace_all(buff, "%4F", "@");
+				replace_all(buff, "%21", "!");
+				replace_all(buff, "%22", "\"");
+				replace_all(buff, "%27", "'");
+				replace_all(buff, "%2C", ",");
+				replace_all(buff, "%2F", "/");
+				replace_all(buff, "%5C", "\\");
+				replace_all(buff, "%24", "$");
+				replace_all(buff, "%26", "&");
+				replace_all(buff, "%23", "#");
+				replace_all(buff, "%3C", "<");
+				replace_all(buff, "%3E", ">");
 				outPaths->emplace_back(fs::path(buff));
 				found = true;
 				break;
@@ -5303,6 +5315,18 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 						replace_all(fullPath, "?", "%3F");
 						replace_all(fullPath, ";", "%3B");
 						replace_all(fullPath, "%", "%25");
+						replace_all(fullPath, "@" ,"%4F");
+						replace_all(fullPath, "!" ,"%21");
+						replace_all(fullPath, "\"","%22");
+						replace_all(fullPath, "'" ,"%27");
+						replace_all(fullPath, "," ,"%2C");
+						replace_all(fullPath, "/" ,"%2F");
+						replace_all(fullPath, "\\","%5C");
+						replace_all(fullPath, "$" ,"%24");
+						replace_all(fullPath, "&" ,"%26");
+						replace_all(fullPath, "#" ,"%23");
+						replace_all(fullPath, "<" ,"%3C");
+						replace_all(fullPath, ">" ,"%3E");
 						needAboslute = false;
 						break;
 					}

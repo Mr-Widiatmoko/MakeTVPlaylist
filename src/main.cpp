@@ -631,16 +631,18 @@ func isContains(const std::string& l, const std::string& r,
 }
 
 func isEqual(const char* const l, const char* const r,
-			 const IgnoreCase ic = IgnoreCase::None)
+			 const IgnoreCase ic = IgnoreCase::None,
+			 const unsigned long max = 0)
 {
 	if (not l or not r) return false;
 	auto sz1 { std::strlen(l) };
 	auto sz2 { std::strlen(r) };
-	if (sz1 != sz2) return false;
+	if (max == 0 and sz1 != sz2) return false;
+	auto total { max > 0 ? max : sz1 };
 	
 	const char* _l = l;
 	const char*_r = r;
-	while (sz1-- > 0) {
+	while (total-- > 0) {
 		switch (ic){
 			case IgnoreCase::Both:
 				if (std::tolower(*_l) != std::tolower(*_r))
@@ -666,27 +668,30 @@ func isEqual(const char* const l, const char* const r,
 
 func isEqual(const std::string& l, const std::string& r,
 			 const IgnoreCase ic = IgnoreCase::None,
-			 const unsigned long start = 0,
-			 const unsigned long end = 0)
+			 const unsigned long startLeft = 0,
+			 const unsigned long startRight = 0,
+			 const unsigned long max = 0)
 {
-	if ((start not_eq 0 or end not_eq 0) and l.size() != r.size()) return false;
+	if (startLeft == 0 and startRight == 0 and max == 0
+		and l.size() != r.size()) return false;
 	
-	for (auto i{ start }; i< (end > 0 and start < end ? end : l.size()); ++i)
+	auto minimum { std::min(l.size(), r.size()) };
+	for (auto i{ 0 }; i<(max > 0 ? std::min(max, minimum) : minimum); ++i)
 		switch (ic){
 			case IgnoreCase::Both:
-				if (std::tolower(l[i]) != std::tolower(r[i]))
+				if (std::tolower(l[i + startLeft]) != std::tolower(r[i + startRight]))
 					return false;
 				break;
 			case IgnoreCase::Left:
-				if (std::tolower(l[i]) != r[i])
+				if (std::tolower(l[i + startLeft]) != r[i + startRight])
 					return false;
 				break;
 			case IgnoreCase::Right:
-				if (l[i] != std::tolower(r[i]))
+				if (l[i + startLeft] != std::tolower(r[i + startRight]))
 					return false;
 				break;
 			default:
-				if (l[i] != r[i])
+				if (l[i + startLeft] != r[i + startRight])
 					return false;
 		}
 	return true;
@@ -696,11 +701,12 @@ inline
 func isEqual(const char* const source,
 			 const std::initializer_list<const char*>& list,
 			 const IgnoreCase ic = IgnoreCase::None,
-			 const unsigned long start = 0,
-			 const unsigned long end = 0)
+			 const unsigned long startLeft = 0,
+			 const unsigned long startRight = 0,
+			 const unsigned long max = 0)
 {
 	for (auto& s : list) {
-		if (isEqual(source, s, ic, start, end))
+		if (isEqual(source, s, ic, startLeft, startRight, max))
 			return true;
 	}
 	return false;
@@ -710,11 +716,12 @@ template <template <class ...> class Container, class ... Args>
 func isEqual(const std::string& source,
 			 const Container<std::string, Args ...>* args,
 			 const IgnoreCase ic = IgnoreCase::None,
-			 const unsigned long start = 0,
-			 const unsigned long end = 0)
+			 const unsigned long startLeft = 0,
+			 const unsigned long startRight = 0,
+			 const unsigned long max = 0)
 {
 	for (auto& check : *args)
-		if (isEqual(source, check, ic, start, end))
+		if (isEqual(source, check, ic, startLeft, startRight, max))
 			return true;
 
 	return false;
@@ -1864,7 +1871,7 @@ public:
 			const char* currVal { nullptr };
 			if (key and id3->tags.find(key) == id3->tags.end())
 				id3->add(key, value ? value : "");
-			else
+			else if (key)
 				currVal = id3->get(key).c_str();
 			
 			auto val { key ? (value ? value : (currVal ? currVal
@@ -3494,6 +3501,8 @@ func writeConfig(const std::vector<std::string>* const args,
 		
 		definedList.clear();
 	}
+	else if (mode == WriteConfigMode::New)
+		argsToLines(&lines, ReadDirection::Current, true);
 	else
 		argsToLines(&lines, ReadDirection::All, true);
 	
@@ -3922,12 +3931,11 @@ auto main(const int argc, char* const argv[]) -> int
 				and args[i][0] == '-'
 				and args[i][1] == '-')
 			{
-				auto lower { args[i].substr(2) };
-				result = isEqual(lower, with, IgnoreCase::Left);
+				result = isEqual(args[i], with, IgnoreCase::Left, 2, 0);
 				
 				if (not result)
 					for (auto& other : others)
-						if (isEqual(lower, other[0] == '-' and other[1] == '-'
+						if (isEqual(args[i], other[0] == '-' and other[1] == '-'
 									? other + 2 : other, IgnoreCase::Left))
 						{
 							if (other[0] == '-' and other[1] == '-')

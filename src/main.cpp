@@ -5393,6 +5393,13 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 		   "\t<meta name=\"Generator\" content=\"tvplaylist -- 1.1\" />\n"\
 		   "\t<meta name=\"description\" content=\"Playlist\" />\n"\
 		   "\t<title>" << outputName.filename().string() << "</title>\n"\
+			"\t<style>\n"\
+			"\t\t.row_regular{  }\n"\
+			"\t\t.row_subtitle{  }\n"\
+			"\t\t.row_advertise{  }\n"\
+			"\t\t.column_numbering{ align=left; }\n"\
+			"\t\t.column_file{ width: 100%; }\n"\
+			"\t</style>\n"\
 		   "</head>\n"\
 		   "</body>\n"\
 		   "\t<table>\n";
@@ -5429,7 +5436,10 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 	#endif
 	auto putIntoPlaylist{ [&](const fs::path& file)
 	{
-		auto putIt{ [&](const fs::path& file, const char* title = nullptr)
+		enum class Type { None, Regular, Subtitle, Advertise };
+		
+		auto putIt{ [&](const fs::path& file, const char* title = nullptr,
+						Type type = Type::None)
 		{
 			playlistCount++;
 			if (dontWrite) {
@@ -5549,10 +5559,29 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 					suffix = "</string>\n\t\t</dict>";
 				}
 				else if (isEqual(outExt.c_str(), {".htm", ".html", ".xhtml"})) {
-					prefix = "\t\t<tr>\n"\
-						   "\t\t\t<td align=\"right\">"
+					std::string typeName;
+					std::pair<std::string, std::string> classDef
+						{"column_numbering", "column_file"};
+					
+					switch (type) {
+						case Type::Regular:
+							typeName = "regular";
+							break;
+						case Type::Subtitle:
+							typeName = "subtitle";
+							break;
+						case Type::Advertise:
+							typeName = "advertise";
+							break;
+						default:
+							classDef.first = "align=\"right\"";
+							classDef.second = "width=\"100%\"";
+					}
+					
+					prefix = "\t\t<tr class=\"row_" + typeName + "\">\n"\
+						   "\t\t\t<td " + classDef.first + ">"
 						   + std::to_string(playlistCount) + ".</td>\n"\
-						   "\t\t\t<td width=\"100%\"><a href=\"";
+						   "\t\t\t<td " + classDef.second + "><a href=\"";
 					suffix = "\">" + file.filename().string() + "</a></td>\n"\
 						   "\t\t</tr>\n";
 				}
@@ -5586,14 +5615,14 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 		#define OS_NAME	"Linux"
 		#endif
 
-		putIt(file, OS_NAME " Path");
+		putIt(file, OS_NAME " Path", Type::Regular);
 		   
 
 		if (state[OPT_SKIPSUBTITLE] != "true") {
 		   std::vector<fs::path> subtitleFiles;
 		   findSubtitleFile(file, &subtitleFiles);
 		   for (auto& sf : subtitleFiles)
-			   putIt(std::move(sf), "Subtitle Path on " OS_NAME);
+			   putIt(std::move(sf), "Subtitle Path on " OS_NAME, Type::Subtitle);
 		}
 		   
 		if (not listAdsDir.empty())
@@ -5603,7 +5632,7 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 			   ++i, ++playlistCount)
 			   putIt(fs::absolute(
 						   listAdsDir[distrib(mersenneTwisterEngine)]).string(),
-						   "Ads path on " OS_NAME);
+						   "Ads path on " OS_NAME, Type::Advertise);
 		#undef OS_NAME
 	}};
 					   

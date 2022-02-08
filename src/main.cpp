@@ -5855,14 +5855,19 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 		const auto outputFullpath { fs::absolute(outputName).string() };
 		std::cout << outputFullpath << '\n';
 		
-			if (const auto app { opt::state[OPT_OPENWITH] };
-				opt::state[OPT_OPEN] == "true" or not app.empty())
+		if (const auto app { opt::state[OPT_OPENWITH] };
+			opt::state[OPT_OPEN] == "true" or not app.empty())
+		{
 			#if defined(_WIN32) || defined(_WIN64)
-			std::cout << "📢 Open in Windows is Under construction.\n";
+			if (app.empty())
+				std::cout << "📢 Open in Windows is Under construction.\n";
+			else
+				std::system(std::string("\"" + app + "\" \"" + outputFullpath + "\"").c_str());
 			#else
-			std::system(std::string((not app.empty() ? app : "open")
+			std::system(std::string((not app.empty() ? "\"" + app + "\"" : "open")
 						+ " \"" + outputFullpath + "\"").c_str());
 			#endif
+		}
 	}
 }
 #undef RETURN_VALUE

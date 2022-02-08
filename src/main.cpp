@@ -214,11 +214,16 @@ then by default, arranged one episode per Title.\nHosted in https://github.com/M
 Usage:\n    tvplaylist [Option or Dir or File] ...\n\n\
 If no argument was specified, the current directory will be use.\n\n\
 Option:\n\
--h, --help ['keyword']\n\
+";
+constexpr auto A_HELP=\
+"-h, --help ['keyword']\n\
         Display options description.\n\
--v, --version\n\
+";
+constexpr auto A_VERSION=\
+"-v, --version\n\
         Display version.\n\
 ";
+
 constexpr auto ADSDIR=\
 "-D, --ads-dir 'directory constains advertise'\n\
         Add advertise directory. Ads file will be inserted between each ordered files.\n\
@@ -494,7 +499,7 @@ constexpr const char* const* OPTS[] = { &OPT_VERSION, &OPT_HELP, &OPT_ARRANGEMEN
 };
 
 /// Conjunction with OPTS, to enable access OPTS[index] == HELPS[index]
-constexpr const char* const* HELPS[] = { &VERSION, &HELP, &ARRANGEMENT,
+constexpr const char* const* HELPS[] = { &VERSION, &A_HELP, &ARRANGEMENT,
 	&SEARCH, &VERBOSE, &BENCHMARK, & OVERWRITE,
 	&SKIPSUBTITLE, &OUTDIR, &ADSDIR, &ADSCOUNT,
 	&EXECUTION, &LOAD, &WRITE, &SHOW, &FIXFILENAME,
@@ -528,7 +533,7 @@ constexpr const char* const* MULTI_VALUE_OPT[] = {
 	&OPT_DEXCLCREATED, &OPT_DEXCLMODIFIED, &OPT_DEXCLACCESSED, &OPT_DEXCLCHANGED,};
 
 constexpr const char* const* ALL_HELPS[] = {
-	&VERSION, &HELP, &LOAD, &WRITE, &SHOW, &ARRANGEMENT, &SEARCH, &VERBOSE, &BENCHMARK,
+	&HELP, &A_HELP, &A_VERSION, &LOAD, &WRITE, &SHOW, &ARRANGEMENT, &SEARCH, &VERBOSE, &BENCHMARK,
 	&OVERWRITE, &SKIPSUBTITLE, &OUTDIR, &ADSDIR, &ADSCOUNT, &EXECUTION, &FIXFILENAME,
 	&NOOUTPUTFILE, &OPEN, &OPENWITH, &EXCLHIDDEN,
 	
@@ -865,49 +870,6 @@ func containInts(const std::string& s, std::vector<MAXNUM>* const out)
 }
 
 namespace fs = std::filesystem;
-
-func installMan(bool uninstall = false)
-{
-	#define MANPATH "/usr/local/share/man/man1/"
-	#define MANFILE "tvplaylist.1"
-	if (uninstall) {
-		std::system("rm " MANPATH MANFILE);
-	}
-	else
-	{
-	if (not fs::exists(MANPATH))
-		std::system("mkdir " MANPATH);
-	std::ofstream file(MANPATH MANFILE);
-	
-	file <<
-	".\" Manpage for tvplaylist.\n"
-	".\" Contact atapgenteng@yahoo.com to correct errors or typos.\n"
-	".TH man 8 \"08 Feb 2022\" \"1.1\" \"tvplaylist man page\"\n"
-	".SH NAME\n"
-	"tvplaylist \\- Create playlist file from vary directories and files, \
-then by default, arranged one episode per Title.\n"
-	".SH SYNOPSIS\n"
-	"tvplaylist [Option or Dir or File] ...\n"
-	".SH DESCRIPTION\n"
-	"Create playlist file from vary directories and files, then by default, arranged one episode per Title.\nHosted in https://github.com/Mr-Widiatmoko/MakeTVPlaylist\n"
-	".SH OPTIONS\n"
-	;
-	
-	for (const auto& h : ALL_HELPS)
-		file << *h;
-	
-	file <<
-	".SH SEE ALSO\n"
-	".SH BUGS\n"
-	"No known bugs.\n"
-	".SH AUTHOR\n"
-	"Widiatmoko (atapgenteng@yahoo.com)\n";
-	file.flush();
-	file.close();
-	}
-	#undef MANPATH
-	#undef MANFILE
-}
 
 inline
 func excludeExtension(const fs::path& path)
@@ -3720,6 +3682,63 @@ func replace_all(std::string& inout,
 	}
 }
  
+func installMan(bool install)
+{
+	#define MANPATH "/usr/local/share/man/man1/"
+	#define MANFILE "tvplaylist.1"
+	if (not install) {
+		std::system("rm " MANPATH MANFILE);
+	}
+	else
+	{
+	if (not fs::exists(MANPATH))
+		std::system("mkdir " MANPATH);
+	std::ofstream file(MANPATH MANFILE);
+	
+	file <<
+	".\" Manpage for tvplaylist.\n"
+	".\" Contact atapgenteng@yahoo.com to correct errors or typos.\n"
+	".TH man 8 \"08 Feb 2022\" \"1.1\" \"tvplaylist man page\"\n"
+	".SH NAME\n"
+	"tvplaylist \\- Create playlist file from vary directories and files, \
+then by default, arranged one episode per Title.\n"
+	".SH SYNOPSIS\n"
+	"tvplaylist [Option or Dir or File] ...\n"
+	".SH DESCRIPTION\n"
+	"Create playlist file from vary directories and files, then by default, arranged one episode per Title.\nHosted in https://github.com/Mr-Widiatmoko/MakeTVPlaylist\n"
+	".SH OPTIONS\n"
+	;
+	
+	constexpr auto MARK { "        " };
+	for (auto i{ 1 }; i<(sizeof(ALL_HELPS) / sizeof(ALL_HELPS[0])); ++i) {
+		auto buff = std::string(*ALL_HELPS[i]);
+		const auto pos { buff.find(MARK) };
+		if (pos != std::string::npos) {
+			auto opts = buff.substr(0, pos);
+			replace_all(opts, "\n     ", "\n");
+			//replace_all(opts, "--", ".B \\--");
+			//replace_all(opts, "-", ".B \\-");
+			file << ".TP\n" << opts << '\n';
+			
+			buff = buff.substr(pos + std::strlen(MARK));
+			replace_all(buff, MARK, "");
+			//replace_all(buff, "--", ".B \\--");
+			file << buff << '\n';
+		} else
+			file << buff << '\n';
+	}
+	
+	file <<
+	".SH BUGS\n"
+	"No known bugs.\n"
+	".SH AUTHOR\n"
+	"Widiatmoko is the main author.\n";
+	file.flush();
+	file.close();
+	}
+	#undef MANPATH
+	#undef MANFILE
+}
 
 func loadPlaylistInto(const fs::path& path, std::vector<fs::path>* const outPaths)
 {
@@ -4124,7 +4143,7 @@ auto main(const int argc, char* const argv[]) -> int
 					auto cmd { std::string("copy \"") };
 					#else
 					auto cmd { std::string("cp -f \"") };
-					installMan();
+					installMan(true);
 					#endif
 					cmd += argv[0];
 					cmd += "\" ";
@@ -4145,17 +4164,17 @@ auto main(const int argc, char* const argv[]) -> int
 					std::system("del " INSTALL_FULLPATH);
 				#else
 					std::system("rm -f " INSTALL_FULLPATH);
-					installMan(true);
+					installMan(false);
 				#endif
 				std::cout << (not fs::exists(path) ? "Uninstalled" :
 							  "⚠️  For some reason, uninstall fail!") << ".\n";
 			}
 			else if (isMatch(OPT_UNINSTALLMAN, '\0')) {
-				installMan(true);
+				installMan(false);
 				return RETURN_VALUE
 			}
 			else if (isMatch(OPT_INSTALLMAN, '\0')) {
-				installMan();
+				installMan(true);
 				return RETURN_VALUE
 			}
 			else if (isMatch(OPT_HELP, 'h') or isMatch(OPT_VERSION, 'v')) // MARK: Option Matching

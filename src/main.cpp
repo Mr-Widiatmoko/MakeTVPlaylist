@@ -30,6 +30,7 @@
 constexpr auto TRUE_FALSE = {"true", "false"};
 
 constexpr auto OPT_OPEN				{"open"};
+constexpr auto OPT_OPENWITH			{"open-with"};
 
 constexpr auto OPT_SHOWCONFIG				{"show-config"};
 constexpr auto OPT_SHOWCONFIG_ALTERNATIVE = {"show-defaults",
@@ -142,8 +143,16 @@ constexpr auto UPDATE=\
 ";
 
 constexpr auto OPEN=\
-"--open  Open generated playlist file with default app\
+"--open\n\
+        Open generated playlist file with default app.\n\
+        See also: --open-with\n\
 ";
+constexpr auto OPENWITH=\
+"--open-with 'application'\n\
+        Open with specified application.\n\
+        See also: --open\n\
+";
+
 constexpr auto SHOW=\
 "--show-defaults\n\
 --show-config\n\
@@ -470,7 +479,7 @@ constexpr const char* const* OPTS[] = { &OPT_VERSION, &OPT_HELP, &OPT_ARRANGEMEN
 	&OPT_SEARCH, &OPT_VERBOSE, &OPT_BENCHMARK, & OPT_OVERWRITE,
 	&OPT_SKIPSUBTITLE, &OPT_OUTDIR, &OPT_ADSDIR, &OPT_ADSCOUNT,
 	&OPT_EXECUTION, &OPT_LOADCONFIG, &OPT_WRITEDEFAULTS, &OPT_SHOWCONFIG,
-	&OPT_FIXFILENAME, &OPT_NOOUTPUTFILE, &OPT_OPEN,
+	&OPT_FIXFILENAME, &OPT_NOOUTPUTFILE, &OPT_OPEN, &OPT_OPENWITH,
 	&OPT_SIZE, &OPT_EXCLSIZE, &OPT_EXT, &OPT_EXCLEXT,
 	&OPT_FIND, &OPT_EXCLFIND, &OPT_REGEX, &OPT_EXCLREGEX, &OPT_EXCLHIDDEN,
 	&OPT_INSTALL, &OPT_UNINSTALL, &OPT_UPDATE,
@@ -487,7 +496,7 @@ constexpr const char* const* HELPS[] = { &VERSION, &HELP, &ARRANGEMENT,
 	&SEARCH, &VERBOSE, &BENCHMARK, & OVERWRITE,
 	&SKIPSUBTITLE, &OUTDIR, &ADSDIR, &ADSCOUNT,
 	&EXECUTION, &LOAD, &WRITE, &SHOW, &FIXFILENAME,
-	&NOOUTPUTFILE, &OPEN, &SIZE, &SIZE, &EXT, &EXT,
+	&NOOUTPUTFILE, &OPEN, &OPENWITH, &SIZE, &SIZE, &EXT, &EXT,
 	&FIND, &FIND, &REGEX, &REGEX, &EXCLHIDDEN,
 	&INSTALL, &UNINSTALL, &UPDATE,
 	&DATE, &DATE,
@@ -502,7 +511,7 @@ static_assert((sizeof(OPTS)/sizeof(OPTS[0])) - 1 == (sizeof(HELPS)/sizeof(HELPS[
 			  "Size need to be equal!, to be able accessed by index");
 
 constexpr const char* const* SINGLE_VALUE_OPT[] = {&OPT_LOADCONFIG, &OPT_SHOWCONFIG,
-	&OPT_ARRANGEMENT, &OPT_OPEN,
+	&OPT_ARRANGEMENT, &OPT_OPEN, &OPENWITH,
 	&OPT_VERBOSE, &OPT_BENCHMARK, &OPT_OVERWRITE, &OPT_SKIPSUBTITLE,
 	&OPT_OUTDIR, &OPT_ADSCOUNT, &OPT_EXECUTION, &OPT_FIXFILENAME, &OPT_EXCLHIDDEN,
 	&OPT_EXT, &OPT_EXCLEXT};
@@ -519,7 +528,7 @@ constexpr const char* const* MULTI_VALUE_OPT[] = {
 constexpr const char* const* ALL_HELPS[] = {
 	&VERSION, &HELP, &LOAD, &WRITE, &SHOW, &ARRANGEMENT, &SEARCH, &VERBOSE, &BENCHMARK,
 	&OVERWRITE, &SKIPSUBTITLE, &OUTDIR, &ADSDIR, &ADSCOUNT, &EXECUTION, &FIXFILENAME,
-	&NOOUTPUTFILE, &OPEN, &EXCLHIDDEN,
+	&NOOUTPUTFILE, &OPEN, &OPENWITH, &EXCLHIDDEN,
 	
 	&SIZE, &EXT, &FIND, &REGEX, &DATE, &CREATED, &MODIFIED, &ACCESSED, &CHANGED,
 	
@@ -4179,6 +4188,10 @@ auto main(const int argc, char* const argv[]) -> int
 				}
 			}
 			else if (isMatch(OPT_OPEN, '\0', true));
+			else if (isMatch(OPT_OPENWITH, '\0') and i + 1 < args.size()) {
+				i++;
+				opt::state[OPT_OPENWITH] = args[i];
+			}
 			else if (isMatch(OPT_SHOWCONFIG, '\0', true, OPT_SHOWCONFIG_ALTERNATIVE));
 			else if (isMatch(OPT_WRITEDEFAULTS, 'W', true, OPT_WRITEDEFAULTS_ALTERNATIVE)) {
 				if (i + 1 < args.size()) {
@@ -5072,6 +5085,8 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 		std::cout << d.string() << (i < in::listAdsDir.size() - 1 ? ", " : "\n");
 			
 	std::cout << "\n";
+	
+	std::cout << LABEL(OPT_OPENWITH) << opt::state[OPT_OPENWITH] << '\n';
 	#undef LABEL
 	} // END Info
 					   
@@ -5297,7 +5312,7 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 					   
 	start = std::chrono::system_clock::now();
 					   
-					   for (auto i{0}; i<std::max(maxDirSize, in::listAdsDir.size()); ++i)
+	for (auto i{0}; i<std::max(maxDirSize, in::listAdsDir.size()); ++i)
 		for (auto& x : {0, 1, 2})
 			if (i < (x == 1 ? in::regularDirs.size() : (x == 2 ? in::seasonDirs.size()
 														: in::listAdsDir.size())) )
@@ -5840,11 +5855,13 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 		const auto outputFullpath { fs::absolute(outputName).string() };
 		std::cout << outputFullpath << '\n';
 		
-		if (opt::state[OPT_OPEN] == "true")
+			if (const auto app { opt::state[OPT_OPENWITH] };
+				opt::state[OPT_OPEN] == "true" or not app.empty())
 			#if defined(_WIN32) || defined(_WIN64)
-			std::cout << "📢 Under construction.\n";
+			std::cout << "📢 Open in Windows is Under construction.\n";
 			#else
-			std::system(std::string("open \"" + outputFullpath + "\"").c_str());
+			std::system(std::string((not app.empty() ? app : "open")
+						+ " \"" + outputFullpath + "\"").c_str());
 			#endif
 	}
 }

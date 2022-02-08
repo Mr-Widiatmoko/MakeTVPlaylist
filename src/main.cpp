@@ -4188,9 +4188,13 @@ auto main(const int argc, char* const argv[]) -> int
 				}
 			}
 			else if (isMatch(OPT_OPEN, '\0', true));
-			else if (isMatch(OPT_OPENWITH, '\0') and i + 1 < args.size()) {
-				i++;
-				opt::state[OPT_OPENWITH] = args[i];
+			else if (isMatch(OPT_OPENWITH, '\0')) {
+				if (i + 1 < args.size()) {
+					i++;
+					opt::state[OPT_OPENWITH] = trim(args[i]);
+				} else
+					std::cout << "⚠️  Expecting application. Please see --help "
+					<< args[i].substr(2) << '\n';
 			}
 			else if (isMatch(OPT_SHOWCONFIG, '\0', true, OPT_SHOWCONFIG_ALTERNATIVE));
 			else if (isMatch(OPT_WRITEDEFAULTS, 'W', true, OPT_WRITEDEFAULTS_ALTERNATIVE)) {

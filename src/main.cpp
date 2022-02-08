@@ -29,6 +29,8 @@
 
 constexpr auto TRUE_FALSE = {"true", "false"};
 
+constexpr auto OPT_INSTALLMAN		{"install-man"};
+constexpr auto OPT_UNINSTALLMAN		{"uninstall-man"};
 constexpr auto OPT_OPEN				{"open"};
 constexpr auto OPT_OPENWITH			{"open-with"};
 
@@ -686,11 +688,9 @@ func isEqual(const std::string& l, const std::string& r,
 			 const unsigned long startRight = 0,
 			 const unsigned long max = 0)
 {
-	if (startLeft == 0 and startRight == 0 and max == 0
-		and l.size() != r.size()) return false;
-	
-	auto minimum { std::min(l.size(), r.size()) };
-	for (auto i{ 0 }; i<(max > 0 ? std::min(max, minimum) : minimum); ++i)
+	if (max == 0 and l.size() - startLeft != r.size() - startRight) return false;
+	auto total { std::max(l.size() - startLeft, r.size() - startRight) };
+	for (auto i{ 0 }; i<(max > 0 ? std::min(max, total) : total); ++i)
 		switch (ic){
 			case IgnoreCase::Both:
 				if (std::tolower(l[i + startLeft]) != std::tolower(r[i + startRight]))
@@ -711,7 +711,6 @@ func isEqual(const std::string& l, const std::string& r,
 	return true;
 }
 
-inline
 func isEqual(const char* const source,
 			 const std::initializer_list<const char*>& list,
 			 const IgnoreCase ic = IgnoreCase::None,
@@ -754,7 +753,6 @@ func isInt(const std::string& s, int* const value = nullptr)
 	return false;
 }
 
-inline
 func getLikely(const std::string_view& src, const std::string_view& with)
 {
 	auto first { src.begin() }, last { src.end() };
@@ -867,6 +865,49 @@ func containInts(const std::string& s, std::vector<MAXNUM>* const out)
 }
 
 namespace fs = std::filesystem;
+
+func installMan(bool uninstall = false)
+{
+	#define MANPATH "/usr/local/share/man/man1/"
+	#define MANFILE "tvplaylist.1"
+	if (uninstall) {
+		std::system("rm " MANPATH MANFILE);
+	}
+	else
+	{
+	if (not fs::exists(MANPATH))
+		std::system("mkdir " MANPATH);
+	std::ofstream file(MANPATH MANFILE);
+	
+	file <<
+	".\" Manpage for tvplaylist.\n"
+	".\" Contact atapgenteng@yahoo.com to correct errors or typos.\n"
+	".TH man 8 \"08 Feb 2022\" \"1.1\" \"tvplaylist man page\"\n"
+	".SH NAME\n"
+	"tvplaylist \\- Create playlist file from vary directories and files, \
+then by default, arranged one episode per Title.\n"
+	".SH SYNOPSIS\n"
+	"tvplaylist [Option or Dir or File] ...\n"
+	".SH DESCRIPTION\n"
+	"Create playlist file from vary directories and files, then by default, arranged one episode per Title.\nHosted in https://github.com/Mr-Widiatmoko/MakeTVPlaylist\n"
+	".SH OPTIONS\n"
+	;
+	
+	for (const auto& h : ALL_HELPS)
+		file << *h;
+	
+	file <<
+	".SH SEE ALSO\n"
+	".SH BUGS\n"
+	"No known bugs.\n"
+	".SH AUTHOR\n"
+	"Widiatmoko (atapgenteng@yahoo.com)\n";
+	file.flush();
+	file.close();
+	}
+	#undef MANPATH
+	#undef MANFILE
+}
 
 inline
 func excludeExtension(const fs::path& path)
@@ -2521,6 +2562,7 @@ func getAvailableFilename(const fs::path& original,
 		return original.string();
 }
 
+inline
 func sort(const fs::path& a, const fs::path& b, bool ascending)
 {
 	std::string afn { a.filename().string().substr(0,
@@ -2543,13 +2585,11 @@ func sort(const fs::path& a, const fs::path& b, bool ascending)
 	return afn < bfn;
 }
 
-inline
 func ascending(const fs::path& a, const fs::path& b)
 {
 	return sort(a, b, true);
 }
 
-inline
 func descending(const fs::path& a, const fs::path& b)
 {
 	return sort(a, b, false);
@@ -4084,6 +4124,7 @@ auto main(const int argc, char* const argv[]) -> int
 					auto cmd { std::string("copy \"") };
 					#else
 					auto cmd { std::string("cp -f \"") };
+					installMan();
 					#endif
 					cmd += argv[0];
 					cmd += "\" ";
@@ -4104,9 +4145,18 @@ auto main(const int argc, char* const argv[]) -> int
 					std::system("del " INSTALL_FULLPATH);
 				#else
 					std::system("rm -f " INSTALL_FULLPATH);
+					installMan(true);
 				#endif
 				std::cout << (not fs::exists(path) ? "Uninstalled" :
 							  "⚠️  For some reason, uninstall fail!") << ".\n";
+			}
+			else if (isMatch(OPT_UNINSTALLMAN, '\0')) {
+				installMan(true);
+				return RETURN_VALUE
+			}
+			else if (isMatch(OPT_INSTALLMAN, '\0')) {
+				installMan();
+				return RETURN_VALUE
 			}
 			else if (isMatch(OPT_HELP, 'h') or isMatch(OPT_VERSION, 'v')) // MARK: Option Matching
 			{

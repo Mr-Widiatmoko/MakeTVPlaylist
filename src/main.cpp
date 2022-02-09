@@ -26,92 +26,111 @@
 #include <sys/stat.h> // TODO: I dont know in Windows, should change to use FileAttribute?
 #include <fstream>
 #include <random>
-
-constexpr auto TRUE_FALSE = {"true", "false"};
-
-constexpr auto OPT_INSTALLMAN		{"install-man"};
-constexpr auto OPT_UNINSTALLMAN		{"uninstall-man"};
-constexpr auto OPT_OPEN				{"open"};
-constexpr auto OPT_OPENWITH			{"open-with"};
-
-constexpr auto OPT_SHOWCONFIG				{"show-config"};
-constexpr auto OPT_SHOWCONFIG_ALTERNATIVE = {"show-defaults",
-	"display-config", "display-defaults", "print-config", "print-defaults",
-};
-constexpr auto OPT_WRITEDEFAULTS				{"write-defaults"};	// W
-constexpr auto OPT_WRITEDEFAULTS_ALTERNATIVE = 	{"write-config"};
-constexpr auto OPT_WRITEDEFAULTS_ARGS = 		{
-	"new", "edit", "remove", "reset", "add"
+#include <dirent.h>
+#define let constexpr auto
+let TRUE_FALSE						= {	"true",
+										"false"
 };
 
-constexpr auto OPT_LOADCONFIG		{"load-config"};			// L
-constexpr auto OPT_ARRANGEMENT 		{"arrangement"};			// w
-constexpr auto OPT_ARRANGEMENT_DEFAULT		{"default"};
-constexpr auto OPT_ARRANGEMENT_UNORDERED	{"unordered"};
-constexpr auto OPT_ARRANGEMENT_ASCENDING	{"ascending"};
-constexpr auto OPT_ARRANGEMENT_PERTITLE		{"per-title"};
-constexpr auto OPT_ARRANGEMENT_SHUFFLE		{"shuffle"};
-constexpr auto OPT_ARRANGEMENT_SHUFFLE_DEFAULT	{"default-shuffle"};
-constexpr auto OPT_ARRANGEMENT_SHUFFLE_PERTITLE	{"per-title-shuffle"};
-constexpr auto OPT_ARRANGEMENT_DESCENDING			{"descending"};
-constexpr auto OPT_ARRANGEMENT_DESCENDING_DEFAULT	{"default-descending"};
-constexpr auto OPT_ARRANGEMENT_DESCENDING_PERTITLE	{"per-title-descending"};
-constexpr auto OPT_HELP 			{"help"};					// h
-constexpr auto OPT_VERSION 			{"version"};				// v
-constexpr auto OPT_VERBOSE 			{"verbose"};				// V
-constexpr auto OPT_BENCHMARK 		{"benchmark"};				// b
-constexpr auto OPT_OVERWRITE 		{"overwrite"};				// O
-constexpr auto OPT_SKIPSUBTITLE 	{"skip-subtitle"};			// x
-constexpr auto OPT_OUTDIR 			{"out-dir"};				// d
-constexpr auto OPT_ADSDIR 			{"ads-dir"};				// D
-constexpr auto OPT_ADSCOUNT			{"ads-count"};				// C
-constexpr auto OPT_EXECUTION		{"execution"};				// c
-constexpr auto OPT_EXECUTION_THREAD			{"thread"};
-constexpr auto OPT_EXECUTION_ASYNC			{"async"};
-constexpr auto OPT_EXCLHIDDEN		{"exclude-hidden"};			// n
-constexpr auto OPT_REGEXSYNTAX			{"regex-syntax"};		// X
-constexpr auto OPT_REGEXSYNTAX_ARGS = 	{"ecma", "basic", "extended", "awk",
-	"grep", "egrep"
+let OPT_INSTALLMAN					{"install-man"};
+let OPT_UNINSTALLMAN				{"uninstall-man"};
+let OPT_OPEN						{"open"};
+let OPT_OPENWITH					{"open-with"};
+
+let OPT_SHOWCONFIG					{"show-config"};
+let OPT_SHOWCONFIG_ALTERNATIVE 		= {	"show-defaults",
+										"display-config",
+										"display-defaults",
+										"print-config",
+										"print-defaults",
 };
-constexpr auto OPT_CASEINSENSITIVE				 {"make-case-insensitive"};	// N
-constexpr auto OPT_CASEINSENSITIVE_ALTERNATIVE = {"case-insensitive",
-	"caseinsensitive", "ignore-case", "ignorecase"
+let OPT_WRITEDEFAULTS				{"write-defaults"};	// W
+let OPT_WRITEDEFAULTS_ALTERNATIVE 	= {	"write-config"
+};
+let OPT_WRITEDEFAULTS_ARGS 			= { "new",
+										"edit",
+										"remove",
+										"reset",
+										"add"
 };
 
-constexpr auto OPT_SEARCH			{"search"};					// q
+let OPT_LOADCONFIG					{"load-config"};			// L
+let OPT_ARRANGEMENT 				{"arrangement"};			// w
+let OPT_ARRANGEMENT_DEFAULT				{"default"};
+let OPT_ARRANGEMENT_UNORDERED			{"unordered"};
+let OPT_ARRANGEMENT_ASCENDING			{"ascending"};
+let OPT_ARRANGEMENT_PERTITLE			{"per-title"};
+let OPT_ARRANGEMENT_SHUFFLE				{"shuffle"};
+let OPT_ARRANGEMENT_SHUFFLE_DEFAULT		{"default-shuffle"};
+let OPT_ARRANGEMENT_SHUFFLE_PERTITLE	{"per-title-shuffle"};
+let OPT_ARRANGEMENT_DESCENDING			{"descending"};
+let OPT_ARRANGEMENT_DESCENDING_DEFAULT	{"default-descending"};
+let OPT_ARRANGEMENT_DESCENDING_PERTITLE	{"per-title-descending"};
+let OPT_HELP 						{"help"};					// h
+let OPT_VERSION 					{"version"};				// v
+let OPT_VERBOSE 					{"verbose"};				// V
+let OPT_BENCHMARK 					{"benchmark"};				// b
+let OPT_OVERWRITE 					{"overwrite"};				// O
+let OPT_SKIPSUBTITLE 				{"skip-subtitle"};			// x
+let OPT_OUTDIR 						{"out-dir"};				// d
+let OPT_ADSDIR 						{"ads-dir"};				// D
+let OPT_ADSCOUNT					{"ads-count"};				// C
+let OPT_EXECUTION					{"execution"};				// c
+let OPT_EXECUTION_THREAD			{"thread"};
+let OPT_EXECUTION_ASYNC				{"async"};
+let OPT_EXCLHIDDEN					{"exclude-hidden"};			// n
+let OPT_REGEXSYNTAX					{"regex-syntax"};		// X
+let OPT_REGEXSYNTAX_ARGS 			= {	"ecma",
+										"basic",
+										"extended",
+										"awk",
+										"grep",
+										"egrep"
+};
+let OPT_CASEINSENSITIVE				{"make-case-insensitive"};	// N
+let OPT_CASEINSENSITIVE_ALTERNATIVE = {	"case-insensitive",
+										"caseinsensitive",
+										"ignore-case",
+										"ignorecase"
+};
 
-constexpr auto OPT_FIXFILENAME 		{"out-filename"};			// f
-constexpr auto OPT_NOOUTPUTFILE 	{"no-output-file"};			// F
+let OPT_SEARCH						{"search"};					// q
 
-constexpr auto OPT_SIZE				{"size"};					// s
-constexpr auto OPT_SIZEOPGT			{"size_op"};
-constexpr auto OPT_EXCLSIZE			{"exclude-size"};			// S
-constexpr auto OPT_EXCLSIZEOPGT		{"exclude-size_op"};
+let OPT_FIXFILENAME 				{"out-filename"};			// f
+let OPT_NOOUTPUTFILE 				{"no-output-file"};			// F
 
-constexpr auto OPT_EXT 				{"ext"};					// e
-constexpr auto OPT_EXCLEXT 			{"exclude-ext"};			// E
+let OPT_SIZE						{"size"};					// s
+let OPT_SIZEOPGT					{"size_op"};
+let OPT_EXCLSIZE					{"exclude-size"};			// S
+let OPT_EXCLSIZEOPGT				{"exclude-size_op"};
 
-constexpr auto OPT_FIND				{"find"};					// i
-constexpr auto OPT_EXCLFIND			{"exclude-find"};			// I
+let OPT_EXT 						{"ext"};					// e
+let OPT_EXCLEXT 					{"exclude-ext"};			// E
 
-constexpr auto OPT_REGEX			{"regex"};					// r
-constexpr auto OPT_EXCLREGEX		{"exclude-regex"};			// R
+let OPT_FIND						{"find"};					// i
+let OPT_EXCLFIND					{"exclude-find"};			// I
 
-constexpr auto OPT_DATE				{"date"};					// z
-constexpr auto OPT_EXCLDATE			{"exclude-date"};			// Z
+let OPT_REGEX						{"regex"};					// r
+let OPT_EXCLREGEX					{"exclude-regex"};			// R
 
-constexpr auto OPT_DCREATED			{"created"};				// t
-constexpr auto OPT_DMODIFIED		{"modified"};				// m
-constexpr auto OPT_DACCESSED		{"accessed"};				// a
-constexpr auto OPT_DCHANGED			{"changed"};				// g
+let OPT_DATE						{"date"};					// z
+let OPT_EXCLDATE					{"exclude-date"};			// Z
 
-constexpr auto OPT_DEXCLCREATED		{"exclude-created"};		// T
-constexpr auto OPT_DEXCLMODIFIED	{"exclude-modified"};		// M
-constexpr auto OPT_DEXCLACCESSED	{"exclude-accessed"};		// A
-constexpr auto OPT_DEXCLCHANGED		{"exclude-changed"};		// G
+let OPT_DCREATED					{"created"};				// t
+let OPT_DMODIFIED					{"modified"};				// m
+let OPT_DACCESSED					{"accessed"};				// a
+let OPT_DCHANGED					{"changed"};				// g
 
-constexpr auto OPT_DEBUG			{"debug"};                  // B
-constexpr auto OPT_DEBUG_ARGS = 	{"date", "args", "id3"};
+let OPT_DEXCLCREATED				{"exclude-created"};		// T
+let OPT_DEXCLMODIFIED				{"exclude-modified"};		// M
+let OPT_DEXCLACCESSED				{"exclude-accessed"};		// A
+let OPT_DEXCLCHANGED				{"exclude-changed"};		// G
+
+let OPT_DEBUG						{"debug"};                  // B
+let OPT_DEBUG_ARGS 					= {	"date",
+										"args",
+										"id3"
+};
 
 
 #if defined(_WIN32) || defined(_WIN64)
@@ -127,35 +146,35 @@ constexpr auto OPT_DEBUG_ARGS = 	{"date", "args", "id3"};
 #endif
 #define INSTALL_FULLPATH	INSTALL_PATH SEP_PATH "tvplaylist" PE_EXT
 
-constexpr auto OPT_INSTALL			{"install"};
-constexpr auto INSTALL="\
+let OPT_INSTALL						{"install"};
+let INSTALL="\
 --install\n\
         Install tvplaylist into \"" INSTALL_PATH "\".\n\
 ";
-constexpr auto OPT_UNINSTALL		{"uninstall"};
-constexpr auto UNINSTALL="\
+let OPT_UNINSTALL					{"uninstall"};
+let UNINSTALL="\
 --uninstall\n\
         Uninstall tvplaylist from \"" INSTALL_PATH "\".\n\
 ";
-constexpr auto OPT_UPDATE			{"update"};
-constexpr auto UPDATE="\
+let OPT_UPDATE						{"update"};
+let UPDATE="\
 --update\n\
 --upgrade\n\
         Update tvplaylist.\n\
 ";
 
-constexpr auto OPEN="\
+let OPEN="\
 --open\n\
         Open generated playlist file with default app.\n\
         See also: --open-with\n\
 ";
-constexpr auto OPENWITH="\
+let OPENWITH="\
 --open-with 'application'\n\
         Open with specified application.\n\
         See also: --open\n\
 ";
 
-constexpr auto SHOW="\
+let SHOW="\
 --show-defaults\n\
 --show-config\n\
 --display-defaults\n\
@@ -166,7 +185,7 @@ constexpr auto SHOW="\
         See also --verbose or --verbose=info or --debug=args or --benchmark.\n\
         Example: --print-defaults\n\
 ";
-constexpr auto WRITE="\
+let WRITE="\
 -W, --write-defaults [new | reset | edit | add | remove]\n\
     --write-config [new | reset | edit | add | remove]\n\
         Write anything you defined to \""\
@@ -183,7 +202,7 @@ constexpr auto WRITE="\
         To remove the exact pairs of options and values, pass \"remove\"\n\
         Example: --debug=args --write-config=remove\n\
 ";
-constexpr auto LOAD="\
+let LOAD="\
 -L, --load-config 'custom file'\n\
         Load configuration from custom file.\n\
         Example:\n\
@@ -204,33 +223,33 @@ constexpr auto LOAD="\
         To set custom path for config file, use --write-defaults.\n\
         Example: --write-defaults:load-config=/tmp/setting.txt\n\
 ";
-constexpr auto VERSION="\
+let VERSION="\
 tvplaylist version 1.1 (Early 2022)\nTM and (C) 2022 Widiatmoko. \
 All Rights Reserved. License and Warranty\n";
 
-constexpr auto HELP="\
+let HELP="\
 Create playlist file from vary directories and files, \
 then by default, arranged one episode per Title.\nHosted in https://github.com/Mr-Widiatmoko/MakeTVPlaylist\n\n\
 Usage:\n    tvplaylist [Option or Dir or File] ...\n\n\
 If no argument was specified, the current directory will be use.\n\n\
 Option:\n\
 ";
-constexpr auto A_HELP="\
+let A_HELP="\
 -h, --help ['keyword']\n\
         Display options description.\n\
 ";
-constexpr auto A_VERSION="\
+let A_VERSION="\
 -v, --version\n\
         Display version.\n\
 ";
 
-constexpr auto ADSDIR="\
+let ADSDIR="\
 -D, --ads-dir 'directory constains advertise'\n\
         Add advertise directory. Ads file will be inserted between each ordered files.\n\
         You can specifying this multiple times.\n\
         To set the numbers how many ads shown use --ads-count.\n\
 ";
-constexpr auto ADSCOUNT="\
+let ADSCOUNT="\
 -C, --ads-count 'fixed count'\n\
                  'min count' .. 'max count'\n\
                  'min count' - 'max count'\n\
@@ -238,17 +257,17 @@ constexpr auto ADSCOUNT="\
         If you set using range, then ads will be shown randomly between 'min count' to 'max count'.\n\
         To set where the advertise directories location path, use --ads-dir.\n\
 ";
-constexpr auto VERBOSE="\
+let VERBOSE="\
 -V, --verbose [all | info]\n\
         Display playlist content.\n\
         Define as 'all' will also show fail messages.\n\
         Define as 'info' will also display options info summary.\n\
 ";
-constexpr auto BENCHMARK="\
+let BENCHMARK="\
 -b, --benchmark\n\
         Benchmarking execution.\n\
 ";
-constexpr auto ARRANGEMENT="\
+let ARRANGEMENT="\
 -w, --arrangement [default | unordered | per-title | ascending | shuffle] \n\
         Specifying how playlist content will be arranged.\n\
         default   : One file per Title, Title sorted ascending.\n\
@@ -264,7 +283,7 @@ constexpr auto ARRANGEMENT="\
         descending-default   : \"default\" but each Title has files sorted descending.\n\
         descending-per-title : \"per-title\" but each Title has files sorted descending.\n\
 ";
-constexpr auto SEARCH="\
+let SEARCH="\
 --search 'keywords'\n\
         tvplaylist search engine.\n\
         --search is alias from --no-output-file:verbose:arrangement=ascending:ignore-case\n\
@@ -272,28 +291,28 @@ constexpr auto SEARCH="\
             --search \"ext=* medalion or title=medalion exclude=horse\"\n\
         You can specifying this multiple times.\n\
 ";
-constexpr auto OVERWRITE="\
+let OVERWRITE="\
 -O, --overwrite\n\
         Overwrite output playlist file.\n\
 ";
-constexpr auto SKIPSUBTITLE="\
+let SKIPSUBTITLE="\
 -x, --skip-subtitle\n\
         Dont include subtitle file.\n\
 ";
-constexpr auto OUTDIR="\
+let OUTDIR="\
 -d, --out-dir \"directory path\"\n\
         Override output directory for playlist file.\n\
 ";
-constexpr auto EXECUTION="\
+let EXECUTION="\
 -c, --execution [thread | async | linear]\n\
         Specify execution, \"async\" is selected by default.\n\
 ";
-constexpr auto EXCLHIDDEN="\
+let EXCLHIDDEN="\
 -n, --exclude-hidden\n\
         Exclude hidden folders or files (not for Windows).\n\
 ";
 [[deprecated("Recognized in --find or --exlude-find.")]] [[maybe_unused]]
-constexpr auto CASEINSENSITIVE="\
+let CASEINSENSITIVE="\
 -N, --make-case-insensitive\n\
      --case-insensitive\n\
      --caseinsensitive\n\
@@ -302,7 +321,7 @@ constexpr auto CASEINSENSITIVE="\
         Make --find and --exclude-find case-insensitive.\n\
         To make case-sensitive again, pass --ignorecase=false.\n\
 ";
-constexpr auto FIND="\
+let FIND="\
 -i, --find 'keyword'\n\
 -I, --exclude-find 'keyword'\n\
         Filter only files with (or exclude) filename contains find keyword.\n\
@@ -320,7 +339,7 @@ constexpr auto FIND="\
             Example: --find ignore-case=true\n\
 ";
 [[deprecated("Recognized in --regex or --exlude-regex.")]] [[maybe_unused]]
-constexpr auto REGEXSYNTAX="\
+let REGEXSYNTAX="\
 -X, --regex-syntax [ecma | awk | grep | egrep | basic | extended]\n\
         Specify regular expression syntax type to use.\n\
         Available value are: 'ecma'(Default), 'awk', 'grep', 'egrep', 'basic', 'extended'.\n\
@@ -329,7 +348,7 @@ constexpr auto REGEXSYNTAX="\
         You can also specifying this inside --regex or --exclude-regex, for example\n\
             --regex type=basic  or  --exclude-regex type=extended\n\
 ";
-constexpr auto REGEX="\
+let REGEX="\
 -r, --regex 'syntax'\n\
 -R, --exclude-regex 'syntax'\n\
         Filter only files with (or exclude) filename match regular expression.\n\
@@ -337,7 +356,7 @@ constexpr auto REGEX="\
             Example: --regex type=grep  or  --regex=type=grep\n\
         You can specifying this multiple times.\n\
 ";
-constexpr auto EXT="\
+let EXT="\
 -e, --ext \"'extension', 'extension', ...\"\n\
 -E, --exclude-ext \"'extension', 'extension' ...\"\n\
         Filter only (or exclude) files that match specific extensions, separated by comma.\n\
@@ -347,7 +366,7 @@ constexpr auto EXT="\
         To enable get contents from other playlists, you must include the playlist extensions.\n\
             Example: --ext=mp4,mkv,mp3,m3u,m3u8,pls,wpl,xspf\n\
 ";
-constexpr auto SIZE="\
+let SIZE="\
 -s, --size < | > 'size'\n\
            'min size'..'maz size'\n\
            'min size'-'max size'\n\
@@ -362,7 +381,7 @@ constexpr auto SIZE="\
                 OR using range with '-' OR '..'\n\
                     --size 750 - 1.2gb; size=30..200.2; size 2gb .. 4gb\n\
 ";
-constexpr auto DATE="\
+let DATE="\
 -z, --date = | < | > 'date and/or time'\n\
            'min' .. 'max'\n\
            'min' - 'max'\n\
@@ -378,7 +397,7 @@ constexpr auto DATE="\
                 OR\n\
                     --date=0:20..0:35:date=0:47/2022..0:56/2022\n\
 ";
-constexpr auto CREATED="\
+let CREATED="\
 -t, --created = | < | > 'date and/or time'\n\
               'min' .. 'max'\n\
               'min' - 'max'\n\
@@ -389,7 +408,7 @@ constexpr auto CREATED="\
         For more information about 'date and/or time' possible values, see below.\n\
         You can specifying this multiple times, for both single value or range values.\n\
 ";
-constexpr auto ACCESSED="\
+let ACCESSED="\
 -a, --accessed = | < | > 'date and/or time'\n\
                'min' .. 'max'\n\
                'min' - 'max'\n\
@@ -400,7 +419,7 @@ constexpr auto ACCESSED="\
         You can specifying this multiple times, for both single value or range values.\n\
         For more information about 'date and/or time' possible values, see below.\n\
 ";
-constexpr auto MODIFIED="\
+let MODIFIED="\
 -m, --modified = | < | > 'date and/or time'\n\
                'min' .. 'max'\n\
                'min' - 'max'\n\
@@ -411,7 +430,7 @@ constexpr auto MODIFIED="\
         For more information about 'date and/or time' possible values, see below.\n\
         You can specifying this multiple times, for both single value or range values.\n\
 ";
-constexpr auto CHANGED="\
+let CHANGED="\
 -g, --changed = | < | > 'date and/or time'\n\
               'min' .. 'max'\n\
               'min' - 'max'\n\
@@ -422,7 +441,7 @@ constexpr auto CHANGED="\
         For more information about 'date and/or time' possible values, see below.\n\
         You can specifying this multiple times, for both single value or range values.\n\
 ";
-constexpr auto FIXFILENAME="\
+let FIXFILENAME="\
 -f, --out-filename 'filename'\n\
         Override output playlist filename, by default it will crreate \".m3u8\" playlist.\n\
         To create \".pls\", \".wpl\", or others type of playlist, pass it as extension filename.\n\
@@ -433,11 +452,11 @@ constexpr auto FIXFILENAME="\
         Here the example to convert from different type of playlist to another type:\n\
             Example: --ext=mp3,m3u old_musics.m3u --out-filename=old_music.html\n\
 ";
-constexpr auto NOOUTPUTFILE="\
+let NOOUTPUTFILE="\
 -F, --no-ouput-file [yes | no]\n\
         Choose to create playlist file or no. Default 'yes' if option was declared or if was build as library.\n\
 ";
-constexpr auto HELP_REST="\
+let HELP_REST="\
 \n\
 Arguments can be surrounded by \"\" (eg. \"--verbose;benchmark\") to enable using character ';' or <ENTER> as multiline or another characters that belongs to Terminal or shell. To view how arguments was deduced you can pass option --debug=args.\n\
 Options can be joined, and option assignment separator [SPACE] can be replaced with '=' \
@@ -455,7 +474,7 @@ Note, you cannot join mnemonic option with full option, for the example:\n\n\
 Instead try to separate mnemonic and full option, like this:\n\n\
   tvplaylist -bO --ext=mp3:version\n\n\
 ";
-constexpr auto HELP_DATE_REST="\
+let HELP_DATE_REST="\
 Posible value for 'date and/or time' are: 'Year', 'Month Name' (mnemonic or full), 'Month Number', 'Day', 'WeekDay Name' (mnemonic or full), 'Hour' (if AM/PM defined then it is 12 hours, otherwise 24 hours), 'Minute', 'Second', AM or PM.\n\
 Example:\n\
   Filter only files created in 2009:\n\
@@ -480,7 +499,7 @@ If you want to test 'date and/or time' use --debug=date 'date and/or time' ['for
 	 or --debug=date now \"Date: %F, Time: %T.\"\n\
 It will showing internal tvplaylist date time recognizer, with format \"Weekday Year/Month/Day Hour:Minute:Second\".\n\
 ";
-
+#undef let
 
 constexpr const char* const* OPTS[] = { &OPT_VERSION, &OPT_HELP, &OPT_ARRANGEMENT,
 	&OPT_SEARCH, &OPT_VERBOSE, &OPT_BENCHMARK, & OPT_OVERWRITE,
@@ -550,6 +569,7 @@ constexpr const char* const* ALL_HELPS[] = {
 #include "libtvplaylist.h"
 #endif
 
+#define var  auto
 #define func auto
 
 func tolower(std::string s)
@@ -573,31 +593,34 @@ func transformWhiteSpace(std::string s)
 
 func groupNumber(std::string number)
 {
-	long long i = number.find_last_of('.');
+	var i { number.find_last_of('.') };
 	if (i == std::string::npos) {
 		i = number.find_last_of('e');
 		if (i == std::string::npos)
 			i = number.size();
 	}
-	auto a{ number.size() > 1 and not std::isdigit(number[0]) ? 1
+	
+	var a { number.size() > 1 and not std::isdigit(number[0]) ? 1
 			: ( number.size() > 2 and std::tolower(number[1]) == 'x' ? 2
 			   : 0) };
+	
 	while ( i - 3 > a ) {
 		i-=3;
 		number.insert(i, 1, ',');
 	}
+	
 	return number;
 }
 
 func trim(const std::string& s)
 {
-	unsigned long start{0}, end{s.size()};
-	for (auto i{0}; i<end; ++i)
+	var start { (unsigned long) 0}, end{s.size()};
+	for (var i { 0 }; i<end; ++i)
 		if (not std::isspace(s[i])) {
 			start=i;
 			break;
 		}
-	for (auto i{end}; i>start; --i)
+	for (var i { end }; i>start; --i)
 		if (not std::isspace(s[i])) {
 			end=i;
 			break;
@@ -616,11 +639,11 @@ func isContains(const std::string& l, const std::string& r,
 {
 	if (r.size() > l.size()) return std::string::npos;
 	
-	unsigned k{ 0 };
-	unsigned i{ 0 };
+	var k { (unsigned) 0 };
+	var i { (unsigned) 0 };
 	if (l.size() > r.size())
 		for (; i<l.size(); ++i) {
-			auto match { ignoreChar and
+			var match { ignoreChar and
 				(  (l[i] == ignoreChar->first 	and r[k] == ignoreChar->second)
 				or (l[i] == ignoreChar->second 	and r[k] == ignoreChar->first)
 				or (l[i] == ignoreChar->first 	and r[k] == ignoreChar->first)
@@ -656,29 +679,29 @@ func isEqual(const char* const l, const char* const r,
 			 const unsigned long max = 0)
 {
 	if (not l or not r) return false;
-	auto sz1 { std::strlen(l) };
-	auto sz2 { std::strlen(r) };
-	if (max == 0 and sz1 != sz2) return false;
-	auto total { max > 0 ? max : sz1 };
+	const var sz1 { std::strlen(l) };
+	const var sz2 { std::strlen(r) };
+	if (max == 0 and sz1 not_eq sz2) return false;
+	var total { max > 0 ? max : sz1 };
 	
 	const char* _l = l;
 	const char*_r = r;
 	while (total-- > 0) {
 		switch (ic){
 			case IgnoreCase::Both:
-				if (std::tolower(*_l) != std::tolower(*_r))
+				if (std::tolower(*_l) not_eq std::tolower(*_r))
 					return false;
 				break;
 			case IgnoreCase::Left:
-				if (std::tolower(*_l) != *_r)
+				if (std::tolower(*_l) not_eq *_r)
 					return false;
 				break;
 			case IgnoreCase::Right:
-				if (*_l != std::tolower(*_r))
+				if (*_l not_eq std::tolower(*_r))
 					return false;
 				break;
 			default:
-				if (*_l != *_r)
+				if (*_l not_eq *_r)
 					return false;
 		}
 		_l++;
@@ -693,24 +716,24 @@ func isEqual(const std::string& l, const std::string& r,
 			 const unsigned long startRight = 0,
 			 const unsigned long max = 0)
 {
-	if (max == 0 and l.size() - startLeft != r.size() - startRight) return false;
-	auto total { std::max(l.size() - startLeft, r.size() - startRight) };
-	for (auto i{ 0 }; i<(max > 0 ? std::min(max, total) : total); ++i)
+	if (max == 0 and l.size() - startLeft not_eq r.size() - startRight) return false;
+	var total { std::max(l.size() - startLeft, r.size() - startRight) };
+	for (var i { 0 }; i<(max > 0 ? std::min(max, total) : total); ++i)
 		switch (ic){
 			case IgnoreCase::Both:
-				if (std::tolower(l[i + startLeft]) != std::tolower(r[i + startRight]))
+				if (std::tolower(l[i + startLeft]) not_eq std::tolower(r[i + startRight]))
 					return false;
 				break;
 			case IgnoreCase::Left:
-				if (std::tolower(l[i + startLeft]) != r[i + startRight])
+				if (std::tolower(l[i + startLeft]) not_eq r[i + startRight])
 					return false;
 				break;
 			case IgnoreCase::Right:
-				if (l[i + startLeft] != std::tolower(r[i + startRight]))
+				if (l[i + startLeft] not_eq std::tolower(r[i + startRight]))
 					return false;
 				break;
 			default:
-				if (l[i + startLeft] != r[i + startRight])
+				if (l[i + startLeft] not_eq r[i + startRight])
 					return false;
 		}
 	return true;
@@ -723,7 +746,7 @@ func isEqual(const char* const source,
 			 const unsigned long startRight = 0,
 			 const unsigned long max = 0)
 {
-	for (auto& s : list) {
+	for (var& s : list) {
 		if (isEqual(source, s, ic, startLeft, startRight, max))
 			return true;
 	}
@@ -732,13 +755,13 @@ func isEqual(const char* const source,
 
 template <template <class ...> class Container, class ... Args>
 func isEqual(const std::string& source,
-			 const Container<std::string, Args ...>* args,
+			 const Container<std::string, Args ...>* const args,
 			 const IgnoreCase ic = IgnoreCase::None,
 			 const unsigned long startLeft = 0,
 			 const unsigned long startRight = 0,
 			 const unsigned long max = 0)
 {
-	for (auto& check : *args)
+	for (var& check : *args)
 		if (isEqual(source, check, ic, startLeft, startRight, max))
 			return true;
 
@@ -747,8 +770,8 @@ func isEqual(const std::string& source,
 
 func isInt(const std::string& s, int* const value = nullptr)
 {
-	int result;
-	if (auto [p, ec] = std::from_chars(s.c_str(), s.c_str()+s.size(), result);
+	var result { 0 };
+	if (var [p, ec] = std::from_chars(s.c_str(), s.c_str()+s.size(), result);
 		ec == std::errc()) {
 		if (value)
 			*value = result;
@@ -760,13 +783,13 @@ func isInt(const std::string& s, int* const value = nullptr)
 
 func getLikely(const std::string_view& src, const std::string_view& with)
 {
-	auto first { src.begin() }, last { src.end() };
-	auto d_first { with.begin() };
-	float score = 0, scoreOpenent = 0;
-	if (first != last) {
+	var first { src.begin() }, last { src.end() };
+	var d_first { with.begin() };
+	var score { 0.f }, scoreOpenent { 0.f };
+	if (first not_eq last) {
 		decltype (d_first) d_last = std::next(d_first, std::distance(first, last));
-		for (decltype (first) i = first; i != last; ++i) {
-			if (i != std::find(first, i, *i))
+		for (decltype (first) i = first; i not_eq last; ++i) {
+			if (i not_eq std::find(first, i, *i))
 				continue;
 			scoreOpenent += std::count(d_first, d_last, *i);
 			score += std::count(i, last, *i);
@@ -785,11 +808,11 @@ func printHelp(const char* const arg = nullptr)
 			OPT_DEXCLMODIFIED, OPT_DACCESSED, OPT_DEXCLACCESSED}))
 			std::cout << HELP_DATE_REST;
 	}};
-	if (auto i{0}; arg) {
-		for (auto& opt : OPTS) {
+	if (var i { 0 }; arg) {
+		for (var& opt : OPTS) {
 			if (isEqual(arg, *opt)) {
 				if (isEqual(arg, OPT_HELP))
-					for (auto& help : ALL_HELPS)
+					for (var& help : ALL_HELPS)
 						std::cout << *help;
 				else
 					print(i);
@@ -797,10 +820,10 @@ func printHelp(const char* const arg = nullptr)
 			}
 			i++;
 			if (i >= (sizeof(OPTS)/sizeof(OPTS[0])) - 1) {
-				std::vector<std::string> found;
-				auto k { 0 };
-				auto indexFound { k };
-				for (auto& opt : OPTS) {
+				var found { std::vector<std::string>() };
+				var k { 0 };
+				var indexFound { k };
+				for (var& opt : OPTS) {
 					if (getLikely(arg, *opt) > 80) {
 						found.emplace_back(*opt);
 						indexFound = k;
@@ -811,9 +834,9 @@ func printHelp(const char* const arg = nullptr)
 					print(indexFound);
 				}
 				else {
-					std::vector<int> foundIndexes;
+					var foundIndexes { std::vector<int>() };
 					if (found.empty()) {
-						for (auto h { 0 }; ; ++h) {
+						for (var h { 0 }; ; ++h) {
 							if (h >= (sizeof(ALL_HELPS)/sizeof(ALL_HELPS[0])) - 2)
 								break;
 							if (isContains(*ALL_HELPS[h], arg, IgnoreCase::Both)
@@ -827,7 +850,7 @@ func printHelp(const char* const arg = nullptr)
 					else {
 						std::cout << "Found " << foundIndexes.size()
 						<< " result containing \"" << arg << "\":\n\n";
-						for (auto& id : foundIndexes) {
+						for (var& id : foundIndexes) {
 							print(id);
 							std::cout << '\n';
 						}
@@ -835,7 +858,7 @@ func printHelp(const char* const arg = nullptr)
 						
 					if (foundIndexes.empty() and not found.empty()) {
 						std::cout << ", do you mean ";
-						for (auto k{0}; k<found.size(); ++k)
+						for (var k{0}; k<found.size(); ++k)
 							std::cout << '\"' << found[k] << '\"'
 							<< (k + 1 == found.size() ? "." : " or ");
 					}
@@ -851,13 +874,13 @@ func printHelp(const char* const arg = nullptr)
 typedef unsigned long long MAXNUM;
 func containInts(const std::string& s, std::vector<MAXNUM>* const out)
 {
-	std::string buffer;
-	auto make{[&]() -> void {
+	var buffer { std::string() };
+	func make{[&]() -> void {
 		if (buffer.size() > 0 and buffer.size() < 19) /// ULLONG_MAX length is 20
 			out->emplace_back(std::stoull(std::move(buffer)));
 	}};
 	
-	for (auto& c : s) {
+	for (var& c : s) {
 		if (std::isdigit(c)) {
 			buffer += c;
 		} else {
@@ -883,8 +906,8 @@ template <template <class ...> class Container, class ... Args>
 func parseExtCommaDelimited(const std::string& literal,
 							Container<std::string, Args...>* const result)
 {
-	std::string buffer;
-	for (auto& c : literal) {
+	var buffer { std::string() };
+	for (var& c : literal) {
 		if (std::isspace(c))
 			continue;
 		else if (c == ',' and buffer.size() > 2) {
@@ -914,31 +937,31 @@ struct Date
 	
 	friend
 	func operator < (const Date& l, const Date& r) -> bool {
-		auto ull { Date::get_ull(l, r) };
+		var ull { Date::get_ull(l, r) };
 		return ull.first < ull.second;
 	}
 	
 	friend
 	func operator > (const Date& l, const Date& r) -> bool {
-		auto ull { Date::get_ull(l, r) };
+		var ull { Date::get_ull(l, r) };
 		return ull.first > ull.second;
 	}
 	
 	friend
 	func operator <= (const Date& l, const Date& r) -> bool {
-		auto ull { Date::get_ull(l, r) };
+		var ull { Date::get_ull(l, r) };
 		return ull.first <= ull.second;
 	}
 	
 	friend
 	func operator >= (const Date& l, const Date& r) -> bool {
-		auto ull { Date::get_ull(l, r) };
+		var ull { Date::get_ull(l, r) };
 		return ull.first >= ull.second;
 	}
 	
 	friend
 	func operator == (const Date& l, const Date& r) -> bool {
-		#define is_equal(x, y) (x != 0 and y != 0 ? x == y : true)
+		#define is_equal(x, y) (x not_eq 0 and y not_eq 0 ? x == y : true)
 		return (is_equal(l.year, r.year)
 			and is_equal(l.month, r.month)
 			and is_equal(l.day, r.day)
@@ -951,7 +974,7 @@ struct Date
 	}
 	
 	func time_t(const Date* const d = nullptr) {
-		std::tm tm{};
+		var tm { std::tm() };
 		if ((d ? d : this)->year > 0)
 			tm.tm_year = (d ? d : this)->year-1900;
 		if ((d ? d : this)->month > 0)
@@ -967,9 +990,9 @@ struct Date
 	}
 
 	func string(const char* const format = nullptr, const bool UTC = false) const {
-		std::string s;
+		var s { std::string() };
 		if (format and std::strlen(format) > 0) {
-			std::tm tm{};
+			var tm { std::tm() };
 			if (year > 0)
 				tm.tm_year = year-1900;
 			if (month > 0)
@@ -981,7 +1004,7 @@ struct Date
 			tm.tm_sec = second;
 			if (weekday > 0)
 				tm.tm_wday = weekday;
-			std::time_t t =  std::mktime(&tm);
+			var t { std::mktime(&tm) };
 			char mbstr[100];
 			if (std::strftime(mbstr, sizeof(mbstr), format,
 							  UTC ? std::gmtime(&t) : std::localtime(&t)))
@@ -1009,11 +1032,11 @@ struct Date
 		-> std::string
 	{
 		if (index >= 1 or index <= 7) {
-			std::tm tm{};
+			var tm { std::tm() };
 			tm.tm_year = 2020-1900; // 2020
 			tm.tm_mon = 2-1; // February
 			tm.tm_mday = 8 + index; // 15th
-			std::time_t t = std::mktime(&tm); //std::time(nullptr);
+			std::time_t t { std::mktime(&tm) }; //std::time(nullptr);
 			
 			char mbstr[20];
 			std::setlocale(LC_ALL, locale ? locale : std::locale().name().c_str());
@@ -1025,12 +1048,12 @@ struct Date
 	
 	static
 	func getWeekDayNames(const char* result[7], const char* const locale = nullptr) {
-		for (auto i{9}, k{0}; i<16; ++i, ++k) {
-			std::tm tm{};
+		for (var i { 9 }, k{0}; i<16; ++i, ++k) {
+			var tm { std::tm() };
 			tm.tm_year = 2020-1900; // 2020
 			tm.tm_mon = 2-1; // February
 			tm.tm_mday = i; // 15th
-			std::time_t t = std::mktime(&tm); //std::time(nullptr);
+			var t { std::mktime(&tm) }; //std::time(nullptr);
 			
 			char mbstr[3];
 			std::setlocale(LC_ALL, locale ? locale : std::locale().name().c_str());
@@ -1045,21 +1068,21 @@ struct Date
 						 const unsigned short aDay = 0,
 						 const unsigned short expectedWeekDay = 0)
 	{
-		for (int Y{ aYear > 0 ? aYear : 1970 };
+		for (var Y { aYear > 0 ? aYear : 1970 };
 			 Y <= aYear > 0 ? aYear : 1970; ++Y)
 		{
-			auto curr_year { std::chrono::year(Y) };
+			var curr_year { std::chrono::year(Y) };
 			
 			for (int cur_month{ aMonth > 0 ? aMonth : 1 };
-				 cur_month != (aYear > 0 ? aMonth + 1 : 13); ++cur_month)
+				 cur_month not_eq (aYear > 0 ? aMonth + 1 : 13); ++cur_month)
 			
-				for (auto d { aDay > 0 ? aDay : 1 };
+				for (var d { aDay > 0 ? aDay : 1 };
 					 d<(aDay > 0 ? aDay + 1 : 32); ++d)
 				{
-					const std::chrono::year_month_day 	ymd
-						{ curr_year / cur_month / d };
-					const std::chrono::weekday 			cur_weekday
-						{ std::chrono::sys_days{ ymd } };
+					const var ymd
+						{ std::chrono::year_month_day(curr_year / cur_month / d) };
+					const var cur_weekday
+						{ std::chrono::weekday(std::chrono::sys_days{ ymd }) };
 					
 					if (expectedWeekDay > 0) {
 						if (cur_weekday.iso_encoding() == expectedWeekDay)
@@ -1073,7 +1096,7 @@ struct Date
 	}
 
 private:
-	static constexpr auto WEEKDAYS = {
+	static constexpr var WEEKDAYS = {
 	/*en_US.UTF-8:*/ "sun", "mon", "tue", "wed", "thu", "fri", "sat",
 	/*id_ID       */ "min", "sen", "sel", "rab", "kam", "jum", "sab",
 	/*de_DE.UTF-8:*/ "so", "mo", "di", "mi", "do", "fr", "sa",
@@ -1098,7 +1121,7 @@ private:
 	/*id_ID.UTF-8:*/ "星期日", "星期一", "星期二", "星期三", "星期四", "星期五", "星期六",
 	};
 	
-	static constexpr auto MONTHS = {
+	static constexpr var MONTHS = {
 	/*en_US.UTF-8:*/ "jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec",
 	/*id_ID       */ "jan", "feb", "mar", "apr", "mei", "jun", "jul", "agu", "sep", "okt", "nov", "des",
 	/*de_DE.UTF-8:*/ "jan", "feb", "mär", "apr", "mai", "jun", "jul", "aug", "sep", "okt", "nov", "dez",
@@ -1122,15 +1145,15 @@ private:
 	func get_ull(const Date& l, const Date& r)
 					-> std::pair<unsigned long long, unsigned long long>
 	{
-		std::string sleft, sright;
+		var sleft { std::string() }, sright { std::string() };
 		func go{[&sleft, &sright](const unsigned short& x, const unsigned short& y)
 		{
 			if (x == 0 or y == 0) return;
 			
-			auto sx { std::to_string(x) };
+			var sx { std::to_string(x) };
 			if (sx.size() < 2) sx.insert(0, 1, '0');
 			sleft.append(sx);
-			auto sy { std::to_string(y) };
+			var sy { std::to_string(y) };
 			if (sy.size() < 2) sy.insert(0, 1, '0');
 			sright.append(sy);
 		}};
@@ -1148,16 +1171,16 @@ private:
 	
 	func fold() const
 	{
-		auto Y = std::to_string(year);
-		auto m = std::to_string(month);
+		var Y { std::to_string(year) };
+		var m { std::to_string(month) };
 		if (m.size() not_eq 2) m.insert(0, 1, '0');
-		auto d = std::to_string(day);
+		var d { std::to_string(day) };
 		if (d.size() not_eq 2) d.insert(0, 1, '0');
-		auto H = std::to_string(hour);
+		var H { std::to_string(hour) };
 		if (H.size() not_eq 2) H.insert(0, 1, '0');
-		auto M = std::to_string(minute);
+		var M { std::to_string(minute) };
 		if (M.size() not_eq 2) M.insert(0, 1, '0');
-		auto S = std::to_string(second);
+		var S { std::to_string(second) };
 		if (S.size() not_eq 2) S.insert(0, 1, '0');
 		
 		return std::stoull(Y + m + d + H + M + S);
@@ -1165,31 +1188,30 @@ private:
 	
 	func setWeekday()
 	{
-		const std::chrono::year_month_day 	ymd
-			{ std::chrono::year(year) / month / day };
-		const std::chrono::weekday 			aweekday
-			{ std::chrono::sys_days{ ymd } };
+		const var ymd
+			{ std::chrono::year_month_day(std::chrono::year(year) / month / day) };
+		const var aweekday
+			{ std::chrono::weekday(std::chrono::sys_days{ ymd }) };
 		
-		if (weekday != aweekday.iso_encoding())
+		if (weekday not_eq aweekday.iso_encoding())
 			weekday = aweekday.iso_encoding();
 	}
 public:
 	static
 	func now()
 	{
-		const std::chrono::time_point<std::chrono::system_clock> now =
-				std::chrono::system_clock::now();
-		const std::time_t t = std::chrono::system_clock::to_time_t(now);
+		const var now { std::chrono::time_point<std::chrono::system_clock>(
+											std::chrono::system_clock::now()) };
+		const var t { std::chrono::system_clock::to_time_t(now) };
 
-		Date date(&t);
-		return date;
+		return Date(&t);
 	}
 	
 	func set(const std::time_t* t, const bool UTC = false)
 	{
 		char a[5];
 		unsigned short * unit[] = {&year, &month, &day, &hour, &minute, &second};
-		for (unsigned short i{ 0 }; auto& f : {"%Y", "%m", "%d", "%H", "%M", "%S"}) {
+		for (var i { 0 }; var& f : {"%Y", "%m", "%d", "%H", "%M", "%S"}) {
 			std::strftime(a, sizeof(a), f,
 						  UTC ? std::gmtime(t) : std::localtime(t));
 			*unit[i++] = std::stoi(a);
@@ -1207,9 +1229,9 @@ public:
 								hour{0}, minute{0}, second{0}
 	{
 		if (isEqual(s.c_str(), {"now", "today"}, IgnoreCase::Left)) {
-			const std::chrono::time_point<std::chrono::system_clock> now =
-					std::chrono::system_clock::now();
-			const std::time_t t = std::chrono::system_clock::to_time_t(now);
+			const var now { std::chrono::time_point<std::chrono::system_clock>(
+											std::chrono::system_clock::now()) };
+			const var t { std::chrono::system_clock::to_time_t(now) };
 			set(&t);
 			if (isEqual(s, "today")) {
 				hour = 0;
@@ -1222,9 +1244,9 @@ public:
 			
 		func isDigit{[](const std::string& s)
 		{
-			for (auto i{0}; i<s.size(); ++i)
+			for (var i { 0 }; i<s.size(); ++i)
 				if (not isdigit(s[i]))
-				return false;
+					return false;
 			return s not_eq "";
 		}};
 		
@@ -1238,20 +1260,20 @@ public:
 			}
 			return 0;
 		}};
-		std::vector<unsigned short> date;
-		std::vector<short> time;
-		std::vector<std::string> others;
-		char last = '\0';
-		for (unsigned i{ 0 }, k{ 0 }; i<s.size(); ++i)
+		var date { std::vector<unsigned short>() };
+		var time { std::vector<short>() };
+		var others { std::vector<std::string>() };
+		var last { '\0' };
+		for (var i { 0 }, k{ 0 }; i<s.size(); ++i)
 			if (not std::isdigit(s[i])) {
 				if (s[i] == ':') {
-					auto get{ s.substr(k, i - k) };
+					var get { s.substr(k, i - k) };
 					if (isDigit(get))
 						time.emplace_back(std::stoi(get));
 					else if (not get.empty())
 						others.emplace_back(get);
 				} else if (std::ispunct(s[i])) {
-					auto get{ s.substr(k, i - k) };
+					var get { s.substr(k, i - k) };
 					if (isDigit(get)) {
 						if (last == ':')
 							time.emplace_back(std::stoi(get));
@@ -1260,11 +1282,11 @@ public:
 					} else if (not get.empty())
 						others.emplace_back(get);
 				} else if (std::isspace(s[i])) {
-					if (k != i) {
-						auto get{ s.substr(k, i - k) };
-						auto isNumber{ isDigit(get) };
+					if (k not_eq i) {
+						var get { s.substr(k, i - k) };
+						var isNumber { isDigit(get) };
 						if (std::isalpha(last)) {
-							if (auto pm{ isPM(get)}; pm)
+							if (var pm { isPM(get) }; pm)
 								time.emplace_back(pm);
 							else if (not get.empty())
 								others.emplace_back(get);
@@ -1280,8 +1302,8 @@ public:
 					continue;
 				} else {
 					if (i == s.size() - 1) {
-						auto get = s.substr(k);
-						if (auto pm{ isPM(get)}; pm)
+						var get { s.substr(k) };
+						if (var pm { isPM(get) }; pm)
 							time.emplace_back(pm);
 						else if (not get.empty())
 							others.emplace_back(get);
@@ -1295,8 +1317,8 @@ public:
 				k = i + 1;
 				
 			} else if (i == s.size() - 1) {
-				auto get{ s.substr(k) };
-				auto isNumber{ isDigit(get) };
+				var get { s.substr(k) };
+				var isNumber { isDigit(get) };
 				if (last == ':' and isNumber)
 					time.emplace_back(std::stoi(get));
 				else if ((std::ispunct(last) or last == '\0') and isNumber)
@@ -1308,14 +1330,14 @@ public:
 			
 			
 			
-		auto weekDay = -1;
-		for (auto found{ 0 };
-			auto& s : others)
+		var weekDay { -1 };
+		for (var found { 0 };
+			var& s : others)
 		{
 			s[0] = std::tolower(s[0]);
 			
 			if (weekDay == -1) {
-				for (auto i{ 0 }; auto& m : WEEKDAYS) {
+				for (var i { 0 }; var& m : WEEKDAYS) {
 					if (s == m)
 					{
 						weekDay = (i % 7) + 1;
@@ -1324,15 +1346,15 @@ public:
 					i++;
 				}
 				
-				if (weekDay != -1) {
+				if (weekDay not_eq -1) {
 					assert(weekday == 0);
 					weekday = weekDay;
 					continue;
 				}
 			}
 			
-			for (auto i{ 0 };
-				auto& m : MONTHS) {
+			for (var i { 0 };
+				var& m : MONTHS) {
 				if (s == m)
 				{
 					found = (i % 12) + 1;
@@ -1357,7 +1379,7 @@ public:
 		}
 		
 		
-		for (auto& i : date)
+		for (var& i : date)
 			if (i > 32)
 				year = i;
 			else if (i <= 12) {
@@ -1385,8 +1407,8 @@ public:
 			
 		if (year > 0 and year < 1000) {
 			const std::chrono::year_month_day ymd{floor<std::chrono::days>(std::chrono::system_clock::now())};
-			auto Y { std::to_string(year) };
-			auto nowy { std::to_string(int(ymd.year())) };
+			var Y { std::to_string(year) };
+			var nowy { std::to_string(int(ymd.year())) };
 			year = std::stoi(nowy.substr(0, nowy.size() - Y.size()) + Y);
 		}
 			
@@ -1395,13 +1417,13 @@ public:
 				std::chrono::year_month_day{std::chrono::year(year)/month/day}
 			}}.iso_encoding();
 			
-			if (weekDay > -1 and weekDay != weekday)
+			if (weekDay > -1 and weekDay not_eq weekday)
 				std::cout << "⚠️  Invalid Weekday was defined for " << string("%B %d %Y") << "!\n";
 		}
 			
 		unsigned short* unit[] = {&hour, &minute, &second };
-		auto hasPM{ false };
-		for (auto i { 0 }; auto& t : time)
+		var hasPM { false };
+		for (var i { 0 }; var& t : time)
 			if (t < 0) {
 				hasPM = t == -2;
 			} else if (i < sizeof(unit)/sizeof(unit[0]))
@@ -1427,7 +1449,7 @@ public:
 
 };
 
-static const std::unordered_set<std::string> SET_OF_ID3_TAGS = {
+static const var SET_OF_ID3_TAGS { std::unordered_set<std::string>{
 	"id3",
 	"version",								// both		2.3		2.4
 	"audio_encryption", 					// AENC
@@ -1518,7 +1540,7 @@ static const std::unordered_set<std::string> SET_OF_ID3_TAGS = {
 	"payment",								// WPAY
 	"publisher_official_webpage",			// WPUB
 	"user_defined_url_link_frame"			// WXXX
-};
+}};
 struct ID3
 {
 	static constexpr const char* GENRES[] = {
@@ -1560,12 +1582,12 @@ struct ID3
 	func parseInput(const std::string& keyword) const
 		-> std::shared_ptr<std::pair<std::string, std::string>>
 	{
-		auto pos { keyword.find('=') };
-		auto found{ pos > 2 and pos != std::string::npos };
+		var pos { keyword.find('=') };
+		var found { pos > 2 and pos not_eq std::string::npos };
 		
 		if (found) {
-			auto selectedTag { keyword.substr(0, pos) };
-			found = SET_OF_ID3_TAGS.find(selectedTag) != SET_OF_ID3_TAGS.end();
+			var selectedTag { keyword.substr(0, pos) };
+			found = SET_OF_ID3_TAGS.find(selectedTag) not_eq SET_OF_ID3_TAGS.end();
 			if (found) {
 				std::string val { keyword.substr(pos + 1) };
 				return std::make_shared<std::pair<std::string,
@@ -1578,8 +1600,8 @@ struct ID3
 	
 	func get(const std::string& tag) const
 	{
-		auto found { tags.find(tag) };
-		if (found != tags.end())
+		var found { tags.find(tag) };
+		if (found not_eq tags.end())
 			return found->second;
 		else
 			return std::string();
@@ -1587,8 +1609,8 @@ struct ID3
 	
 	func set(const std::string& tag, const std::string& value)
 	{
-		auto found { tags.find(tag) };
-		if (found != tags.end())
+		var found { tags.find(tag) };
+		if (found not_eq tags.end())
 			found->second = value;
 		else
 			tags.emplace(std::make_pair(tag, value));
@@ -1601,11 +1623,11 @@ struct ID3
 	
 //	func operator [](const std::string& tag) -> std::string&
 //	{
-//		auto found { tags.find(tag) };
-//		if (found != tags.end())
+//		var found { tags.find(tag) };
+//		if (found not_eq tags.end())
 //			return found->second;
 //		else {
-//			auto newItem { std::make_pair(tag, "") };
+//			var newItem { std::make_pair(tag, "") };
 //			tags.emplace(std::move(newItem));
 //			return tags.find(tag)->second;
 //		}
@@ -1619,20 +1641,20 @@ struct ID3
 	friend
 	func operator % (const ID3& l, const std::string& keyword) -> bool
 	{
-		auto keyVal { l.parseInput(keyword) };
+		var keyVal { l.parseInput(keyword) };
 		if (keyVal) {
 			if (keyVal->first == "id3") {
-				for (auto& tag : l.tags)
+				for (var& tag : l.tags)
 					if (isContains(	tag.second, keyVal->second,
 									l.isCaseInsensitive ? IgnoreCase::Both
 									: IgnoreCase::None)
-						!= std::string::npos)
+						not_eq std::string::npos)
 						return true;
 			} else
 				return isContains(l[keyVal->first], keyVal->second,
 								  l.isCaseInsensitive ? IgnoreCase::Both
 								  : IgnoreCase::None)
-						!= std::string::npos;
+						not_eq std::string::npos;
 		}
 		
 		return false;
@@ -1646,8 +1668,8 @@ private:
 	static
 	func btoi(const char* bytes, const int size, const int offset)
 	{
-		unsigned int result = 0x00;
-		for(auto i { 0 }; i < size; ++i)
+		var result { (unsigned int) 0x00 };
+		for (var i { 0 }; i < size; ++i)
 		{
 			result = result << 8;
 			result = result | (unsigned char) bytes[offset + i];
@@ -1661,16 +1683,16 @@ private:
 	func itob(const int integer, char* result[4])
 	{
 		// We need to reverse the bytes because Intel uses little endian.
-		constexpr auto size { 4 };
-		char* aux = (char*) &integer;
-		for(auto i = size - 1; i >= 0; i--)
+		constexpr var size { 4 };
+		var aux { (char*) &integer };
+		for (var i { size - 1 }; i >= 0; i--)
 			*result[size - 1 - i] = aux[i];
 	}
 	
 	static
 	func syncint_encode(int value)
 	{
-		int out = 0, mask = 0x7F;
+		var out { 0 }, mask { 0x7F };
 
 		while (mask ^ 0x7FFFFFFF) {
 			out = value & ~mask;
@@ -1702,13 +1724,13 @@ private:
 	}
 	
 	struct V2 {
-		static constexpr auto SZ_HEADER 				= 10;
-		static constexpr auto SZ_TAG 					= 3;
-		static constexpr auto SZ_VERSION 				= 1;
-		static constexpr auto SZ_REVISION				= 1;
-		static constexpr auto SZ_FLAGS 					= 1;
-		static constexpr auto SZ_HEADER_SIZE 			= 4;
-		static constexpr auto SZ_EXTENDED_HEADER_SIZE 	= 4;
+		static constexpr var SZ_HEADER 					= 10;
+		static constexpr var SZ_TAG 					= 3;
+		static constexpr var SZ_VERSION 				= 1;
+		static constexpr var SZ_REVISION				= 1;
+		static constexpr var SZ_FLAGS 					= 1;
+		static constexpr var SZ_HEADER_SIZE 			= 4;
+		static constexpr var SZ_EXTENDED_HEADER_SIZE 	= 4;
 		
 		
 		property char 	tag[SZ_TAG];
@@ -1722,7 +1744,7 @@ private:
 			major_version{0x0}, minor_version{0x0}, flags{0x0},
 			tag_size{0}, extended_header_size{0}
 		{
-			auto position{ 0 };
+			var position { 0 };
 			std::memcpy(tag, buffer, SZ_TAG);
 			major_version = buffer[position += SZ_TAG];
 			minor_version = buffer[position += SZ_VERSION];
@@ -1736,21 +1758,21 @@ private:
 		}
 		
 		struct Frame {
-			static constexpr auto SZ_HEADER 					= 10;
-			static constexpr auto SZ_ID 						= 4;
-			static constexpr auto SZ_SIZE 						= 4;
-			static constexpr auto SZ_FLAGS 						= 2;
-			static constexpr auto SZ_ENCODING 					= 1;
-			static constexpr auto SZ_LANGUAGE 					= 3;
-			static constexpr auto SZ_SHORT_DESCRIPTION 			= 1;
+			static constexpr var SZ_HEADER 						= 10;
+			static constexpr var SZ_ID 							= 4;
+			static constexpr var SZ_SIZE 						= 4;
+			static constexpr var SZ_FLAGS 						= 2;
+			static constexpr var SZ_ENCODING 					= 1;
+			static constexpr var SZ_LANGUAGE 					= 3;
+			static constexpr var SZ_SHORT_DESCRIPTION 			= 1;
 			
-			static constexpr auto INVALID_FRAME 	= 0;
-			static constexpr auto TEXT_FRAME 		= 1;
-			static constexpr auto COMMENT_FRAME 	= 2;
-			static constexpr auto APIC_FRAME 		= 3;
+			static constexpr var INVALID_FRAME 		= 0;
+			static constexpr var TEXT_FRAME 		= 1;
+			static constexpr var COMMENT_FRAME 		= 2;
+			static constexpr var APIC_FRAME 		= 3;
 			
-			static constexpr auto ISO_ENCODING 		= 0;
-			static constexpr auto UTF_16_ENCODING 	= 1;
+			static constexpr var ISO_ENCODING 		= 0;
+			static constexpr var UTF_16_ENCODING 	= 1;
 			
 			property char id[SZ_ID];
 			property char flags[SZ_FLAGS];
@@ -1759,7 +1781,7 @@ private:
 			
 			func isValid() const
 			{
-				return size != 0;
+				return size not_eq 0;
 			}
 			
 			Frame(const char* const raw, int offset, const int major_version) :
@@ -1775,7 +1797,7 @@ private:
 				std::memcpy(flags, raw + (offset += SZ_SIZE), 2);
 				
 				// Load frame data
-				auto tmp = raw;
+				var tmp { raw };
 				if (*(tmp + (offset + SZ_FLAGS)) == '\0')
 					offset++;
 				
@@ -1796,14 +1818,13 @@ public:
 	{
 		if (not path and not a_path)
 			return;
-		std::fstream file;
-		file.open(a_path ? a_path : path);
+		var file { std::fstream(a_path ? a_path : path) };
 		
 		file.seekp(0, std::ios_base::end);
-		const int end = int(file.tellp());
+		const var end { int(file.tellp()) };
 		
 		file.seekp(end - 128);
-		int pos = int(file.tellp());
+		var pos { int(file.tellp()) };
 		
 		func set{[&file, &pos](ID3* const id3,
 							   const char* const key,
@@ -1816,7 +1837,7 @@ public:
 			else if (key)
 				currVal = id3->get(key).c_str();
 			
-			auto val { key ? (value ? value : (currVal ? currVal
+			var val { key ? (value ? value : (currVal ? currVal
 							  : nullptr)) : nullptr };
 			
 			if (val) {
@@ -1840,9 +1861,9 @@ public:
 		set(this, nullptr, 1);
 		set(this, "track", 1);
 		
-		if (auto genre { get("genre") };
+		if (var genre { get("genre") };
 			not genre.empty())
-			for (auto i{0}; auto& g : GENRES) {
+			for (var i { 0 }; var& g : GENRES) {
 				if (genre == g) {
 					set(this, "genre", 1, std::to_string(i).c_str());
 					break;
@@ -1858,9 +1879,9 @@ public:
 	
 	func string() const
 	{
-		std::string s;
+		var s { std::string() };
 		
-		for (auto& tag : tags)
+		for (var& tag : tags)
 		{
 			if (tag.second.empty())
 				continue;
@@ -1874,14 +1895,13 @@ public:
 		return s;
 	}
 	
-	ID3() { }
+	ID3(): path{nullptr} { }
 	
 	ID3(const char* const path, const bool case_insensitive = false)
 	{
 		this->path = path;
 		isCaseInsensitive = case_insensitive;
-		std::ifstream file;
-		file.open(path, std::ios::in | std::ios::ate | std::ios::binary);
+		var file { std::ifstream(path, std::ios::in | std::ios::ate | std::ios::binary) };
 		if (not file.good()) {
 			this->path = nullptr;
 			return;
@@ -1893,10 +1913,10 @@ public:
 			file.read(s_tag, V2::SZ_HEADER)
 			and isEqual(s_tag, "ID3", IgnoreCase::None, 3))
 		{
-			V2 tag(s_tag);
+			var tag { V2(s_tag) };
 			if (char bytes[tag.tag_size + 10];
 				
-				tag.major_version != 0
+				tag.major_version not_eq 0
 				and file.read(bytes, tag.tag_size + 10))
 			{
 				
@@ -1905,14 +1925,14 @@ public:
 					? "." + std::to_string(tag.minor_version)
 					: ""));
 				
-				auto isv24 { tag.major_version == 4 };
-				auto isv23 { tag.major_version == 3 };
+				var isv24 { tag.major_version == 4 };
+				var isv23 { tag.major_version == 3 };
 				
-				auto offset{ tag.extended_header_size };
+				var offset{ tag.extended_header_size };
 				
 				while (offset < tag.tag_size)
 				{
-					V2::Frame frame(bytes, offset, tag.major_version);
+					var frame { V2::Frame(bytes, offset, tag.major_version) };
 					if (frame.isValid())
 					{
 						offset += frame.size + 10;
@@ -1981,7 +2001,7 @@ public:
 							add("composer", frame.data);
 						else if (isEqual(frame.id, "TCON") and not frame.data.empty())
 						{
-							int index = -1;
+							var index { -1 };
 							
 							if (frame.data[0] == '(')
 								index = std::stoi(frame.data.substr(
@@ -2139,13 +2159,13 @@ public:
 			{
 				char buffer[size + 1];
 				buffer[size] = '\0';
-				for(int i = 0; i < size; ++i)
+				for (var i { 0 }; i < size; ++i)
 					buffer[i] = file.get();
 				
 				if (size == 1) {
 					int result = buffer[0];
-					if (auto genreIndex{0}; isGenre)
-						for (auto& g : GENRES) {
+					if (var genreIndex { 0 }; isGenre)
+						for (var& g : GENRES) {
 							if (result == genreIndex)
 								return g;
 							genreIndex++;
@@ -2158,7 +2178,7 @@ public:
 			}};
 		
 			file.seekg(0, std::ios::end);
-			const int end = int(file.tellg());
+			const var end { (int) file.tellg() };
 			file.seekg(end - 128);
 			if (get(3) == "TAG")
 			{
@@ -2170,9 +2190,9 @@ public:
 				add("comment", get(28));
 				get(/*Zero Track*/ 1);
 				add("track", get(1));
-				auto genre { get(1, true) };
-				int index;
-				if (auto [p, ec] = std::from_chars(genre.c_str(),
+				var genre { get(1, true) };
+				var index { 0 };
+				if (var [p, ec] = std::from_chars(genre.c_str(),
 								genre.c_str()+genre.size(), index);
 					ec == std::errc())
 					add("genre", GENRES[index]);
@@ -2199,17 +2219,17 @@ public:
 #undef property
 
 namespace opt {
-	std::unordered_set<std::string> EXCLUDE_EXT;
-	std::unordered_set<std::string> DEFAULT_EXT {
+	var EXCLUDE_EXT { std::unordered_set<std::string>() };
+	var DEFAULT_EXT { std::unordered_set<std::string>{
 		".mp4",  ".mkv", ".mov", ".m4v",  ".mpeg", ".mpg",  ".mts", ".ts",
 		".webm", ".flv", ".wmv", ".avi",  ".divx", ".xvid", ".dv",  ".3gp",
 		".tmvb", ".rm",  ".mpg4",".mqv",  ".ogm",  ".qt",
 		".vox",  ".3gpp",".m2ts",".m1v",  ".m2v",  ".mpe",
 		".mp3",	 ".m4a", ".aac", ".wav",  ".wma",  ".flac", ".ape", ".aiff"
 		".jpg",  ".jpeg",".png", ".gif",  ".bmp"
-	};
-	bool EXCLUDE_EXT_REPLACED = false;
-	bool DEFAULT_EXT_REPLACED = false;
+	}};
+	var EXCLUDE_EXT_REPLACED { false };
+	var DEFAULT_EXT_REPLACED { false };
 
 	std::vector<std::regex> 	listRegex, 	listExclRegex;
 	
@@ -2244,18 +2264,17 @@ namespace opt {
 		};
 	}
 
-	std::unordered_map<std::string, std::string> state;
+	var state { std::unordered_map<std::string, std::string>() };
 }
 
 
-#include <dirent.h>
+
 func directory_iterator(const fs::path& path, const unsigned char type)
 {
-	std::vector<fs::directory_entry> result;
-	
-	DIR* folder = opendir(path.string().c_str());
-	if(folder) {
-		auto parentPath { path.string() + fs::path::preferred_separator };
+	var result { std::vector<fs::directory_entry>() };
+		
+	if(var folder { opendir(path.string().c_str()) }; folder) {
+		var parentPath { path.string() + fs::path::preferred_separator };
 		struct dirent* entry;
 		readdir(folder);
 		readdir(folder);
@@ -2266,10 +2285,10 @@ func directory_iterator(const fs::path& path, const unsigned char type)
 					and isEqual(entry->d_name, ".DS_Store"))
 					;
 				else {
-					std::string name = parentPath;
+					var name { parentPath };
 					name += entry->d_name;
-					fs::path path_name { std::move(name) };
-					auto d { fs::directory_entry(std::move(path_name)) };
+					var path_name { fs::path(std::move(name)) };
+					var d { fs::directory_entry(std::move(path_name)) };
 					d.refresh();
 					if (((d.status().permissions() & ( fs::perms::owner_read
 													| fs::perms::group_read
@@ -2279,7 +2298,7 @@ func directory_iterator(const fs::path& path, const unsigned char type)
 							and entry->d_name[0] == '.'))
 						continue;
 					if (d.is_symlink()) {
-						const auto ori { fs::directory_entry(
+						const var ori { fs::directory_entry(
 										std::move(fs::read_symlink(d.path()))) };
 						if ((ori.path().empty() or not ori.exists())
 							and
@@ -2297,8 +2316,8 @@ func directory_iterator(const fs::path& path, const unsigned char type)
 				}
 			}
 		}
+		closedir(folder);
 	}
-	closedir(folder);
 	return result;
 }
 
@@ -2320,7 +2339,7 @@ func isValidFile(const fs::path& path)
 	
 	
 	
-	fs::path tmp{ path };
+	var tmp { path };
 	if (fs::is_symlink(tmp)) { //TODO: is_symlink() cannot detect macOS alias file!
 		tmp = fs::read_symlink(path);
 		
@@ -2328,7 +2347,7 @@ func isValidFile(const fs::path& path)
 			return false;
 	}
 	
-	std::string fileExt { tolower(tmp.extension().string()) };
+	var fileExt { tolower(tmp.extension().string()) };
 	if (opt::state[OPT_EXT] not_eq "*"
 		and opt::DEFAULT_EXT.find(fileExt)
 		== opt::DEFAULT_EXT.end())
@@ -2364,16 +2383,16 @@ func isValidFile(const fs::path& path)
 
 
 		bool found[2]{ false, false };
-		for (auto& z : { 0, 1 })
-		for (auto& i : { 0, 1, 2, 3 })
+		for (var& z : { 0, 1 })
+		for (var& i : { 0, 1, 2, 3 })
 		{
 			if (opt::state[*opt::date::SINGLE_DATE[z][i]] not_eq "") {
-				for (auto& r : *opt::date::RANGE_DATE[z][i])
+				for (var& r : *opt::date::RANGE_DATE[z][i])
 					if (ft[z][i] >= r.first and ft[z][i] <= r.second ) {
 						found[z] = true;
 						break;
 					}
-				for (auto& t : *opt::date::OPERATOR_DATE[z][i])
+				for (var& t : *opt::date::OPERATOR_DATE[z][i])
 					if (t.first == '=') {
 						if (ft[z][i] == t.second) {
 							found[z] = true;
@@ -2400,9 +2419,9 @@ func isValidFile(const fs::path& path)
 	}
 	
 	
-	if (bool found{ false }; not opt::state[OPT_REGEX].empty()) {
-		for (auto filename{ excludeExtension(tmp.filename()) };
-			 auto& regex : opt::listRegex)
+	if (var found { false }; not opt::state[OPT_REGEX].empty()) {
+		for (var filename { excludeExtension(tmp.filename()) };
+			 var& regex : opt::listRegex)
 			if (std::regex_search(filename, regex)) {
 				found = true;
 				break;
@@ -2412,26 +2431,26 @@ func isValidFile(const fs::path& path)
 	}
 	
 	if (not opt::state[OPT_EXCLREGEX].empty())
-		for (auto filename{ excludeExtension(tmp.filename()) };
-			 auto& regex : opt::listExclRegex)
+		for (var filename { excludeExtension(tmp.filename()) };
+			 var& regex : opt::listExclRegex)
 			if (std::regex_search(filename, regex))
 				return false;
 	
 	if (not opt::listFind.empty() or not opt::listExclFind.empty()) // MARK: Find statement
 	{
-		auto ismp3 { isEqual(fileExt.c_str(), {".mp3", ".aac", ".m4a"}) };
-		auto filename { excludeExtension(tmp.filename()) };
-		auto isCaseInsensitive { opt::state[OPT_CASEINSENSITIVE] == "true" };
+		var ismp3 { isEqual(fileExt.c_str(), {".mp3", ".aac", ".m4a"}) };
+		var filename { excludeExtension(tmp.filename()) };
+		var isCaseInsensitive { opt::state[OPT_CASEINSENSITIVE] == "true" };
 		
-		ID3 id3;
+		var id3 { ID3() };
 		if (ismp3)
 			id3 = ID3(tmp.string().c_str(), isCaseInsensitive);
 	
-		if (bool found{ false }; not opt::listFind.empty())
+		if (var found { false }; not opt::listFind.empty())
 		{
-			for (auto& keyword : opt::listFind)
+			for (var& keyword : opt::listFind)
 			{
-				auto handled { keyword[0] == char(1) };
+				var handled { keyword[0] == char(1) };
 				if (not handled and ismp3 and (handled = true))
 					found = id3 % keyword;
 				
@@ -2447,10 +2466,10 @@ func isValidFile(const fs::path& path)
 				return false;
 		}
 
-		for (auto& keyword : opt::listExclFind)
+		for (var& keyword : opt::listExclFind)
 		{
-			auto handled { keyword[0] == char(1) };
-			if (auto found { false }; not handled and ismp3 and (handled = true)) {
+			var handled { keyword[0] == char(1) };
+			if (var found { false }; not handled and ismp3 and (handled = true)) {
 				found = id3 % keyword;
 				if (handled and found)
 					return false;
@@ -2463,13 +2482,13 @@ func isValidFile(const fs::path& path)
 	}
 
 
-	if (bool found{ false };
+	if (var found { false };
 		not opt::listSize.empty()
-		or (opt::state[OPT_SIZEOPGT][0] != '\0' and opt::state[OPT_SIZE] != "0"))
+		or (opt::state[OPT_SIZEOPGT][0] not_eq '\0' and opt::state[OPT_SIZE] not_eq "0"))
 	{
-		const std::uintmax_t fileSize{ fs::file_size(tmp) };
+		const var fileSize { fs::file_size(tmp) };
 		
-		for (auto& range : opt::listSize)
+		for (var& range : opt::listSize)
 			if (fileSize > range.first and fileSize < range.second) {
 				found = true;
 				break;
@@ -2483,13 +2502,13 @@ func isValidFile(const fs::path& path)
 			return false;
 	}
 	
-	if (bool found{ false };
+	if (var found { false };
 		not opt::listExclSize.empty()
-		or (opt::state[OPT_EXCLSIZEOPGT][0] != '\0' and opt::state[OPT_EXCLSIZE] != "0"))
+		or (opt::state[OPT_EXCLSIZEOPGT][0] not_eq '\0' and opt::state[OPT_EXCLSIZE] not_eq "0"))
 	{
-		const std::uintmax_t fileSize{ fs::file_size(tmp) };
+		const var fileSize { fs::file_size(tmp) };
 		
-		for (auto& range : opt::listExclSize)
+		for (var& range : opt::listExclSize)
 			if (fileSize > range.first and fileSize < range.second)
 				return false;
 		
@@ -2509,12 +2528,12 @@ func getAvailableFilename(const fs::path& original,
 						  const std::string& suffix = "")
 {
 	if (fs::exists(original)) {
-		auto s{original.string()};
-		auto ext{original.extension().string()};
-		auto noext{s.substr(0, s.size() - ext.size())};
-		unsigned i{0};
+		var s { original.string() };
+		var ext { original.extension().string() };
+		var noext { s.substr(0, s.size() - ext.size()) };
+		var i { (unsigned) 0};
 		while (true) {
-			fs::path test(noext + prefix + std::to_string(++i) + suffix + ext);
+			var test { fs::path(noext + prefix + std::to_string(++i) + suffix + ext) };
 			
 			if (not fs::exists(test)) {
 				return test.string();
@@ -2527,10 +2546,10 @@ func getAvailableFilename(const fs::path& original,
 inline
 func sort(const fs::path& a, const fs::path& b, bool ascending)
 {
-	std::string afn { a.filename().string().substr(0,
+	var afn { a.filename().string().substr(0,
 	a.filename().string().size() - a.extension().string().size()) };
 
-	std::string bfn { b.filename().string().substr(0,
+	var bfn { b.filename().string().substr(0,
 	b.filename().string().size() - b.extension().string().size()) };
 
 	std::vector<MAXNUM> av, bv;
@@ -2538,7 +2557,7 @@ func sort(const fs::path& a, const fs::path& b, bool ascending)
 	containInts(bfn, &bv);
 
 	if (av.size() == bv.size())
-		for (auto i{0}; i<av.size(); ++ i) {
+		for (var i { 0 }; i<av.size(); ++ i) {
 			if (av[i] == bv[i])
 				continue;
 			return ascending ? av[i] < bv[i] : av[i] > bv[i];
@@ -2561,28 +2580,29 @@ func descending(const fs::path& a, const fs::path& b)
 func sortFiles(std::vector<fs::path>* const selectFiles)
 {
 	if (selectFiles->size() > 1) {
-		std::unordered_map<std::string, std::shared_ptr<std::vector<fs::path>>> selectFilesDirs;
 		std::sort(selectFiles->begin(), selectFiles->end());
 		
-		for (auto& f : *selectFiles) {
-			auto parent { f.parent_path().string() };
-			if (auto ptr { selectFilesDirs[parent] };
-				ptr) {
+		var selectFilesDirs { std::unordered_map<std::string,
+			std::shared_ptr<std::vector<fs::path>>>() };
+		for (var& f : *selectFiles) {
+			var parent { f.parent_path().string() };
+			if (var ptr { selectFilesDirs[parent] };
+				ptr)
 				ptr->emplace_back(f);
-			} else {
-				std::vector<fs::path> flist;
-				flist.emplace_back(f);
-				selectFilesDirs[parent] = std::make_shared<std::vector<fs::path>>(std::move(flist));
+			else {
+				var flist { std::vector<fs::path>{f} };
+				
+				selectFilesDirs[parent] = std::make_shared<std::vector<fs::path>>
+													(std::move(flist));
 			}
 		}
 		
 		selectFiles->clear();
-		for (auto& m : selectFilesDirs) {
-			std::vector<fs::path> files {*(m.second)};
+		for (var& m : selectFilesDirs) {
+			var files { *(m.second) };
 			std::sort(files.begin(), files.end(), ascending);
-			for (auto& f : files) {
+			for (var& f : files)
 				selectFiles->emplace_back(f);
-			}
 		}
 	}
 }
@@ -2592,15 +2612,15 @@ func isDirNameValid(const fs::path& dir)
 	if (opt::listFindDir.empty() and opt::listExclFindDir.empty())
 		return true;
 	
-	const auto filename { dir.filename().string() };
-	const auto ignoreCase { opt::state[OPT_CASEINSENSITIVE] == "true" };
-	for (auto& keyword : opt::listFindDir)
+	const var filename { dir.filename().string() };
+	const var ignoreCase { opt::state[OPT_CASEINSENSITIVE] == "true" };
+	for (var& keyword : opt::listFindDir)
 		if (isContains(filename, keyword, ignoreCase ? IgnoreCase::Left
 					   : IgnoreCase::None) not_eq std::string::npos)
 			return true;
 	
-	auto result { true };
-	for (auto& keyword : opt::listExclFindDir)
+	var result { true };
+	for (var& keyword : opt::listExclFindDir)
 		if (isContains(filename, keyword, ignoreCase ? IgnoreCase::Left
 					   : IgnoreCase::None) not_eq std::string::npos)
 		{
@@ -2632,15 +2652,15 @@ func listDirInto(const fs::path& ori, std::vector<fs::directory_entry>* const ou
 	if (not out)
 		return;
 	
-	auto path { std::move(ori) };
+	var path { std::move(ori) };
 	if (fs::is_symlink(ori)) {
-		std::error_code ec;
+		var ec { std::error_code() };
 		path = fs::read_symlink(ori, ec);
 		if (ec or not fs::is_directory(path))
 			return;
 	}
 
-	for (auto& child : directory_iterator(path, (includeRegularFiles
+	for (var& child : directory_iterator(path, (includeRegularFiles
 				? (DT_DIR | DT_REG) : DT_DIR)))
 		out->emplace_back(child);
 	
@@ -2659,19 +2679,19 @@ func listDirRecursivelyInto(const fs::path& path,
 	if (not out or path.empty())
 		return;
 	
-	fs::path head = path;
+	var head { path };
 	std::fill_n(std::inserter(*out, out->end()), 1, std::move(path));
 	
 	/// Try to expand single dir and put into list
-	std::vector<fs::directory_entry> list;
+	var list { std::vector<fs::directory_entry>() };
 	std::vector<fs::path> dirs;
-	std::vector<std::thread> threads;
-	std::vector<std::future<void>> asyncs;
+	var threads { std::vector<std::thread>() };
+	var asyncs { std::vector<std::future<void>>() };
 	
 	
 	func emplace{[&list, &out]()
 	{
-		for (auto& d : list)
+		for (var& d : list)
 			std::fill_n(std::inserter(*out, out->end()), 1, std::move(d.path()));
 	}};
 	
@@ -2684,7 +2704,7 @@ func listDirRecursivelyInto(const fs::path& path,
 				std::fill_n(std::inserter(*out, out->end()), 1,
 							std::move(list[0].path()));
 			if (not list.empty()) {
-				for (auto& child : list)
+				for (var& child : list)
 					if (child.is_directory())
 						dirs.emplace_back(std::move(child.path()));
 				if (dirs.empty()) {
@@ -2700,7 +2720,7 @@ func listDirRecursivelyInto(const fs::path& path,
 		
 		/// If single dir was expanded, then expand each child dir
 		
-		for (auto& d : dirs)
+		for (var& d : dirs)
 			if (d.empty())
 				continue;
 			else if (opt::state[OPT_EXECUTION] == OPT_EXECUTION_THREAD)
@@ -2715,12 +2735,12 @@ func listDirRecursivelyInto(const fs::path& path,
 		
 		
 		if (opt::state[OPT_EXECUTION] == OPT_EXECUTION_THREAD) {
-			for (auto& t : threads)
+			for (var& t : threads)
 				t.join();
 			threads.clear();
 		}
 		else if (opt::state[OPT_EXECUTION] == OPT_EXECUTION_ASYNC) {
-			for (auto& a : asyncs)
+			for (var& a : asyncs)
 				a.wait();
 			asyncs.clear();
 		}
@@ -2734,29 +2754,29 @@ func isContainsSeasonDirs(const fs::path& path)
 	if (path.empty())
 		return false;
 	
-	std::vector<fs::directory_entry> sortedDir;
+	var sortedDir { std::vector<fs::directory_entry>() };
 	listDirInto(path, &sortedDir);
 	
 	if (sortedDir.size() <= 1)
 		return false;
 	
-	auto hasDirs{false};
+	var hasDirs { false };
 	
-	auto isNum{true};
-	std::vector<MAXNUM> lastNum;
+	var isNum { true };
+	var lastNum { std::vector<MAXNUM>() };
 	
-	for (auto& child : sortedDir) {
+	for (var& child : sortedDir) {
 		hasDirs = true;
 		if (isNum) {
-			std::vector<MAXNUM> iNames;
+			var iNames { std::vector<MAXNUM>() };
 			containInts(child.path().filename().string(), &iNames);
 			if (not iNames.empty()) {
 				if (lastNum.empty()) {
 					lastNum = std::move(iNames);
 					continue;
 				} else if (lastNum.size() == iNames.size()) {
-					bool hasIncreased{false};
-					for (auto xi{0}; xi < lastNum.size(); ++xi)
+					var hasIncreased { false };
+					for (var xi { 0 }; xi < lastNum.size(); ++xi)
 						if (hasIncreased = lastNum[xi] < iNames[xi];
 							hasIncreased)
 							break;
@@ -2774,32 +2794,32 @@ func isContainsSeasonDirs(const fs::path& path)
 }
 
 namespace in {
-	std::vector<fs::path> regularDirs;
-	std::vector<fs::path> seasonDirs;
-	std::vector<fs::path> selectFiles;
-	std::vector<fs::path> listAdsDir;
+	std::vector<fs::path> 	regularDirs,
+							seasonDirs,
+							selectFiles,
+							listAdsDir;
 }
 
 namespace def {
-	const std::vector<std::string> SUBTITLES_EXT { ".srt", ".ass", ".vtt" };
-	const std::pair<char, char> FILENAME_IGNORE_CHAR {'.', ' '};
+	const var SUBTITLES_EXT { std::vector<std::string>{ ".srt", ".ass", ".vtt" } };
+	const var FILENAME_IGNORE_CHAR { std::pair<char, char>{'.', ' '} };
 	
-	constexpr auto ARG_SEP { ':' };
-	constexpr auto ARG_ASSIGN { '=' };
+	constexpr var ARG_SEP { ':' };
+	constexpr var ARG_ASSIGN { '=' };
 
-	constexpr auto ARGS_SEPARATOR {"\x0a\x0aARGS-SEPARATOR\x0a\x0a"};
+	constexpr var ARGS_SEPARATOR {"\x0a\x0aARGS-SEPARATOR\x0a\x0a"};
 
 	const std::string XML_CHARS_ALIAS[] = {"&quot", "&apos", "&lt", "&gt", "&amp"};
 	const std::string XML_CHARS_NORMAL[] = {"\"", "\\", "<", ">", "&"};
-	constexpr auto NETWORK_PROTOCOLS = {"http:", "https:", "ftp:", "ftps:", "rtsp:", "mms:"};
+	constexpr var NETWORK_PROTOCOLS = {"http:", "https:", "ftp:", "ftps:", "rtsp:", "mms:"};
 }
 
 func findSubtitleFileInto(const fs::path& original,
 					  std::vector<fs::path>* const result)
 {
-	if (auto parentPath{original.parent_path()}; not parentPath.empty()) {
-		auto noext{excludeExtension(original.filename())};
-		for (auto& f : directory_iterator(parentPath, DT_REG))
+	if (var parentPath { original.parent_path() }; not parentPath.empty()) {
+		var noext { excludeExtension(original.filename()) };
+		for (var& f : directory_iterator(parentPath, DT_REG))
 			if (isValid(f)
 				and f.path().string().size() >= original.string().size()
 				and isEqual(f.path().extension().string(), &def::SUBTITLES_EXT,
@@ -2816,7 +2836,7 @@ func findSubtitleFileInto(const fs::path& original,
 template <typename Container, typename T>
 func insertInto(Container* const out, const T& path)
 {
-	auto isFound { isValid(path) };
+	var isFound { isValid(path) };
 	if (isFound)
 		std::fill_n(std::inserter(*out, out->end()), 1, std::move(path));
 
@@ -2826,32 +2846,32 @@ func insertInto(Container* const out, const T& path)
 func checkForSeasonDir(const fs::path& path) -> void
 {
 	if (not path.empty()) {
-		auto hasDir{false};
+		var hasDir { false };
 		
-		bool isNum{true};
-		std::vector<MAXNUM> lastNum;
-		std::vector<fs::path> bufferNum;
+		var isNum { true };
+		var lastNum { std::vector<MAXNUM>() };
+		var bufferNum { std::vector<fs::path>() };
 		
 		func pullFromBufferNum{ [&bufferNum, &isNum]()
 		{
 			isNum = false;
-			for (auto& child : bufferNum) {
+			for (var& child : bufferNum) {
 				insertInto(&in::regularDirs, child);
 				checkForSeasonDir(child);
 			}
 		}};
 		
-		std::vector<fs::directory_entry> sortedDir;
+		var sortedDir { std::vector<fs::directory_entry>() };
 		listDirInto(path, &sortedDir);
 		
 		if (sortedDir.size() == 1)
 			checkForSeasonDir(sortedDir[0].path());
 		else if (sortedDir.size() > 1)
-			for (auto& child : sortedDir) {
+			for (var& child : sortedDir) {
 				hasDir = true;
 
 				if (isNum) {
-					std::vector<MAXNUM> iNames;
+					var iNames { std::vector<MAXNUM>() };
 					containInts(child.path().filename().string(), &iNames);
 					if (not iNames.empty()) {
 						if (isContainsSeasonDirs(child.path())) {
@@ -2862,8 +2882,8 @@ func checkForSeasonDir(const fs::path& path) -> void
 							bufferNum.emplace_back(child.path());
 							continue;
 						} else if (lastNum.size() == iNames.size()) {
-							bool hasIncreased{false};
-							for (auto xi{0}; xi < lastNum.size(); ++xi)
+							var hasIncreased { false };
+							for (var xi { 0 }; xi < lastNum.size(); ++xi)
 								if (lastNum[xi] < iNames[xi]) {
 									hasIncreased = true;
 									break;
@@ -2883,7 +2903,7 @@ func checkForSeasonDir(const fs::path& path) -> void
 			}
 		
 		if (isNum and hasDir) {
-			for (auto it = in::regularDirs.begin(); it != in::regularDirs.end(); ) {
+			for (var it { in::regularDirs.begin() }; it not_eq in::regularDirs.end(); ) {
 				if (*it == path) {
 					it = in::regularDirs.erase(it);
 				} else {
@@ -2899,19 +2919,19 @@ func checkForSeasonDir(const fs::path& path) -> void
 
 func getBytes(const std::string& s)
 {
-	std::string unit{"mb"};
-	std::string value{s};
+	var unit { std::string("mb") };
+	var value { s };
 	if (s.size() > 2 and std::isalpha(s[s.size() - 2])) {
 		unit = s.substr(s.size() - 2);
 		value = s.substr(0, s.size() - 2);
 	}
 	
-	uintmax_t result{0};
+	var result { (uintmax_t) 0 };
 	
 	if (not isInt(value))
 		return result;
 	
-	float v { std::stof(value) };
+	var v { std::stof(value) };
 	if (v <= 0)
 		return result;
 	
@@ -2932,16 +2952,16 @@ func getBytes(const std::string& s)
 func getRange(const std::string& argv, const std::string& separator)
 		-> std::shared_ptr<std::pair<uintmax_t, uintmax_t>>
 {
-	auto pos{argv.find(separator)};
+	var pos { argv.find(separator) };
 	if (pos == std::string::npos)
 		return nullptr;
 	
-	auto first{argv.substr(0, pos)};
-	auto second{argv.substr(pos + separator.size())};
+	var first { argv.substr(0, pos) };
+	var second { argv.substr(pos + separator.size()) };
 
-	uintmax_t from{getBytes(std::move(first))};
+	var from { getBytes(std::move(first)) };
 	from = std::max(from, static_cast<uintmax_t>(0));
-	uintmax_t to{getBytes(std::move(second))};
+	var to { getBytes(std::move(second)) };
 	to = std::max(to, static_cast<uintmax_t>(0));
 	return std::make_shared<std::pair<uintmax_t, uintmax_t>>(from, to);
 }
@@ -2949,16 +2969,16 @@ func getRange(const std::string& argv, const std::string& separator)
 func expandArgsInto(const int argc, char* const argv[],
 				const int startAt, std::vector<std::string>* const args)
 {
-	bool newFull{ false };
-	unsigned lastOptCode{ 0 };
+	var newFull { false };
+	var lastOptCode { (unsigned) 0 };
 	func push{ [&newFull, &args](const char* const arg,
 								 const unsigned index,
 								 const int last)
 	{
 		if (last < 0 or index - last <= 0) return;
 				
-		unsigned size = index - last;
-		std::string newArg;
+		var size { (unsigned) (index - last) };
+		var newArg { std::string() };
 
 		if (newFull)
 			newArg = "--";
@@ -2974,21 +2994,21 @@ func expandArgsInto(const int argc, char* const argv[],
 			newFull = false;
 	}};
 	
-	const bool isMultiLine{
+	const var isMultiLine {
 		startAt < argc
 		and std::string(argv[startAt]).find("\x0a") not_eq std::string::npos
 	};
-	for (int i{startAt}; i<argc; ++i) {
-		auto arg { argv[i] };
+	for (var i { startAt }; i<argc; ++i) {
+		var arg { argv[i] };
 		
 		if (isMultiLine)
 			while (arg[0] == 0x0a or arg[0] == 0x0d)
 				arg++;
 		
-		auto len { std::strlen(arg) };
-		auto isMnemonic{ len > 1 and arg[0] == '-'
+		var len { std::strlen(arg) };
+		var isMnemonic { len > 1 and arg[0] == '-'
 			and (std::isalpha(arg[1]) or arg[1] == def::ARG_SEP or arg[1] == ';' ) };
-		auto isFull {false};
+		var isFull { false };
 		if (not isMnemonic) {
 			isFull = len > 2 and arg[0] == '-' and arg[1] == '-'
 				and (std::isalpha(arg[2]) or arg[2] == def::ARG_SEP or arg[1] == ';');
@@ -3016,10 +3036,10 @@ func expandArgsInto(const int argc, char* const argv[],
 			}
 		}
 		
-		unsigned equalOpCount{ 0 };
-		unsigned fallthrough { 0 };
-		unsigned index = lastOptCode == 3 ? -1 : (isFull and lastOptCode != 2 ? 1 : 0);
-		int last{ -1 };
+		var equalOpCount { (unsigned) 0 };
+		var fallthrough { (unsigned) 0 };
+		var index { (unsigned) lastOptCode == 3 ? -1 : (isFull and lastOptCode not_eq 2 ? 1 : 0) };
+		var last { -1 };
 		while (++index < len) {
 			if (fallthrough > 0) {
 				if (arg[index] == '"') {
@@ -3034,11 +3054,11 @@ func expandArgsInto(const int argc, char* const argv[],
 			if (last < 0 and std::isalpha(arg[index])) {
 				if (isMnemonic) {
 					lastOptCode = 1;
-					std::string new_s {'-'};
+					var new_s { std::string() };
+					new_s += '-';
 					new_s += arg[index];
 					args->emplace_back(new_s);
 				} else if (isFull) {
-					//lastOptCode = 2;
 					last = index;
 				}
 			} else {
@@ -3052,7 +3072,7 @@ func expandArgsInto(const int argc, char* const argv[],
 						last = index + 1;
 					}
 					equalOpCount++;
-				} else if (auto foundEnter { arg[index] == 0x0a };
+				} else if (var foundEnter { arg[index] == 0x0a };
 						   ((arg[index] == def::ARG_SEP or arg[index] == ';')
 						   and (index + 1 == std::strlen(arg) or
 								(index + 1 < std::strlen(arg) and std::isalpha(arg[index + 1])))
@@ -3101,8 +3121,8 @@ func timeLapse(std::chrono::system_clock::time_point& start,
 			   const std::string& msg,
 			   const bool resetStart=false)
 {
-	auto value { (std::chrono::system_clock::now() - start).count() };
-	unsigned inc{ 0 };
+	var value { (std::chrono::system_clock::now() - start).count() };
+	var inc { (unsigned) 0 };
 	while (value / 1000 > 0 and inc < 2) {
 		inc++;
 		value /= 1000;
@@ -3128,21 +3148,20 @@ func parseKeyValue(std::string* const s, const bool isExclude)
 	if (not s or s->empty())
 		return false;
 		
-	const char* keyword = "";
-	std::string value;
-	bool isKeyValue { true };
-	for (auto& key : {"dir", OPT_EXT, OPT_EXCLEXT,
+	const char* keyword { "" };
+	var value { std::string() };
+	var isKeyValue { true };
+	for (var& key : {"dir", OPT_EXT, OPT_EXCLEXT,
 		OPT_CASEINSENSITIVE, OPT_EXCLHIDDEN, OPT_SIZE, OPT_EXCLSIZE,
 		"case-insensitive", "caseinsensitive",
 		"ignore-case", "ignorecase", OPT_DATE, OPT_EXCLDATE, OPT_DCREATED,
 		OPT_DCHANGED, OPT_DACCESSED, OPT_DMODIFIED,
    OPT_DEXCLCREATED, OPT_DEXCLCHANGED, OPT_DEXCLMODIFIED, OPT_DEXCLACCESSED})
 	{
-		const auto sz { std::strlen(key) };
+		const var sz { std::strlen(key) };
 		
 		if (s->size() > sz + 2)
-			if (const auto c{ s->at(sz) };
-				
+			if (const var c { s->at(sz) };
 				s->starts_with(key) and (c == '=' or c == '<' or c == '>'))
 			{
 				keyword = key;
@@ -3152,15 +3171,15 @@ func parseKeyValue(std::string* const s, const bool isExclude)
 	}
 	if (isEqual(keyword, { OPT_SIZE,OPT_EXCLSIZE}))
 	{
-		auto pos { value.find("..") };
-		auto next { 2 };
+		var pos { value.find("..") };
+		var next { 2 };
 		if (pos == std::string::npos) {
 			pos =value.find('-');
 			next = 1;
 		}
-		if (pos != std::string::npos) {
-			auto lower { getBytes(value.substr(0, pos))};
-			auto upper { getBytes(value.substr(pos + next)) };
+		if (pos not_eq std::string::npos) {
+			var lower { getBytes(value.substr(0, pos))};
+			var upper { getBytes(value.substr(pos + next)) };
 			if (lower > upper)
 				isKeyValue = false;
 			else {
@@ -3172,9 +3191,9 @@ func parseKeyValue(std::string* const s, const bool isExclude)
 							   upper));
 			}
 		}
-		else if (const auto havePrefix { value[0] == '<' or value[0] == '>'};
+		else if (const var havePrefix { value[0] == '<' or value[0] == '>'};
 				 havePrefix) {
-			if (auto number { getBytes(value.substr(havePrefix ? 1 : 0)) };
+			if (var number { getBytes(value.substr(havePrefix ? 1 : 0)) };
 				number < 0)
 				isKeyValue = false;
 			else {
@@ -3203,12 +3222,11 @@ func parseKeyValue(std::string* const s, const bool isExclude)
 		OPT_DCREATED, OPT_DCHANGED, OPT_DACCESSED, OPT_DMODIFIED,
    OPT_DEXCLCREATED, OPT_DEXCLCHANGED, OPT_DEXCLMODIFIED, OPT_DEXCLACCESSED}))
    {
-	   const auto havePrefix { value[0] == '<' or value[0] == '>'};
-	   if (auto opGt{ value[0] };
-		   
+	   const var havePrefix { value[0] == '<' or value[0] == '>'};
+	   if (var opGt { value[0] };
 		   havePrefix or opGt == '=')
 	   {
-		   if (Date date(value);
+		   if (var date { Date(value) };
 			   not date.isValid())
 			   isKeyValue = false;
 		   else {
@@ -3246,30 +3264,30 @@ func parseKeyValue(std::string* const s, const bool isExclude)
 		   }
 	   }
 	   else {
-		   auto pos { value.find("..") };
-		   auto next { 2 };
+		   var pos { value.find("..") };
+		   var next { 2 };
 		   
 		   if (pos == std::string::npos) {
 			   next = 1;
-			   unsigned strip { 0 };
+			   var strip { (unsigned) 0 };
 			   pos = 0;
-			   for (auto m{ 0 }; m < value.size(); ++m)
+			   for (var m { 0 }; m < value.size(); ++m)
 				   if (value[m] == '-') {
 					   strip++;
 					   pos = m;
 				   }
-			   if (strip != 1)
+			   if (strip not_eq 1)
 				   pos = std::string::npos;
 		   }
 		   
 		   if (pos == std::string::npos)
 			   isKeyValue = false;
 		   else {
-			   if (Date lower(value.substr(0, pos));
+			   if (var lower { Date(value.substr(0, pos)) };
 				   not lower.isValid())
 				   isKeyValue = false;
 			   else {
-				   if (Date upper(value.substr(pos + next));
+				   if (var upper { Date(value.substr(pos + next)) };
 					   not upper.isValid() or lower > upper)
 					   isKeyValue = false;
 				   else {
@@ -3308,20 +3326,20 @@ func parseKeyValue(std::string* const s, const bool isExclude)
 		   }
 	   }
    }
-   else if (0 != std::strlen(keyword)) {
+   else if (0 not_eq std::strlen(keyword)) {
 	   opt::state[OPT_CASEINSENSITIVE] = value;
 		if (isEqual(value, "true", IgnoreCase::Left)) {
-			for (auto& k : opt::listFindDir) k = tolower(k);
-			for (auto& k : opt::listExclFindDir) k = tolower(k);
-			for (auto& k : opt::listFind) k = tolower(k);
-			for (auto& k : opt::listExclFind) k = tolower(k);
+			for (var& k : opt::listFindDir) k = tolower(k);
+			for (var& k : opt::listExclFindDir) k = tolower(k);
+			for (var& k : opt::listFind) k = tolower(k);
+			for (var& k : opt::listExclFind) k = tolower(k);
 		}
 	}
 	
-	if (isKeyValue and 0 != std::strlen(keyword))
+	if (isKeyValue and 0 not_eq std::strlen(keyword))
 		s->insert(0, 1, char(1));
 	
-	return 0 != std::strlen(keyword);
+	return 0 not_eq std::strlen(keyword);
 }
 
 template <typename  T>
@@ -3329,9 +3347,9 @@ func getLinesInto(std::basic_istream<T>* const inputStream,
 			  std::vector<std::string>* const lines,
 			  const std::initializer_list<std::string>&& excludePrefix)
 {
-	int commentCount { 0 };
-	bool isComment { false };
-	std::string buff;
+	var commentCount { 0 };
+	var isComment { false };
+	var buff { std::string() };
 	T c;
 		
 	func push{[&lines, &buff]()
@@ -3344,8 +3362,8 @@ func getLinesInto(std::basic_istream<T>* const inputStream,
 	
 	func hasPrefix{[&c, &inputStream, &excludePrefix]()
 	{
-		unsigned i { 0 };
-		for (const auto& s : excludePrefix) {
+		var i { (unsigned) 0 };
+		for (const var& s : excludePrefix) {
 			if (c == s[i]) {
 				i++;
 				
@@ -3379,7 +3397,7 @@ func getLinesInto(std::basic_istream<T>* const inputStream,
 		}
 		else if (buff.empty() and c == std::isspace(c))
 			continue;
-		else if (auto peek { inputStream->peek() };
+		else if (var peek { inputStream->peek() };
 				 c == '/' and (peek == '/' or peek == '*')) {
 			if (peek == '*')
 				commentCount++;
@@ -3413,10 +3431,10 @@ func writeConfig(const std::vector<std::string>* const args,
 							 const ReadDirection direction,
 							 const bool removeOptPrefix = false)
 	{
-		std::string buffer;
-		auto foundSep { false };
-		for (unsigned i { 0 }; i<args->size(); ++i) {
-			const auto s = (*args)[i];
+		var buffer { std::string() };
+		var foundSep { false };
+		for (var i { 0 }; i<args->size(); ++i) {
+			const var s { (*args)[i] };
 			if (s == def::ARGS_SEPARATOR)
 			{
 				foundSep = true;
@@ -3427,8 +3445,8 @@ func writeConfig(const std::vector<std::string>* const args,
 			} else if (direction == ReadDirection::Current and not foundSep)
 				continue;
 			
-			unsigned offset = 0;
-			auto isOpt { s.starts_with("--") };
+			var offset { (unsigned) 0 };
+			var isOpt { s.starts_with("--") };
 			if (isOpt)
 				offset = 2;
 			else if (isOpt = s.size() >= 2 and s[0] == '-' and std::isalpha(s[1])
@@ -3441,7 +3459,7 @@ func writeConfig(const std::vector<std::string>* const args,
 						OPT_INSTALL, OPT_UNINSTALL, OPT_UPDATE}))
 					or (offset == 1 and (s[1] == 'W')))
 				{
-					if (auto next { i + 1 < args->size() ? (*args)[i + 1] : "" };
+					if (var next { i + 1 < args->size() ? (*args)[i + 1] : "" };
 						OPT_WRITEDEFAULTS
 						and not isEqual(next.c_str(), OPT_WRITEDEFAULTS_ARGS,
 										IgnoreCase::Left))
@@ -3464,19 +3482,19 @@ func writeConfig(const std::vector<std::string>* const args,
 			lines->emplace_back(std::move(buffer));
 	}};
 	
-	std::unordered_set<std::string> definedList;
-	std::vector<std::string> lines;
+	var definedList { std::unordered_set<std::string>() };
+	var lines { std::vector<std::string>() };
 	if (	mode == WriteConfigMode::Edit
 		or 	mode == WriteConfigMode::Remove)
 	{
-		std::vector<std::string> newLines;
+		var newLines { std::vector<std::string>() };
 		argsToLines(&lines, ReadDirection::Old, false);
 		argsToLines(&newLines, ReadDirection::Current, false);
 	
 		if (mode == WriteConfigMode::Remove) {
-			for (auto line = lines.begin(); line<lines.end();) {
-				auto found { false };
-				for (auto& opt : newLines)
+			for (var line { lines.begin() }; line<lines.end();) {
+				var found { false };
+				for (var& opt : newLines)
 					if (found = *line == opt; found) {
 						lines.erase(line);
 						break;
@@ -3485,8 +3503,8 @@ func writeConfig(const std::vector<std::string>* const args,
 					line++;
 			}
 		} else {
-			for (auto line = newLines.begin(); line<newLines.end(); ++line)
-				if (bool isOpt {
+			for (var line { newLines.begin() }; line<newLines.end(); ++line)
+				if (var isOpt {
 					(line->size() > 3 and line->starts_with("--")
 						and std::isalpha((*line)[2]) and std::isalpha((*line)[3]))
 					or
@@ -3496,7 +3514,7 @@ func writeConfig(const std::vector<std::string>* const args,
 					
 					isOpt)
 				{
-					auto pos { line->find('=') };
+					var pos { line->find('=') };
 					if (pos == std::string::npos)
 						pos = line->find(' ');
 					
@@ -3504,9 +3522,9 @@ func writeConfig(const std::vector<std::string>* const args,
 						definedList.emplace(line->substr(0, pos));
 				}
 			
-			for (auto line = lines.begin(); line<lines.end();) {
-				auto found { false };
-				for (auto& opt : definedList)
+			for (var line { lines.begin() }; line<lines.end();) {
+				var found { false };
+				for (var& opt : definedList)
 					if (found = line->starts_with(opt); found) {
 						lines.erase(line);
 						break;
@@ -3516,7 +3534,7 @@ func writeConfig(const std::vector<std::string>* const args,
 			}
 			
 			
-			for (auto& line : newLines)
+			for (var& line : newLines)
 				lines.emplace_back(std::move(line));
 		}
 		
@@ -3528,9 +3546,9 @@ func writeConfig(const std::vector<std::string>* const args,
 		argsToLines(&lines, ReadDirection::All, true);
 	
 	/// Remove duplication
-	for (auto line = lines.end() - 1; line>=lines.begin(); --line) {
-		auto found { false };
-		for (auto& opt : SINGLE_VALUE_OPT)
+	for (var line { lines.end() - 1 }; line>=lines.begin(); --line) {
+		var found { false };
+		for (var& opt : SINGLE_VALUE_OPT)
 		{
 			if (line->starts_with(*opt)) {
 				if (definedList.find(*opt) == definedList.end())
@@ -3550,7 +3568,7 @@ func writeConfig(const std::vector<std::string>* const args,
 		}
 	}
 	
-	std::fstream file(CONFIG_PATH, std::ios::out);
+	var file { std::fstream(CONFIG_PATH, std::ios::out) };
 	#define DATE_FORMAT	"%A, %d %B %Y at %I:%M:%S %p"
 	if (mode == WriteConfigMode::New )
 		file << "# Configuration made in " << Date::now().string(DATE_FORMAT) << '\n';
@@ -3558,7 +3576,7 @@ func writeConfig(const std::vector<std::string>* const args,
 		file << "# Edited on " << Date::now().string(DATE_FORMAT) << '\n';
 	#undef DATE_FORMAT
 	
-	for (auto& line : lines)
+	for (var& line : lines)
 		file << line << '\n';
 	
 	file.flush();
@@ -3574,18 +3592,18 @@ func loadConfigInto(std::vector<std::string>* const args)
 		or not fs::is_regular_file(opt::state[OPT_LOADCONFIG]))
 		return;
 	
-	std::ifstream file(opt::state[OPT_LOADCONFIG], std::ios::in);
+	var file { std::ifstream(opt::state[OPT_LOADCONFIG], std::ios::in) };
 	file.seekg(0);
 
-	std::vector<std::string> lines;
+	var lines { std::vector<std::string>() };
 	getLinesInto(&file, &lines, {"--"});
 	
 	file.close();
 	
-	for (auto found{ false };
-		 const auto& line : lines) {
+	for (var found { false };
+		 const var& line : lines) {
 		for (const char* const *const opt : OPTS)
-			if (auto isMnemonic {
+			if (var isMnemonic {
 				(line.size() >= 2 and line[0] == '-' and std::isalpha(line[1])
 				 and (line.size() == 2 or (line[3] == '=' or line[3] == ' ')))
 				or (line.size() == 1 and std::isalpha(line[0]))
@@ -3610,9 +3628,9 @@ func loadConfigInto(std::vector<std::string>* const args)
 						args->emplace_back("--" + std::string(*opt));
 				}
 				
-				if (auto col{ line.find('=') };
-					col != std::string::npos
-					or line.find(' ') != std::string::npos)
+				if (var col { line.find('=') };
+					col not_eq std::string::npos
+					or line.find(' ') not_eq std::string::npos)
 				{
 					if (col == std::string::npos)
 						col = line.find(' ');
@@ -3623,19 +3641,19 @@ func loadConfigInto(std::vector<std::string>* const args)
 						;
 					
 					if (col < line.size()) {
-						auto value { line.substr(col) };
+						var value { line.substr(col) };
 						
-						std::vector<unsigned> puncs;
-						for (unsigned i{ 0 }; i<value.size(); ++i)
+						var puncs { std::vector<unsigned>() };
+						for (unsigned i { 0 }; i<value.size(); ++i)
 							if (value[i] == '"')
 								puncs.emplace_back(i);
 						
 						if (value[0] == '"' and puncs.size() % 2 == 0 and puncs.size() > 2) {
 							if (args)
-								for (unsigned k{ 0 }; k<puncs.size(); k += 2)
+								for (var k { 0 }; k<puncs.size(); k += 2)
 								{
-									std::string sub;
-									for (auto j{puncs[k] + 1}; j<puncs[k + 1]; j++)
+									var sub { std::string() };
+									for (var j { puncs[k] + 1 }; j<puncs[k + 1]; j++)
 										sub += value[j];
 									/* MARK: C++ Library BUG!
 										std::string.substr() cannot be used for more than twice.
@@ -3671,14 +3689,14 @@ func isNetworkTransportFile(const std::string& fullPath)
 	return false;
 }
 
-func replace_all(std::string& inout,
+func replace_all(std::string& s,
 				 const std::string_view what, const std::string_view with)
 {
-	std::size_t count{};
-	for (std::string::size_type pos{};
-		 inout.npos != (pos = inout.find(what.data(), pos, what.length()));
+	var count { (std::size_t) 0 };
+	for (var pos { (std::string::size_type) 9 };
+		 s.npos not_eq (pos = s.find(what.data(), pos, what.length()));
 		 pos += with.length(), ++count) {
-		inout.replace(pos, what.length(), with.data(), with.length());
+		s.replace(pos, what.length(), with.data(), with.length());
 	}
 }
  
@@ -3693,7 +3711,7 @@ func installMan(bool install)
 	{
 	if (not fs::exists(MANPATH))
 		std::system("mkdir " MANPATH);
-	std::ofstream file(MANPATH MANFILE);
+	var file { std::ofstream(MANPATH MANFILE) };
 	
 	file <<
 	".\" Manpage for tvplaylist.\n"
@@ -3709,12 +3727,12 @@ then by default, arranged one episode per Title.\n"
 	".SH OPTIONS\n"
 	;
 	
-	constexpr auto MARK { "        " };
-	for (auto i{ 1 }; i<(sizeof(ALL_HELPS) / sizeof(ALL_HELPS[0])); ++i) {
-		auto buff = std::string(*ALL_HELPS[i]);
-		const auto pos { buff.find(MARK) };
-		if (pos != std::string::npos) {
-			auto opts = buff.substr(0, pos);
+	constexpr var MARK { "        " };
+	for (var i { 1 }; i<(sizeof(ALL_HELPS) / sizeof(ALL_HELPS[0])); ++i) {
+		var buff { std::string(*ALL_HELPS[i]) };
+		const var pos { buff.find(MARK) };
+		if (pos not_eq std::string::npos) {
+			var opts { buff.substr(0, pos) };
 			replace_all(opts, "\n     ", "\n");
 			file << ".TP\n" << opts << '\n';
 			
@@ -3742,7 +3760,7 @@ func loadPlaylistInto(const fs::path& path, std::vector<fs::path>* const outPath
 	if (not outPaths or path.empty() or not fs::exists(path))
 		return;
 	
-	fs::path lastParent;
+	var lastParent { fs::path() };
 	func prolog{[&path, &lastParent](std::ifstream* const file) {
 		lastParent = fs::current_path();
 		fs::current_path(path.parent_path());
@@ -3758,9 +3776,9 @@ func loadPlaylistInto(const fs::path& path, std::vector<fs::path>* const outPath
 	func push{[&outPaths](std::string& buff) {
 		if (buff.empty())
 			return;
-		auto found { false };
+		var found { false };
 		
-		if (buff.find('%') != std::string::npos
+		if (buff.find('%') not_eq std::string::npos
 			and isNetworkTransportFile(buff)) {
 			replace_all(buff, "%20", " ");
 			replace_all(buff, "%3D", "=");
@@ -3799,11 +3817,11 @@ func loadPlaylistInto(const fs::path& path, std::vector<fs::path>* const outPath
 				  std::string* const before = nullptr)
 	{
 		char c;
-		unsigned long index = 0;
-		unsigned long indexMax = std::strlen(keyword);
-		std::string buff;
-		const auto lastPos { file->tellg() };
-		unsigned commentCount { 0 };
+		var index { (unsigned long) 0 };
+		var indexMax { (unsigned long) std::strlen(keyword) };
+		var buff { std::string() };
+		const var lastPos { file->tellg() };
+		var commentCount { (unsigned) 0 };
 		while ((c = file->get()) and not file->eof()) {
 			if (commentCount > 0
 				and c == '-' and file->peek() == '-') {
@@ -3857,8 +3875,8 @@ func loadPlaylistInto(const fs::path& path, std::vector<fs::path>* const outPath
 	func getLines{[](std::ifstream* const file,
 					 std::vector<std::string>* const lines)
 	{
-		std::string buff;
-		bool isComment{ false };
+		var buff { std::string() };
+		var isComment { false };
 		char c;
 		func push{[&buff, &lines]() {
 			if (not buff.empty()) {
@@ -3892,7 +3910,7 @@ func loadPlaylistInto(const fs::path& path, std::vector<fs::path>* const outPath
 		for (const char* const prefix : *prefixes)
 			if (after(file, prefix)) {
 				for (const char* const suffix : *suffixes)
-					if (std::string value;
+					if (var value { std::string() };
 						after(file, suffix, &value))
 					{
 //						" to  &quot;
@@ -3900,8 +3918,8 @@ func loadPlaylistInto(const fs::path& path, std::vector<fs::path>* const outPath
 //						< to  &lt;
 //						> to  &gt;
 //						& to  &amp;
-						if (value.find('&') != std::string::npos)
-							for (auto w { 0 }; w<sizeof(def::XML_CHARS_ALIAS) /sizeof(def::XML_CHARS_ALIAS[0]); ++w)
+						if (value.find('&') not_eq std::string::npos)
+							for (var w { 0 }; w<sizeof(def::XML_CHARS_ALIAS) /sizeof(def::XML_CHARS_ALIAS[0]); ++w)
 								if (isContains(value, def::XML_CHARS_ALIAS[w],
 									IgnoreCase::Left) not_eq std::string::npos)
 								{
@@ -3919,7 +3937,7 @@ func loadPlaylistInto(const fs::path& path, std::vector<fs::path>* const outPath
 		(std::initializer_list<const char* const>&& prefixes,
 		 std::initializer_list<const char* const>&& suffixes)
 	{
-		std::ifstream file;
+		var file { std::ifstream() };
 		prolog(&file);
 		while (xml_tag(&file, &prefixes, &suffixes))
 				;
@@ -3927,32 +3945,32 @@ func loadPlaylistInto(const fs::path& path, std::vector<fs::path>* const outPath
 	}};
 	
 	func pls{[&prolog, &epilogue, &getLines, &push]() {
-		std::ifstream file;
+		var file { std::ifstream() };
 		prolog(&file);
-		std::vector<std::string> lines;
+		var lines { std::vector<std::string>() };
 		getLines(&file, &lines);
-		for (auto& line : lines)
-			if (unsigned long col;
+		for (var& line : lines)
+			if (var col { std::string::npos };
 				line.starts_with("File")
-				and (col = line.find('=')) != std::string::npos)
+				and (col = line.find('=')) not_eq std::string::npos)
 			{
-				std::string path { line.substr(col + 1) };
+				var path { line.substr(col + 1) };
 				push(path);
 			}
 		epilogue(&file);
 	}};
 	
 	func m3u{[&prolog, &epilogue, &getLines, &push]() {
-		std::ifstream file;
+		var file { std::ifstream() };
 		prolog(&file);
-		std::vector<std::string> lines;
+		var lines { std::vector<std::string>() };
 		getLines(&file, &lines);
-		for (auto& line : lines)
+		for (var& line : lines)
 			push(line);
 		epilogue(&file);
 	}};
 	
-	const auto ext { path.extension().string() };
+	const var ext { path.extension().string() };
 	if (isEqual(ext.c_str(), {".m3u8", ".m3u", ".ram"}, IgnoreCase::Left))
 		m3u();
 	else if (isEqual(ext, ".pls", IgnoreCase::Left))
@@ -3972,7 +3990,6 @@ func loadPlaylistInto(const fs::path& path, std::vector<fs::path>* const outPath
 	
 	//rdf		{"<dc:identifier>"}, {"</dc:identifier>"}
 }
-#undef func
 
 #if MAKE_LIB
 #define RETURN_VALUE	;
@@ -3983,7 +4000,7 @@ void process(int argc, char *argv[], int *outc, char *outs[], unsigned long *max
 #else
 #define RETURN_VALUE	EXIT_SUCCESS;
 #define ARGS_START_INDEX	1
-auto main(const int argc, char* const argv[]) -> int
+func main(const int argc, char* const argv[]) -> int
 {
 #endif
 	opt::state[OPT_SIZEOPGT] 	= '\0';
@@ -3995,7 +4012,7 @@ auto main(const int argc, char* const argv[]) -> int
 	opt::state[OPT_REGEXSYNTAX] = "ecma";
 	opt::state[OPT_ARRANGEMENT] = OPT_ARRANGEMENT_DEFAULT;
 		
-	std::vector<std::string> args;
+	var args { std::vector<std::string>() };
 	
 	opt::state[OPT_LOADCONFIG] = CONFIG_PATH ;
 	
@@ -4003,18 +4020,17 @@ auto main(const int argc, char* const argv[]) -> int
 	args.emplace_back(def::ARGS_SEPARATOR);
 	expandArgsInto(argc, argv, ARGS_START_INDEX, &args);
 #undef ARGS_START_INDEX
-	unsigned long fileCountPerTurn{ 1 };
+	var fileCountPerTurn{ (unsigned long) 1 };
+	var invalidArgs { std::unordered_set<std::string_view>() };
+	var bufferDirs { std::vector<fs::path>() };
 
-	std::unordered_set<std::string_view> invalidArgs;
-	std::vector<fs::path> bufferDirs;
-
-	for (int i{0}; i<args.size(); ++i) {
-		if (auto isMatch{ [&args, &i](const char* const with,
+	for (var i { 0 }; i<args.size(); ++i) {
+		if (func isMatch{ [&args, &i](const char* const with,
 							  const char mnemonic,
 							  bool writeBoolean=false,
 							  const std::initializer_list<const char*>& others = {}) {
-			auto result { false };
-			const auto isWithStartWithDoubleStrip {
+			var result { false };
+			const var isWithStartWithDoubleStrip {
 				std::strlen(with) > 2 and with[0] == '-' and with[1] == '-' };
 			if (args[i].length() > 3
 				and args[i][0] == '-'
@@ -4024,8 +4040,8 @@ auto main(const int argc, char* const argv[]) -> int
 								 isWithStartWithDoubleStrip ? 0 : 2);
 				
 				if (not result)
-					for (auto& other : others)
-						if (const auto isOtherStartWithDoubleStrip {
+					for (var& other : others)
+						if (const var isOtherStartWithDoubleStrip {
 							std::strlen(other) > 2 and
 							other[0] == '-' and other[1] == '-' };
 							isEqual(args[i], other, IgnoreCase::Left,
@@ -4037,7 +4053,7 @@ auto main(const int argc, char* const argv[]) -> int
 							result = true;
 							break;
 						}
-			} else if (mnemonic != '\0'
+			} else if (mnemonic not_eq '\0'
 					   and args[i].length() == 2
 					   and args[i][0] == '-')
 			{
@@ -4060,19 +4076,19 @@ auto main(const int argc, char* const argv[]) -> int
 				continue;
 				#endif
 				
-				const auto path { fs::path(INSTALL_FULLPATH) };
+				const var path { fs::path(INSTALL_FULLPATH) };
 				#define REPO_URI "https://github.com/Mr-Widiatmoko/MakeTVPlaylist.git"
 				#if defined(_WIN32) || defined(_WIN64)
 				// TODO: Windows
 				std::cout << "📢 Under construction.\n";
 				#define CACHE_PATH "%userprofile%\\AppData\\Local"
-				if (0 != std::system("git.exe --version")
-					or (0 != std::system("cmake.exe --version"))) {
+				if (0 not_eq std::system("git.exe --version")
+					or (0 not_eq std::system("cmake.exe --version"))) {
 					std::cout << "⚠️  \"GIT\" and \"CMAKE\" required!.\n";
 					continue;
 				}
 				fs::current_path(fs::path(CACHE_PATH));
-				auto dir { fs::path("tvplaylist") };
+				var dir { fs::path("tvplaylist") };
 				if (not fs::exists(dir))
 					std::system(
 					"git.exe clone --depth 1 " REPO_URI " " CACHE_PATH  "\\tvplaylist");
@@ -4100,7 +4116,7 @@ auto main(const int argc, char* const argv[]) -> int
 				}
 				
 				fs::current_path(fs::path("~"));
-				auto dir { fs::path(".tvplaylist") };
+				var dir { fs::path(".tvplaylist") };
 				if (not fs::exists(dir))
 					std::system("git clone --depth 1 " REPO_URI " ~/.tvplaylist");
 				fs::current_path(dir);
@@ -4131,15 +4147,15 @@ auto main(const int argc, char* const argv[]) -> int
 				continue;
 				#endif
 					
-				const auto path { fs::path(INSTALL_FULLPATH) };
+				const var path { fs::path(INSTALL_FULLPATH) };
 				
 				if (not isEqual(argv[0], path)) {
 					#if defined(_WIN32) || defined(_WIN64)
 					if (fs::exists(path))
 						fs::remove(path);
-					auto cmd { std::string("copy \"") };
+					var cmd { std::string("copy \"") };
 					#else
-					auto cmd { std::string("cp -f \"") };
+					var cmd { std::string("cp -f \"") };
 					installMan(true);
 					#endif
 					cmd += argv[0];
@@ -4155,7 +4171,7 @@ auto main(const int argc, char* const argv[]) -> int
 				continue;
 				#endif
 					
-				const auto path { fs::path(INSTALL_FULLPATH) };
+				const var path { fs::path(INSTALL_FULLPATH) };
 				if (fs::exists(path))
 				#if defined(_WIN32) || defined(_WIN64)
 					std::system("del " INSTALL_FULLPATH);
@@ -4195,16 +4211,16 @@ auto main(const int argc, char* const argv[]) -> int
 					{
 						if (i + 1 == args.size())
 							std::cout << "Usage: --debug=id3 [key[=]value ...] file [file ...]\n";
-						std::unordered_map<std::string, std::string> keyVals;
-						std::vector<fs::path> files;
+						var keyVals { std::unordered_map<std::string, std::string>() };
+						var files { std::vector<fs::path>() };
 						while (++i < args.size()) {
-							if (auto path { fs::path(args[i]) };
+							if (var path { fs::path(args[i]) };
 								fs::exists(path)
 								and isEqual(path.extension().string().c_str(),
 											".mp3", IgnoreCase::Left))
 								files.emplace_back(std::move(path));
 							else {
-								if (auto pos { args[i].find('=') };
+								if (var pos { args[i].find('=') };
 									pos not_eq std::string::npos)
 									keyVals.emplace(std::make_pair(
 													args[i].substr(0, pos),
@@ -4216,9 +4232,9 @@ auto main(const int argc, char* const argv[]) -> int
 							}
 						}
 						
-						for (auto& file : files) {
-							auto mp3{ ID3(file.string().c_str()) };
-							for (auto& keyVal : keyVals)
+						for (var& file : files) {
+							var mp3 { ID3(file.string().c_str()) };
+							for (var& keyVal : keyVals)
 								mp3.set(keyVal.first, keyVal.second);
 							
 							if (not keyVals.empty())
@@ -4236,9 +4252,8 @@ auto main(const int argc, char* const argv[]) -> int
 						}
 						else {
 							i++;
-							auto input { args[i] };
-							
-							Date date(input);
+							var input { args[i] };
+							var date { Date(input) };
 							
 							std::cout << '\"' << input << '\"' << "  -> \"";
 							
@@ -4299,7 +4314,7 @@ auto main(const int argc, char* const argv[]) -> int
 				<< args[i].substr(2) << '\n';
 			}
 			else if (isMatch(OPT_ADSCOUNT, 'C')) {
-				if (std::pair<int, int> range;
+				if (var range { std::pair<int, int>() };
 					i + 3 < args.size()
 					and (args[i + 2] == ".." or args[i + 2] == "-")
 					and isInt(args[i + 1], &(range.first))
@@ -4313,35 +4328,35 @@ auto main(const int argc, char* const argv[]) -> int
 					std::cout << "⚠️  " << args[i] << " value range is up side down!. "
 					<< range.first << " greater than " << range.second << '\n';
 				}
-				else if (auto push{[&args, &i] (unsigned long pos, unsigned long offset) {
-					auto lower { args[i + 1].substr(0, pos) };
-					   auto upper { args[i + 1].substr(pos + offset) };
+				else if (func push{[&args, &i] (unsigned long pos, unsigned long offset) {
+					var lower { args[i + 1].substr(0, pos) };
+					var upper { args[i + 1].substr(pos + offset) };
 					   
-					   int count[2] { 0, 0 };
-					   if (isInt(lower, &count[0]) and isInt(upper, &count[1])
-						   and count[0] < count[1]) {
-						   opt::state[OPT_ADSCOUNT] = lower + '-' + upper;
-						   i++;
-						   return true;
-					   }
-					   return false;
-				   }};
+					int count[2] { 0, 0 };
+					if (isInt(lower, &count[0]) and isInt(upper, &count[1])
+						and count[0] < count[1]) {
+						opt::state[OPT_ADSCOUNT] = lower + '-' + upper;
+						i++;
+						return true;
+					}
+					return false;
+				}};
 					i + 1 < args.size())
 				{
-					if (auto pos { args[i + 1].find('-') };
-							pos != std::string::npos
-						and pos != 0 and pos != args[i + 1].size() - 1)
+					if (var pos { args[i + 1].find('-') };
+							pos not_eq std::string::npos
+						and pos not_eq 0 and pos not_eq args[i + 1].size() - 1)
 					{
 						if (push(pos, 1))
 							continue;
 					}
 					else if (pos = args[i + 1].find("..");
-							 pos != std::string::npos)
+							 pos not_eq std::string::npos)
 					{
 						if (push(pos, 2))
 							continue;
 					}
-					else if (int value{};
+					else if (var value { 0 };
 						isInt(args[i + 1], &value)) {
 						i++;
 						opt::state[OPT_ADSCOUNT] = std::to_string(value);
@@ -4379,15 +4394,15 @@ auto main(const int argc, char* const argv[]) -> int
 						 or args[i + 1].starts_with(OPT_ARRANGEMENT_DESCENDING_DEFAULT)))
 				{
 					i++;
-					std::string value = args[i];
+					var value { args[i] };
 					if (args[i].starts_with(OPT_ARRANGEMENT_DEFAULT)
 						or args[i].starts_with(OPT_ARRANGEMENT_DEFAULT)
 						or args[i].starts_with(OPT_ARRANGEMENT_DESCENDING_DEFAULT))
 					{
-						auto pos = args[i].find('=');
+						var pos { args[i].find('=') };
 						value = args[i].substr(0, pos - 1);
-						auto count_s { args[i].substr(pos + 1) };
-						if (int count; isInt(count_s, &count) and count > 1)
+						var count_s { args[i].substr(pos + 1) };
+						if (var count { 0 }; isInt(count_s, &count) and count > 1)
 							fileCountPerTurn = count;
 					}
 					
@@ -4404,10 +4419,10 @@ auto main(const int argc, char* const argv[]) -> int
 					opt::state[OPT_CASEINSENSITIVE] = args[++i];
 				
 				if (opt::state[OPT_CASEINSENSITIVE] == "true") {
-					for (auto& k : opt::listFindDir) k = tolower(k);
-					for (auto& k : opt::listExclFindDir) k = tolower(k);
-					for (auto& k : opt::listFind) k = tolower(k);
-					for (auto& k : opt::listExclFind) k = tolower(k);
+					for (var& k : opt::listFindDir) k = tolower(k);
+					for (var& k : opt::listExclFindDir) k = tolower(k);
+					for (var& k : opt::listFind) k = tolower(k);
+					for (var& k : opt::listExclFind) k = tolower(k);
 				}
 			}
 			else if (isMatch(OPT_SEARCH, 'q')) {
@@ -4419,18 +4434,18 @@ auto main(const int argc, char* const argv[]) -> int
 					
 					i++;
 					
-					auto index{ -1 };
-					auto last{ 0 };
-					auto push{[&]() {
-						auto keyVal { args[i].substr(last, index) };
-						if (keyVal != "or" and keyVal != "and") {
+					var index { -1 };
+					var last { 0 };
+					func push{[&]() {
+						var keyVal { args[i].substr(last, index) };
+						if (keyVal not_eq "or" and keyVal not_eq "and") {
 							parseKeyValue(&keyVal, keyVal.starts_with("exclude-"));
 							
-							if (constexpr auto EXCL {"exclude="};
+							if (constexpr var EXCL {"exclude="};
 								keyVal.starts_with(EXCL))
 							{
-								auto value { keyVal.substr(std::strlen(EXCL)) };
-								if (value.find('=') != std::string::npos)
+								var value { keyVal.substr(std::strlen(EXCL)) };
+								if (value.find('=') not_eq std::string::npos)
 									parseKeyValue(&value, true);
 								if (not value.empty())
 									opt::listExclFind.emplace_back(value);
@@ -4440,7 +4455,7 @@ auto main(const int argc, char* const argv[]) -> int
 					}};
 					while (++index < args[i].size()) {
 						if (std::isspace(args[i][index])) {
-							if (last != -1 and index - last > 0) {
+							if (last not_eq -1 and index - last > 0) {
 								push();
 								last = -1;
 							}
@@ -4449,7 +4464,7 @@ auto main(const int argc, char* const argv[]) -> int
 						if (last == -1)
 							last = index;
 					}
-					if (last != -1)
+					if (last not_eq -1)
 						push();
 				} else
 					std::cout << "⚠️  Expecting search keyword!\n";
@@ -4458,26 +4473,26 @@ auto main(const int argc, char* const argv[]) -> int
 					 or isMatch(OPT_EXCLFIND, 	'I')) {
 				if (i + 1 < args.size())
 				{
-					const auto opt { args[i].substr(2) };
-					const auto isExclude { opt == OPT_EXCLFIND };
+					const var opt { args[i].substr(2) };
+					const var isExclude { opt == OPT_EXCLFIND };
 					i++;
-					auto index{ -1 };
-					auto last{ 0 };
-					std::string buff;
-					auto lastIndex{ 0 };
-					auto push{[&](){
-						auto keyVal { args[i].substr(last, index) };
+					var index { -1 };
+					var last { 0 };
+					var buff { std::string() };
+					var lastIndex{ 0 };
+					func push{[&](){
+						var keyVal { args[i].substr(last, index) };
 						if (keyVal.empty())
 							return;
 						
-						const auto isTrue { parseKeyValue(&keyVal,
+						const var isTrue { parseKeyValue(&keyVal,
 											keyVal.starts_with("exclude-")) };
 						
-						if (constexpr auto EXCL {"exclude="};
+						if (constexpr var EXCL {"exclude="};
 							keyVal.starts_with(EXCL))
 						{
-							auto value { keyVal.substr(std::strlen(EXCL)) };
-							if (value.find('=') != std::string::npos)
+							var value { keyVal.substr(std::strlen(EXCL)) };
+							if (value.find('=') not_eq std::string::npos)
 								parseKeyValue(&value, true);
 							if (not value.empty()) {
 								(isExclude ? opt::listExclFind : opt::listFind)
@@ -4496,7 +4511,7 @@ auto main(const int argc, char* const argv[]) -> int
 					}};
 					while (++index < args[i].size()) {
 						if (std::isspace(args[i][index])) {
-							if (last != -1 and index - last > 0) {
+							if (last not_eq -1 and index - last > 0) {
 								push();
 								last = -1;
 							}
@@ -4505,7 +4520,7 @@ auto main(const int argc, char* const argv[]) -> int
 						if (last == -1)
 							last = index;
 					}
-					if (last != -1)
+					if (last not_eq -1)
 						push();
 					
 					if (not buff.empty()) {
@@ -4518,8 +4533,8 @@ auto main(const int argc, char* const argv[]) -> int
 					<< args[i].substr(2) << "\n";
 			}
 			else if (isMatch(OPT_REGEXSYNTAX, 	'X')) {
-				if (auto found{ false }; i + 1 < args.size()) {
-					for (auto& s : OPT_REGEXSYNTAX_ARGS)
+				if (var found { false }; i + 1 < args.size()) {
+					for (var& s : OPT_REGEXSYNTAX_ARGS)
 						if (isEqual(args[i + 1].c_str(), s, IgnoreCase::Left)) {
 							opt::state[OPT_REGEXSYNTAX] = s;
 							i++;
@@ -4533,16 +4548,16 @@ auto main(const int argc, char* const argv[]) -> int
 							<< args[i] << "\" option. Please see --help "
 							<< args[i].substr(2) << "\n";
 			}
-			else if (isMatch(OPT_REGEX, 		'r')
+			else if (	isMatch(OPT_REGEX, 		'r')
 					 or isMatch(OPT_EXCLREGEX, 	'R')) {
-				if (auto found{ false }; i + 1 < args.size())
+				if (var found { false }; i + 1 < args.size())
 				{
-					if (auto pos { args[i + 1].find('=') };
-						pos != std::string::npos)
+					if (var pos { args[i + 1].find('=') };
+						pos not_eq std::string::npos)
 					{
 						if (args[i + 1].substr(0, pos) == "type") {
-							auto value { args[i + 1].substr(pos + 1) };
-							for (auto& keyword : OPT_REGEXSYNTAX_ARGS)
+							var value { args[i + 1].substr(pos + 1) };
+							for (var& keyword : OPT_REGEXSYNTAX_ARGS)
 								if (keyword == value) {
 									opt::state[OPT_REGEXSYNTAX] = keyword;
 									i++;
@@ -4553,7 +4568,7 @@ auto main(const int argc, char* const argv[]) -> int
 					}
 					
 					if (not found) {
-						auto getRegexSyntaxType{[](const std::string& s)
+						func getRegexSyntaxType{[](const std::string& s)
 							-> std::regex_constants::syntax_option_type {
 							if (s == "basic") return std::regex_constants::syntax_option_type::basic;
 							if (s == "extended") return std::regex_constants::syntax_option_type::extended;
@@ -4562,7 +4577,7 @@ auto main(const int argc, char* const argv[]) -> int
 							if (s == "egrep") return std::regex_constants::syntax_option_type::egrep;
 							else return std::regex_constants::syntax_option_type::ECMAScript;
 						}};
-						const auto opt {args[i].substr(2)};
+						const var opt { args[i].substr(2) };
 						(opt == OPT_REGEX ? opt::listRegex : opt::listExclRegex)
 							.emplace_back(std::regex(args[i + 1],
 										getRegexSyntaxType(opt::state[OPT_REGEXSYNTAX])));
@@ -4586,9 +4601,9 @@ auto main(const int argc, char* const argv[]) -> int
 					 or isMatch(OPT_DEXCLMODIFIED, 	'M')
 					 )
 			{
-				const auto opt { args[i].substr(2) };
-				auto as_single{[&](const char opGt) -> bool {
-					Date date(args[i + 1]);
+				const var opt { args[i].substr(2) };
+				func as_single{[&](const char opGt) -> bool {
+					var date { Date(args[i + 1]) };
 					if (date.isValid()) {
 						if (opt == OPT_DATE) {
 							opt::listDCreated.emplace_back(std::make_pair(opGt, date));
@@ -4645,7 +4660,7 @@ auto main(const int argc, char* const argv[]) -> int
 				}
 				else
 				{
-					auto push{[&](const Date& lower, const Date& upper) {
+					func push{[&](const Date& lower, const Date& upper) {
 						if (lower > upper) {
 							std::cout << "⚠️  Date range up side down!, "
 							<< lower.string() << " greater than " << upper.string() << '\n';
@@ -4685,34 +4700,32 @@ auto main(const int argc, char* const argv[]) -> int
 					}};
 					if (i + 3 < args.size() and
 						(args[i + 2] == "-" or args[i + 2] == "..")) {
-						if (Date lower(args[i + 1]); lower.isValid())
-							if (Date upper(args[i + 3]); upper.isValid())
-							{
+						if (var lower { Date(args[i + 1]) }; lower.isValid())
+							if (var upper { Date(args[i + 3]) }; upper.isValid())
 								if (push(lower, upper)) {
 									i += 3;
 									continue;
 								}
-							}
 					} else if (i + 1 < args.size()) {
-						auto pos = args[i + 1].find("..");
-						auto next { 2 };
+						var pos { args[i + 1].find("..") };
+						var next { 2 };
 						if (pos == std::string::npos) {
 							next = 1;
-							unsigned strip { 0 };
+							var strip { (unsigned) 0 };
 							pos = 0;
-							for (auto m{ 0 }; m < args[i + 1].size(); ++m)
+							for (var m { 0 }; m < args[i + 1].size(); ++m)
 								if (args[i + 1][m] == '-') {
 									strip++;
 									pos = m;
 								}
-							if (strip != 1)
+							if (strip not_eq 1)
 								pos = std::string::npos;
 						}
 							
 						if (pos not_eq std::string::npos) {
-							if (Date lower(args[i + 1].substr(0, pos));
+							if (var lower { Date(args[i + 1].substr(0, pos)) };
 								lower.isValid())
-								if (Date upper(args[i + 1].substr(pos + next));
+								if (var upper { Date(args[i + 1].substr(pos + next)) };
 									upper.isValid())
 								{
 									if (push(lower, upper)) {
@@ -4770,8 +4783,9 @@ DATE_NEEDED:	std::cout << "⚠️  Expecting date and/or time after \""
 					std::cout << "⚠️  Expecting 'thread', 'async', or 'none' after \""
 					<< args[i] << "\" option. Please see --help "
 					<< args[i].substr(2) << "\n";
-			} else if (isMatch(OPT_EXT, 	'e')
-					   or isMatch(OPT_EXCLEXT, 'E')) {
+			}
+			else if (	isMatch(OPT_EXT, 	'e')
+					 or isMatch(OPT_EXCLEXT, 'E')) {
 				if (i + 1 < args.size()) {
 					i++;
 					opt::state[args[i - 1].substr(2)] = args[i] == "*.*" ? "*" : args[i];
@@ -4798,7 +4812,7 @@ DATE_NEEDED:	std::cout << "⚠️  Expecting date and/or time after \""
 				if (i + 1 < args.size()) {
 					i++;
 					opt::state[OPT_OUTDIR] = fs::absolute(args[i]);
-					if (auto tmp{args[i]};
+					if (var tmp { args[i] };
 						tmp[tmp.size() - 1] not_eq fs::path::preferred_separator)
 						opt::state[OPT_OUTDIR] += fs::path::preferred_separator;
 				} else
@@ -4806,16 +4820,16 @@ DATE_NEEDED:	std::cout << "⚠️  Expecting date and/or time after \""
 					<< args[i] << "\" option (eg: \"Downloads/\"). Please see --help "
 					<< args[i].substr(2) << "\n";
 			}
-			else if (isMatch(OPT_SIZE, 			's')
+			else if (	isMatch(OPT_SIZE, 			's')
 					 or isMatch(OPT_EXCLSIZE, 	'S')) {
 				if (bool isExclude{ args[i].substr(2) == OPT_EXCLSIZE };
 					i + 1 < args.size()) {
 					if (args[i + 1][0] == '<' or args[i + 1][0] == '>')
 					{
 						i++;
-						const auto opGT { args[i][0] };
+						const var opGT { args[i][0] };
 						
-						uintmax_t value{ 0 };
+						var value{ (uintmax_t) 0 };
 						
 						if (args[i].size() > 1) {
 							value = getBytes(args[i].substr(1));
@@ -4836,12 +4850,13 @@ DATE_NEEDED:	std::cout << "⚠️  Expecting date and/or time after \""
 						opt::state[isExclude ? OPT_EXCLSIZE : OPT_SIZE] = std::to_string(std::move(value));
 						(isExclude ? opt::listExclSize : opt::listSize).clear();
 					} else {
-						auto range{getRange(args[i + 1], std::move("-"))};
+						var range { getRange(args[i + 1], std::move("-")) };
 						if (not range)
 							range = getRange(args[i + 1], std::move(".."));
 						
-						const std::string s_first = isExclude ? OPT_EXCLSIZE : OPT_SIZE;
-						std::string first = "0", second = "0";
+						const var s_first { std::string(isExclude ? OPT_EXCLSIZE : OPT_SIZE) };
+						var first { std::string("0") };
+						var second { std::string("0") };
 						
 						if (range)
 						{
@@ -4851,7 +4866,7 @@ DATE_NEEDED:	std::cout << "⚠️  Expecting date and/or time after \""
 							i++;
 							
 							if (second == "0") {
-								uintmax_t value{ 0 };
+								var value { (uintmax_t) 0 };
 								if (i + 1 < args.size())
 									value = getBytes(args[i + 1]);
 								
@@ -4870,9 +4885,9 @@ DATE_NEEDED:	std::cout << "⚠️  Expecting date and/or time after \""
 								second = std::to_string(getBytes(args[i + 2]));
 							}
 							
-							if (first != "0" and second != "0")
+							if (first not_eq "0" and second not_eq "0")
 								i+=3;
-							else if (first != "0" and second == "0") {
+							else if (first not_eq "0" and second == "0") {
 								if (args[i + 2].size() > 1
 									and args[i + 2][0] == '-'
 									and std::isdigit(args[i + 2][1]))
@@ -4899,7 +4914,7 @@ DATE_NEEDED:	std::cout << "⚠️  Expecting date and/or time after \""
 								<< groupNumber(first) << " bytes greater than "
 								<< groupNumber(second) << " bytes\"\n";
 							opt::state[s_first] = "0";
-						} else if (first != "0" and second != "0")
+						} else if (first not_eq "0" and second not_eq "0")
 							(isExclude ? opt::listExclSize : opt::listSize).emplace_back(std::make_pair(
 										   std::stoul(first),
 										   std::stoul(second)));
@@ -4914,16 +4929,16 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 			insertInto(&in::selectFiles, fs::path(args[i]));
 		else if (fs::is_directory(args[i]))
 			insertInto(&bufferDirs, fs::path(args[i]));
-		else if (const auto path { fs::path(args[i]) };
+		else if (const var path { fs::path(args[i]) };
 				 fs::is_regular_file(path)
 				 and isValid(path) and isValidFile(path))
 		{
-			std::vector<fs::path> list;
+			var list { std::vector<fs::path>() };
 			loadPlaylistInto(path, &list);
 			if (list.empty())
 				insertInto(&in::selectFiles, fs::absolute(path));
 			else
-				for (auto& f : list)
+				for (var& f : list)
 					if (isValid(f) and isValidFile(f))
 						insertInto(&in::selectFiles, std::move(f));
 		}
@@ -4936,16 +4951,16 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 		std::string_view invalid_args[invalidArgs.size()];
 		std::move(invalidArgs.begin(), invalidArgs.end(), invalid_args);
 		std::cout << "⚠️  What " << (invalidArgs.size() > 1 ? "are these" : "is this") << ":\n";
-		for (auto i{ 0 }; i<invalidArgs.size(); ++i) {
-			auto item { &invalid_args[i] };
-			std::string others;
+		for (var i { 0 }; i<invalidArgs.size(); ++i) {
+			var item { &invalid_args[i] };
+			var others { std::string() };
 			if (item->size() > 4)
 			{
-				const auto isStartWithDoubleStrip { item->starts_with("--") };
-				std::vector<std::pair<float, std::string>> possible;
-				const auto pos { item->find("=") };
-				std::string substr_item;
-				std::string substr_next;
+				const var isStartWithDoubleStrip { item->starts_with("--") };
+				var possible { std::vector<std::pair<float, std::string>>() };
+				const var pos { item->find("=") };
+				var substr_item { std::string() };
+				var substr_next { std::string() };
 				if (pos == std::string::npos)
 					substr_item = std::move(item->substr(
 									isStartWithDoubleStrip ? 2 : 0));
@@ -4954,8 +4969,8 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 									isStartWithDoubleStrip ? 2 : 0, pos - 1));
 					substr_next = std::move(item->substr(pos));
 				}
-				for (auto& opt : OPTS)
-					if (auto percentage{ getLikely(substr_item, *opt) };
+				for (var& opt : OPTS)
+					if (var percentage { getLikely(substr_item, *opt) };
 						percentage > 80)
 						possible.emplace_back(std::make_pair(percentage, *opt));
 				
@@ -4967,7 +4982,7 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 						return a.first > b.first;
 					});
 					others = " do you mean ";
-					for (auto k{0}; auto&& s : possible)
+					for (var k { 0 }; var&& s : possible)
 						others.append("\"--" + s.second + substr_next + "\""
 									+ (++k == possible.size() ? "." : " or "));
 				}
@@ -4982,7 +4997,7 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 	if (bufferDirs.empty() and in::selectFiles.empty())
 		insertInto(&bufferDirs, fs::current_path());
 	
-	const auto inputDirsCount = bufferDirs.size();
+	const var inputDirsCount { bufferDirs.size() };
 	fs::path inputDirs[inputDirsCount + 1];
 	std::copy(bufferDirs.begin(), bufferDirs.end(), inputDirs);
 
@@ -4993,14 +5008,14 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 			break;
 		}
 		bufferDirs.clear();
-		std::vector<fs::directory_entry> sortedDirs;
+		var sortedDirs { std::vector<fs::directory_entry>() };
 		listDirInto(fs::path(opt::state[OPT_OUTDIR]), &sortedDirs);
 				
-		for (auto& child : sortedDirs)
+		for (var& child : sortedDirs)
 			insertInto(&bufferDirs, child.path());
 	}
 
-	if (auto dirOut{ inputDirsCount == 1
+	if (var dirOut { inputDirsCount == 1
 			? transformWhiteSpace(fs::path(opt::state[OPT_OUTDIR]).filename().string())
 			: std::to_string(inputDirsCount)};
 		opt::state[OPT_FIXFILENAME].empty())
@@ -5025,7 +5040,7 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 		#endif
 	}
 	
-	if (const auto condToShowArgsParsed { not invalidArgs.empty()
+	if (const var condToShowArgsParsed { not invalidArgs.empty()
 											or opt::state[OPT_DEBUG] == "true"
 											or opt::state[OPT_DEBUG] == "args" };
 		not opt::state[OPT_SHOWCONFIG].empty()
@@ -5034,17 +5049,17 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 		or opt::state[OPT_BENCHMARK]== "true"
 		or condToShowArgsParsed)
 	{ // MARK: Options Summary
-		constexpr auto WIDTH{ 20 };
+		constexpr var WIDTH { 20 };
 		#define LABEL(x)	x << std::setw(unsigned(WIDTH - std::strlen(x))) << ": "
 		#ifndef DEBUG
 		if (condToShowArgsParsed)
 		#endif
 		{
-			std::string formatSuffix;
-			std::string formatPrefix;
+			var formatSuffix { std::string() };
+			var formatPrefix { std::string() };
 			
 			std::cout << LABEL("Original Arguments");
-			for (auto i{1}; i<argc; ++i) {
+			for (var i { 1 }; i<argc; ++i) {
 				#if defined(_WIN32) || defined(_WIN64)
 				#else
 				if (invalidArgs.find(argv[i]) not_eq invalidArgs.end()) {
@@ -5060,7 +5075,7 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 			}
 			std::cout << "\n\n";
 			std::cout << LABEL("Deduced Arguments");
-			for (auto i{0}; i<args.size(); ++i) {
+			for (var i { 0 }; i<args.size(); ++i) {
 				if (args[i] == def::ARGS_SEPARATOR)
 					continue;
 				
@@ -5098,9 +5113,9 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 		<< LABEL(OPT_SKIPSUBTITLE) << PRINT_OPT(opt::state[OPT_SKIPSUBTITLE]) << '\n';
 	{
 		std::cout << LABEL(OPT_EXT) << opt::state[OPT_EXT];
-		if (auto i{0};
+		if (var i { 0 };
 			opt::state[OPT_EXT].empty())
-			for (auto& ext : opt::DEFAULT_EXT)
+			for (var& ext : opt::DEFAULT_EXT)
 				std::cout << ext << (++i < opt::DEFAULT_EXT.size() - 1 ? ", " : "");
 		std::cout << '\n';
 	}
@@ -5108,33 +5123,33 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 	
 	#undef PRINT_OPT
 			
-	for (auto& S : {OPT_FIND, OPT_EXCLFIND}) {
+	for (var& S : {OPT_FIND, OPT_EXCLFIND}) {
 		std::cout << LABEL(S);
-		for (auto i{0}; i<(S == OPT_FIND ? opt::listFind : opt::listExclFind).size(); ++i)
+		for (var i { 0 }; i<(S == OPT_FIND ? opt::listFind : opt::listExclFind).size(); ++i)
 			std::cout << (S == OPT_FIND ? opt::listFind : opt::listExclFind)[i]
 			<< (i < (S == OPT_FIND ? opt::listFind : opt::listExclFind).size() - 1 ? ", " : "");
 		std::cout << '\n';
 	}
 
-	for (auto& S : {OPT_REGEX, OPT_EXCLREGEX}) {
+	for (var& S : {OPT_REGEX, OPT_EXCLREGEX}) {
 		std::cout << LABEL(S);
-		for (auto i{0}; i<(S == OPT_REGEX ? opt::listRegex : opt::listExclRegex).size(); ++i)
+		for (var i { 0 }; i<(S == OPT_REGEX ? opt::listRegex : opt::listExclRegex).size(); ++i)
 			std::cout << (S == OPT_REGEX ? opt::listRegex : opt::listExclRegex)[i].mark_count()
 			<< " expression"
 			<< (i < (S == OPT_REGEX ? opt::listRegex : opt::listExclRegex).size() - 1 ? ", " : "");
 		std::cout << '\n';
 	}
 
-	for (auto& S : {OPT_SIZE, OPT_EXCLSIZE}) {
+	for (var& S : {OPT_SIZE, OPT_EXCLSIZE}) {
 		std::cout << LABEL(S);
-		if (opt::state[OPT_SIZEOPGT][0] != '\0' or opt::state[OPT_EXCLSIZEOPGT][0] != '\0')
+		if (opt::state[OPT_SIZEOPGT][0] not_eq '\0' or opt::state[OPT_EXCLSIZEOPGT][0] not_eq '\0')
 			std::cout << ((S == OPT_SIZE ? opt::listSize : opt::listExclSize).empty()
 					or opt::state[S == OPT_SIZE ? OPT_SIZEOPGT
-							  : OPT_EXCLSIZEOPGT][0] != '\0'
+							  : OPT_EXCLSIZEOPGT][0] not_eq '\0'
 					? (opt::state[S == OPT_SIZE ? OPT_SIZEOPGT
 							 : OPT_EXCLSIZEOPGT][0] == '<' ? "< " : "> ")
 					+ opt::state[S] : "");
-		for (auto i{0}; i<(S == OPT_SIZE ? opt::listSize : opt::listExclSize).size(); ++i)
+		for (var i { 0 }; i<(S == OPT_SIZE ? opt::listSize : opt::listExclSize).size(); ++i)
 			std::cout << (S == OPT_SIZE ? opt::listSize : opt::listExclSize)[i].first
 			<< ".." << (S == OPT_SIZE ? opt::listSize : opt::listExclSize)[i].second
 			<< (i < (S == OPT_SIZE ? opt::listSize : opt::listExclSize).size() - 1 ? ", " : "");
@@ -5154,13 +5169,13 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 			&opt::listDCreatedR, &opt::listDAccessedR, &opt::listDModifiedR, &opt::listDChangedR,
 			&opt::listDExclCreatedR, &opt::listDExclAccessedR, &opt::listDExclModifiedR, &opt::listDExclChangedR };
 		
-		for (auto i {0}; i<8; ++i) {
+		for (var i { 0 }; i<8; ++i) {
 			std::cout << LABEL(*st[i]);
-			for (auto k{0}; k<ot[i]->size(); ++k) {
+			for (var k { 0 }; k<ot[i]->size(); ++k) {
 				std::cout << '\"' << ot[i]->at(k).first << ' ' << ot[i]->at(k).second.string() << "\", ";
 			}
 			
-			for (auto k{0}; k<rt[i]->size(); ++k) {
+			for (var k { 0 }; k<rt[i]->size(); ++k) {
 				std::cout << '\"' << rt[i]->at(k).first.string() << "\" .. \"" << rt[i]->at(k).second.string() << "\", ";
 			}
 			std::cout << '\n';
@@ -5168,7 +5183,7 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 	}
 	
 	std::cout << LABEL("Inputs");
-		for (auto i{0}; i<inputDirsCount + in::selectFiles.size(); ++i) {
+		for (var i { 0 }; i<inputDirsCount + in::selectFiles.size(); ++i) {
 			if (i < inputDirsCount) {
 				std::cout << inputDirs[i];
 			} else {
@@ -5181,8 +5196,8 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 	
 	std::cout << LABEL(OPT_ADSCOUNT) << opt::state[OPT_ADSCOUNT] << '\n';
 	std::cout << LABEL(OPT_ADSDIR);
-	auto i { -1 };
-	for (i++; auto& d : in::listAdsDir)
+	var i { -1 };
+	for (i++; var& d : in::listAdsDir)
 		std::cout << d.string() << (i < in::listAdsDir.size() - 1 ? ", " : "\n");
 			
 	std::cout << "\n";
@@ -5194,7 +5209,7 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 	if (not invalidArgs.empty())
 		return RETURN_VALUE
 					   
-	if (const auto mode{ opt::state[OPT_WRITEDEFAULTS] };
+	if (const var mode { opt::state[OPT_WRITEDEFAULTS] };
 		not mode.empty())
 		writeConfig(&args,
 					  mode == "edit" 	? WriteConfigMode::Edit
@@ -5203,18 +5218,18 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 					: WriteConfigMode::New);
 
 	if (not opt::state[OPT_SHOWCONFIG].empty()) {
-		auto displayFile{[](const char* const path) {
+		func displayFile{[](const char* const path) {
 			if (not fs::exists(fs::path(path)))
 				return;
 			
 			std::cout << "\nContent of file \"" << path << "\":\n";
-			std::ifstream file(path);
+			var file { std::ifstream(path) };
 			std::cout << file.rdbuf() << '\n';
 			file.close();
 		}};
 			
 		displayFile(CONFIG_PATH);
-		auto otherFile { opt::state[OPT_LOADCONFIG].c_str() };
+		var otherFile { opt::state[OPT_LOADCONFIG].c_str() };
 		if (not isEqual(CONFIG_PATH, otherFile))
 			displayFile(otherFile);
 	}
@@ -5224,10 +5239,10 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
         return RETURN_VALUE
 
 	{///Clean up <key=val> dir=??? in listFind and listExclFind
-		auto cleanUp{[](std::vector<std::string>* list) -> void {
-			std::vector<std::string> tmp;
-			for (auto i{0}; i<list->size(); ++i)
-				if (list->at(i)[0] != char(1))
+		func cleanUp{[](std::vector<std::string>* list) -> void {
+			var tmp { std::vector<std::string>() };
+			for (var i { 0 }; i<list->size(); ++i)
+				if (list->at(i)[0] not_eq char(1))
 					tmp.emplace_back(std::move(list->at(i)));
 			*list = std::move(tmp);
 		}};
@@ -5242,15 +5257,15 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 			opt::state[OPT_OUTDIR] = fs::path(in::selectFiles[0]).parent_path().string();
 	}
 	
-	auto start{std::chrono::system_clock::now()};
+	var start { std::chrono::system_clock::now() };
 
-	std::vector<std::thread> threads;
-	std::vector<std::future<void>> asyncs;
+	var threads { std::vector<std::thread>() };
+	var asyncs { std::vector<std::future<void>>() };
 					   
 	{
-		std::vector<fs::path> list = std::move(in::listAdsDir);
+		const var list { std::move(in::listAdsDir) };
 		
-		for (auto& child : list)
+		for (var& child : list)
 			if (opt::state[OPT_EXECUTION] == OPT_EXECUTION_THREAD)
 				threads.emplace_back([&, child]() {
 					listDirRecursivelyInto(child, &in::listAdsDir, false); });
@@ -5261,8 +5276,8 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 				listDirRecursivelyInto(child, &in::listAdsDir, false);
 	}
 	
-	for (bool isByPass {opt::state[OPT_ARRANGEMENT] == OPT_ARRANGEMENT_ASCENDING};
-		 auto& child : bufferDirs)
+	for (const var isByPass { opt::state[OPT_ARRANGEMENT] == OPT_ARRANGEMENT_ASCENDING };
+		 var& child : bufferDirs)
 		if (opt::state[OPT_EXECUTION] == OPT_EXECUTION_THREAD) {
 			if (isByPass)
 				threads.emplace_back([&, child]() {
@@ -5288,19 +5303,19 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 		}
 
 	if (opt::state[OPT_EXECUTION] == OPT_EXECUTION_THREAD) {
-		for (auto& t : threads)
+		for (var& t : threads)
 			t.join();
 		threads.clear();
 	} else if (opt::state[OPT_EXECUTION] == OPT_EXECUTION_ASYNC) {
-		for (auto& a : asyncs)
+		for (var& a : asyncs)
 			a.wait();
 		asyncs.clear();
 	}
 
 	
-	auto maxDirSize{std::max(in::regularDirs.size(), in::seasonDirs.size())};
+	var maxDirSize { std::max(in::regularDirs.size(), in::seasonDirs.size()) };
 
-	const auto BY_PASS {
+	const var BY_PASS {
 			   opt::state[OPT_ARRANGEMENT] == OPT_ARRANGEMENT_PERTITLE
 			or opt::state[OPT_ARRANGEMENT] == OPT_ARRANGEMENT_SHUFFLE_PERTITLE
 			or opt::state[OPT_ARRANGEMENT] == OPT_ARRANGEMENT_ASCENDING
@@ -5336,8 +5351,8 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 	#ifndef DEBUG
 	if (opt::state[OPT_DEBUG] == "true")
 	#endif
-	for (auto i{0}; i<maxDirSize; ++i)
-		for (auto& select : {1, 2}) {
+	for (var i { 0 }; i<maxDirSize; ++i)
+		for (var& select : {1, 2}) {
 			if ((select == 1 and i >= in::regularDirs.size())
 				or (select == 2 and i >= in::seasonDirs.size()))
 				continue;
@@ -5349,12 +5364,12 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 		}
 	
 	
-	std::unordered_map<std::string, std::shared_ptr<std::vector<fs::path>>> records;
+	var records { std::unordered_map<std::string, std::shared_ptr<std::vector<fs::path>>>() };
 	
-	auto filterChildFiles{ [&records](const fs::path& dir, bool recurive=false) {
-		std::vector<fs::path> bufferFiles;
+	func filterChildFiles{ [&records](const fs::path& dir, bool recurive=false) {
+		var bufferFiles { std::vector<fs::path>() };
 		
-		auto putToRecord{[&bufferFiles, &dir, &records](bool wantToSort) {
+		func putToRecord{[&bufferFiles, &dir, &records](bool wantToSort) {
 			if (bufferFiles.empty())
 				return;
 			
@@ -5368,21 +5383,21 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 		}};
 		
 		if (recurive) {
-			std::vector<fs::path> dirs;
+			var dirs { std::vector<fs::path>() };
 			listDirRecursivelyInto(dir, &dirs, false);
 			std::sort(dirs.begin(), dirs.end());
 			
-			for (auto& d : dirs) {
-				std::vector<fs::path> tmp;
+			for (var& d : dirs) {
+				var tmp { std::vector<fs::path>() };
 				
-				for (auto& f : directory_iterator(d, DT_REG))
+				for (var& f : directory_iterator(d, DT_REG))
 					if (isValidFile(f.path())) {
-						std::vector<fs::path> list;
+						var list { std::vector<fs::path>() };
 						loadPlaylistInto(f.path().string(), &list);
 						if (list.empty())
 							tmp.emplace_back(std::move(f));
 						else
-							for (auto& p : list)
+							for (var& p : list)
 								if (fs::is_regular_file(p) and isValid(p) and isValidFile(p))
 									tmp.emplace_back(std::move(p));
 					}
@@ -5395,14 +5410,14 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 			putToRecord(false);
 		}
 		
-		for (auto& f : directory_iterator(dir, DT_REG))
+		for (var& f : directory_iterator(dir, DT_REG))
 			if (isValidFile(f.path())) {
-				std::vector<fs::path> list;
+				var list { std::vector<fs::path>() };
 				loadPlaylistInto(f.path().string(), &list);
 				if (list.empty())
 					bufferFiles.emplace_back(std::move(f));
 				else
-					for (auto& p : list)
+					for (var& p : list)
 						if (fs::is_regular_file(p) and isValid(p) and isValidFile(p))
 							bufferFiles.emplace_back(std::move(p));
 			}
@@ -5413,11 +5428,11 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 					   
 	start = std::chrono::system_clock::now();
 					   
-	for (auto i{0}; i<std::max(maxDirSize, in::listAdsDir.size()); ++i)
-		for (auto& x : {0, 1, 2})
+	for (var i { 0 }; i<std::max(maxDirSize, in::listAdsDir.size()); ++i)
+		for (var& x : {0, 1, 2})
 			if (i < (x == 1 ? in::regularDirs.size() : (x == 2 ? in::seasonDirs.size()
 														: in::listAdsDir.size())) )
-				if (auto dir { x == 1 ? in::regularDirs[i] : (x == 2 ? in::seasonDirs[i]
+				if (const var dir { x == 1 ? in::regularDirs[i] : (x == 2 ? in::seasonDirs[i]
 															  : in::listAdsDir[i]) };
 					not dir.empty() and isDirNameValid(dir)) {
 					if (opt::state[OPT_EXECUTION] == OPT_EXECUTION_THREAD)
@@ -5433,16 +5448,16 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 				}
 					   
 	if (opt::state[OPT_EXECUTION] == OPT_EXECUTION_THREAD)
-		for (auto& t : threads)
+		for (var& t : threads)
 			t.join();
 	else if (opt::state[OPT_EXECUTION] == OPT_EXECUTION_ASYNC)
-		for (auto& a : asyncs)
+		for (var& a : asyncs)
 			a.wait();
 
-	std::ofstream outputFile;
-	fs::path outputName;
+	var outputFile { std::ofstream() };
+	var outputName { fs::path() };
 	
-	const auto dontWrite { opt::state[OPT_NOOUTPUTFILE] == "true" };
+	const var dontWrite { opt::state[OPT_NOOUTPUTFILE] == "true" };
 	if (not dontWrite) {
 		outputName = opt::state[OPT_OUTDIR] + fs::path::preferred_separator
 		   + opt::state[OPT_FIXFILENAME];
@@ -5455,7 +5470,7 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 		outputFile = std::ofstream(outputName, std::ios::out);
 	}
 				  
-	std::string outExt;
+	var outExt { std::string() };
 	if (not dontWrite) {
 		outExt = tolower(outputName.extension().string());
 
@@ -5530,7 +5545,7 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 		}
 		#if 0
 		else if (outExt == ".pdf") {
-			const auto date { Date::now().string("%Y%m%d%H%M%S") };
+			const var date { Date::now().string("%Y%m%d%H%M%S") };
 			outputFile << "%PDF-1.7\n"\
 			"1 0 obj\n"\
 			"<</Creator (tvplaylist v1.1)\n"\
@@ -5546,7 +5561,7 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 		#endif
 	}
 
-	unsigned long playlistCount{0};
+	var playlistCount { (unsigned long) 0};
 	std::random_device rd;  //Will be used to obtain a seed for the random number engine
 	std::mt19937 mersenneTwisterEngine(rd()); //Standard mersenne_twister_engine seeded with rd()
 	std::uniform_int_distribution<> distrib;
@@ -5554,15 +5569,15 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 	unsigned long adsCount[2] {0, 0};
 
 	#ifndef DEBUG
-	const auto isVerbose { 	opt::state[OPT_VERBOSE]	== "all"
+	const var isVerbose { 	opt::state[OPT_VERBOSE]	== "all"
 						or 	opt::state[OPT_VERBOSE]	== "true"
 						or 	opt::state[OPT_DEBUG] 	== "true" };
 	#endif
-	auto putIntoPlaylist{ [&](const fs::path& file)
+	func putIntoPlaylist{ [&](const fs::path& file)
 	{
 		enum class Type { None, Regular, Subtitle, Advertise };
 		
-		auto putIt{ [&](const fs::path& file, const char* title = nullptr,
+		func putIt{ [&](const fs::path& file, const char* title = nullptr,
 						Type type = Type::None)
 		{
 			playlistCount++;
@@ -5571,7 +5586,7 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 				if (outc)
 					*outc += 1;
 				if (maxLength) {
-					if (auto sz { fs::absolute(file).string().size() + 1 };
+					if (var sz { fs::absolute(file).string().size() + 1 };
 						*maxLength < sz)
 						*maxLength = sz;
 				}
@@ -5581,9 +5596,9 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 				#endif
 			}
 		   
-			auto fullPath { file.string() };
-			auto needAboslute { true };
-			const auto isNetworkTransport { isNetworkTransportFile(fullPath) };
+			var fullPath { file.string() };
+			var needAboslute { true };
+			const var isNetworkTransport { isNetworkTransportFile(fullPath) };
 			
 			if (isNetworkTransport or isEqual(outExt.c_str(), {".htm", ".html"}))
 			{
@@ -5616,14 +5631,15 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 				fullPath = fs::absolute(file).string();
 
 			if (not dontWrite) {
-				std::string prefix;
-				std::string suffix;
-				std::string name;
+				var prefix { std::string() };
+				var suffix { std::string() };
+				var name { std::string() };
 				if (isEqual(outExt.c_str(), {".wpl", ".b4s", ".smil",
 											".asx", ".wax", ".wvx"}))
 				{
-					for (auto w { 0 }; w <
-						 (sizeof(def::XML_CHARS_ALIAS) / sizeof(def::XML_CHARS_ALIAS[0])); ++w)
+					for (var w { 0 }; w <
+						 (sizeof(def::XML_CHARS_ALIAS) / sizeof(def::XML_CHARS_ALIAS[0]));
+						 ++w)
 					if (isContains(fullPath, def::XML_CHARS_NORMAL[w],
 						   IgnoreCase::Left) not_eq std::string::npos)
 					{
@@ -5634,14 +5650,14 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 
 					if (not isEqual(outExt.c_str(), {".wpl", ".smil"}))
 					{
-						fs::path tmp = fs::path(fullPath).filename();
+						var tmp { fs::path(fullPath).filename() };
 						name = tmp.string().substr(0,
 							tmp.string().size() - tmp.extension().string().size());
 					}
 				}
 			   
 				if (outExt == ".pls") {
-					auto indexString{ std::to_string(playlistCount) };
+					var indexString { std::to_string(playlistCount) };
 					prefix = "File" + indexString + '=';
 					suffix = "\nTitle" + indexString + '=';
 					suffix += title;
@@ -5674,7 +5690,7 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 					suffix = "\"/>\n\t</entry>";
 				}
 				else if (outExt == ".xml") {
-					auto key = std::to_string(1000 - playlistCount);
+					var key { std::to_string(1000 - playlistCount) };
 					prefix = "\t\t<key>" + key + "</key>\n"\
 					   "\t\t<dict>\n"\
 					   "\t\t\t<key>Track ID</key><integer>" + key + "</integer>\n"\
@@ -5683,9 +5699,9 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 					suffix = "</string>\n\t\t</dict>";
 				}
 				else if (isEqual(outExt.c_str(), {".htm", ".html", ".xhtml"})) {
-					std::string typeName;
-					std::pair<std::string, std::string> classDef
-						{"column_numbering", "column_file"};
+					var typeName { std::string() };
+					var classDef { std::pair<std::string, std::string>
+						{"column_numbering", "column_file"} };
 					
 					switch (type) {
 						case Type::Regular:
@@ -5742,15 +5758,15 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 		putIt(file, OS_NAME " Path", Type::Regular);
 		   
 
-		if (opt::state[OPT_SKIPSUBTITLE] != "true") {
-		   std::vector<fs::path> subtitleFiles;
-		   findSubtitleFileInto(file, &subtitleFiles);
-		   for (auto& sf : subtitleFiles)
-			   putIt(std::move(sf), "Subtitle Path on " OS_NAME, Type::Subtitle);
+		if (opt::state[OPT_SKIPSUBTITLE] not_eq "true") {
+			var subtitleFiles { std::vector<fs::path>() };
+			findSubtitleFileInto(file, &subtitleFiles);
+			for (var& sf : subtitleFiles)
+				putIt(std::move(sf), "Subtitle Path on " OS_NAME, Type::Subtitle);
 		}
 		   
 		if (not in::listAdsDir.empty())
-		   for (auto i{0}; i<(adsCount[1] == 0
+		   for (var i { 0 }; i<(adsCount[1] == 0
 							  ? adsCount[0]
 							  : distribCount(mersenneTwisterEngine));
 			   ++i, ++playlistCount)
@@ -5761,24 +5777,24 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 	}};
 					   
 	///Check if records has listAdsDir and equal
-	if (auto equal { true };
-	   in::listAdsDir.size() == records.size())
+	if (var equal { true };
+		in::listAdsDir.size() == records.size())
 	{
-	   for (auto& dir : in::listAdsDir)
-		   if (records.find(dir) == records.end()) {
-			   equal = false;
-			   break;
-		   }
-	   if (equal) /// Then consider there was no listAdsDir
-		   in::listAdsDir.clear();
+		for (var& dir : in::listAdsDir)
+			if (records.find(dir) == records.end()) {
+				equal = false;
+				break;
+			}
+		if (equal) /// Then consider there was no listAdsDir
+			in::listAdsDir.clear();
 	}
 					   
 	if (not in::listAdsDir.empty()) {
-		std::vector<fs::path> list = std::move(in::listAdsDir);
+		const var list { std::move(in::listAdsDir) };
 		
-		for (auto& dir : list)
+		for (var& dir : list)
 			if (not dir.empty())
-				if (const auto found { records[dir] }; found)
+				if (const var found { records[dir] }; found)
 				{
 					std::move(found->begin(), found->end(),
 							  std::back_inserter(in::listAdsDir));
@@ -5786,14 +5802,14 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 				}
 		distrib = std::uniform_int_distribution<>(0, int(in::listAdsDir.size() - 1));
 			
-		if (auto count_s { opt::state[OPT_ADSCOUNT] };
+		if (var count_s { opt::state[OPT_ADSCOUNT] };
 			count_s.empty()) {
 			adsCount[0] = in::regularDirs.size() + in::seasonDirs.size();
 			adsCount[0] = in::listAdsDir.size() % adsCount[0] == 0
 						? std::min(decltype(in::listAdsDir.size())(3), in::listAdsDir.size())
 						: in::listAdsDir.size() % adsCount[0];
 		} else {
-			if (auto pos { count_s.find('-') };
+			if (var pos { count_s.find('-') };
 				pos == std::string::npos)
 				adsCount[0] = std::stoul(count_s);
 			else {
@@ -5815,16 +5831,16 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 		
 		std::sort(in::regularDirs.begin(), in::regularDirs.end());
 			
-		for (auto& dir : in::regularDirs) {
+		for (var& dir : in::regularDirs) {
 			if (dir.empty())
 				continue;
-			if (const auto found { records[dir] }; found) {
+			if (const var found { records[dir] }; found) {
 				if (opt::state[OPT_ARRANGEMENT] == OPT_ARRANGEMENT_PERTITLE)
 					std::sort(found->begin(), found->end(), ascending);
 				else if (opt::state[OPT_ARRANGEMENT] == OPT_ARRANGEMENT_DESCENDING_PERTITLE)
 					std::sort(found->begin(), found->end(), descending);
 					
-				for (auto& f : *found)
+				for (var& f : *found)
 				{
 					if (opt::state[OPT_ARRANGEMENT] == OPT_ARRANGEMENT_ASCENDING
 						or opt::state[OPT_ARRANGEMENT] == OPT_ARRANGEMENT_DESCENDING
@@ -5849,38 +5865,38 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 		else
 			std::sort(in::selectFiles.begin(), in::selectFiles.end(), ascending);
 			
-		for (auto& f : in::selectFiles)
+		for (var& f : in::selectFiles)
 			putIntoPlaylist(std::move(f));
 	}
 	else
 	{
-		unsigned long indexFile{ 0 };
+		var indexFile { (unsigned long) 0 };
 
 		while (true) {
-			auto finish{true};
-			for (auto i{0}; i < maxDirSize; ++i)
-				for (auto& indexPass : {1, 2})
+			var finish { true };
+			for (var i { 0 }; i < maxDirSize; ++i)
+				for (var& indexPass : {1, 2})
 				{
 					if ((indexPass == 1 and i >= in::regularDirs.size())
 						or (indexPass == 2 and i >= in::seasonDirs.size()))
 						continue;
 					
-					if (const auto dir{indexPass == 1 ? in::regularDirs[i]
-						: in::seasonDirs[i]};
+					if (const var dir { indexPass == 1 ? in::regularDirs[i]
+						: in::seasonDirs[i] };
 						dir.empty())
 						continue;
 
-					else if (auto found { records[dir] }; found) {
+					else if (const var found { records[dir] }; found) {
 						if (opt::state[OPT_ARRANGEMENT] == OPT_ARRANGEMENT_SHUFFLE_PERTITLE)
 						{
 							std::shuffle(found->begin(), found->end(),
 										 mersenneTwisterEngine);
-							for (auto& f : *found)
+							for (var& f : *found)
 								putIntoPlaylist(std::move(f));
 							continue;
 						}
 						
-						if (indexFile ==0) {
+						if (indexFile == 0) {
 							if (opt::state[OPT_ARRANGEMENT] == OPT_ARRANGEMENT_SHUFFLE_DEFAULT)
 								std::shuffle(found->begin(), found->end(), mersenneTwisterEngine);
 							
@@ -5888,7 +5904,7 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 								std::sort(found->begin(), found->end(), descending);
 						}
 							
-						for (auto c{ 0 }; c < fileCountPerTurn; ++c)
+						for (var c { 0 }; c < fileCountPerTurn; ++c)
 							if (indexFile + c < found->size()) {
 								finish = false;
 
@@ -5953,10 +5969,10 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 	if (playlistCount == 0)
 		fs::remove(outputName);
 	else {
-		const auto outputFullpath { fs::absolute(outputName).string() };
+		const var outputFullpath { fs::absolute(outputName).string() };
 		std::cout << outputFullpath << '\n';
 		
-		if (const auto app { opt::state[OPT_OPENWITH] };
+		if (const var app { opt::state[OPT_OPENWITH] };
 			opt::state[OPT_OPEN] == "true" or not app.empty())
 		{
 			#if defined(_WIN32) || defined(_WIN64)
@@ -5971,6 +5987,8 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 		}
 	}
 }
+#undef var
+#undef func
 #undef RETURN_VALUE
 #undef CONFIG_PATH
 #undef INSTALL_PATH

@@ -128,35 +128,35 @@ constexpr auto OPT_DEBUG_ARGS = 	{"date", "args", "id3"};
 #define INSTALL_FULLPATH	INSTALL_PATH SEP_PATH "tvplaylist" PE_EXT
 
 constexpr auto OPT_INSTALL			{"install"};
-constexpr auto INSTALL=\
-"--install\n\
+constexpr auto INSTALL="\
+--install\n\
         Install tvplaylist into \"" INSTALL_PATH "\".\n\
 ";
 constexpr auto OPT_UNINSTALL		{"uninstall"};
-constexpr auto UNINSTALL=\
-"--uninstall\n\
+constexpr auto UNINSTALL="\
+--uninstall\n\
         Uninstall tvplaylist from \"" INSTALL_PATH "\".\n\
 ";
 constexpr auto OPT_UPDATE			{"update"};
-constexpr auto UPDATE=\
-"--update\n\
+constexpr auto UPDATE="\
+--update\n\
 --upgrade\n\
         Update tvplaylist.\n\
 ";
 
-constexpr auto OPEN=\
-"--open\n\
+constexpr auto OPEN="\
+--open\n\
         Open generated playlist file with default app.\n\
         See also: --open-with\n\
 ";
-constexpr auto OPENWITH=\
-"--open-with 'application'\n\
+constexpr auto OPENWITH="\
+--open-with 'application'\n\
         Open with specified application.\n\
         See also: --open\n\
 ";
 
-constexpr auto SHOW=\
-"--show-defaults\n\
+constexpr auto SHOW="\
+--show-defaults\n\
 --show-config\n\
 --display-defaults\n\
 --display-config\n\
@@ -166,9 +166,9 @@ constexpr auto SHOW=\
         See also --verbose or --verbose=info or --debug=args or --benchmark.\n\
         Example: --print-defaults\n\
 ";
-constexpr auto WRITE=\
-"-W, --write-defaults [new | reset | edit | add | remove]\n\
-     --write-config [new | reset | edit | add | remove]\n\
+constexpr auto WRITE="\
+-W, --write-defaults [new | reset | edit | add | remove]\n\
+    --write-config [new | reset | edit | add | remove]\n\
         Write anything you defined to \""\
         CONFIG_PATH\
 "\" as new defaults (if no argument passed), instead executing it.\n\
@@ -183,8 +183,8 @@ constexpr auto WRITE=\
         To remove the exact pairs of options and values, pass \"remove\"\n\
         Example: --debug=args --write-config=remove\n\
 ";
-constexpr auto LOAD=\
-"-L, --load-config 'custom file'\n\
+constexpr auto LOAD="\
+-L, --load-config 'custom file'\n\
         Load configuration from custom file.\n\
         Example:\n\
             --load-config tuesday_night.txt\n\
@@ -204,52 +204,52 @@ constexpr auto LOAD=\
         To set custom path for config file, use --write-defaults.\n\
         Example: --write-defaults:load-config=/tmp/setting.txt\n\
 ";
-constexpr auto VERSION=\
-"tvplaylist version 1.1 (Early 2022)\nTM and (C) 2022 Widiatmoko. \
+constexpr auto VERSION="\
+tvplaylist version 1.1 (Early 2022)\nTM and (C) 2022 Widiatmoko. \
 All Rights Reserved. License and Warranty\n";
 
-constexpr auto HELP=\
-"Create playlist file from vary directories and files, \
+constexpr auto HELP="\
+Create playlist file from vary directories and files, \
 then by default, arranged one episode per Title.\nHosted in https://github.com/Mr-Widiatmoko/MakeTVPlaylist\n\n\
 Usage:\n    tvplaylist [Option or Dir or File] ...\n\n\
 If no argument was specified, the current directory will be use.\n\n\
 Option:\n\
 ";
-constexpr auto A_HELP=\
-"-h, --help ['keyword']\n\
+constexpr auto A_HELP="\
+-h, --help ['keyword']\n\
         Display options description.\n\
 ";
-constexpr auto A_VERSION=\
-"-v, --version\n\
+constexpr auto A_VERSION="\
+-v, --version\n\
         Display version.\n\
 ";
 
-constexpr auto ADSDIR=\
-"-D, --ads-dir 'directory constains advertise'\n\
+constexpr auto ADSDIR="\
+-D, --ads-dir 'directory constains advertise'\n\
         Add advertise directory. Ads file will be inserted between each ordered files.\n\
         You can specifying this multiple times.\n\
         To set the numbers how many ads shown use --ads-count.\n\
 ";
-constexpr auto ADSCOUNT=\
-"-C, --ads-count 'fixed count'\n\
+constexpr auto ADSCOUNT="\
+-C, --ads-count 'fixed count'\n\
                  'min count' .. 'max count'\n\
                  'min count' - 'max count'\n\
         Set the number of how many ads will be shown per insertion. Set 0 to disable ads.\n\
         If you set using range, then ads will be shown randomly between 'min count' to 'max count'.\n\
         To set where the advertise directories location path, use --ads-dir.\n\
 ";
-constexpr auto VERBOSE=\
-"-V, --verbose [all | info]\n\
+constexpr auto VERBOSE="\
+-V, --verbose [all | info]\n\
         Display playlist content.\n\
         Define as 'all' will also show fail messages.\n\
         Define as 'info' will also display options info summary.\n\
 ";
-constexpr auto BENCHMARK=\
-"-b, --benchmark\n\
+constexpr auto BENCHMARK="\
+-b, --benchmark\n\
         Benchmarking execution.\n\
 ";
-constexpr auto ARRANGEMENT=\
-"-w, --arrangement [default | unordered | per-title | ascending | shuffle] \n\
+constexpr auto ARRANGEMENT="\
+-w, --arrangement [default | unordered | per-title | ascending | shuffle] \n\
         Specifying how playlist content will be arranged.\n\
         default   : One file per Title, Title sorted ascending.\n\
                     To set more than one file per Title, pass \"=\"'Count'.\n\
@@ -264,37 +264,37 @@ constexpr auto ARRANGEMENT=\
         descending-default   : \"default\" but each Title has files sorted descending.\n\
         descending-per-title : \"per-title\" but each Title has files sorted descending.\n\
 ";
-constexpr auto SEARCH=\
-"--search 'keywords'\n\
+constexpr auto SEARCH="\
+--search 'keywords'\n\
         tvplaylist search engine.\n\
         --search is alias from --no-output-file:verbose:arrangement=ascending:ignore-case\n\
           Example:\n\
             --search \"ext=* medalion or title=medalion exclude=horse\"\n\
         You can specifying this multiple times.\n\
 ";
-constexpr auto OVERWRITE=\
-"-O, --overwrite\n\
+constexpr auto OVERWRITE="\
+-O, --overwrite\n\
         Overwrite output playlist file.\n\
 ";
-constexpr auto SKIPSUBTITLE=\
-"-x, --skip-subtitle\n\
+constexpr auto SKIPSUBTITLE="\
+-x, --skip-subtitle\n\
         Dont include subtitle file.\n\
 ";
-constexpr auto OUTDIR=\
-"-d, --out-dir \"directory path\"\n\
+constexpr auto OUTDIR="\
+-d, --out-dir \"directory path\"\n\
         Override output directory for playlist file.\n\
 ";
-constexpr auto EXECUTION=\
-"-c, --execution [thread | async | linear]\n\
+constexpr auto EXECUTION="\
+-c, --execution [thread | async | linear]\n\
         Specify execution, \"async\" is selected by default.\n\
 ";
-constexpr auto EXCLHIDDEN=\
-"-n, --exclude-hidden\n\
+constexpr auto EXCLHIDDEN="\
+-n, --exclude-hidden\n\
         Exclude hidden folders or files (not for Windows).\n\
 ";
 [[deprecated("Recognized in --find or --exlude-find.")]] [[maybe_unused]]
-constexpr auto CASEINSENSITIVE=\
-"-N, --make-case-insensitive\n\
+constexpr auto CASEINSENSITIVE="\
+-N, --make-case-insensitive\n\
      --case-insensitive\n\
      --caseinsensitive\n\
      --ignore-case\n\
@@ -302,8 +302,8 @@ constexpr auto CASEINSENSITIVE=\
         Make --find and --exclude-find case-insensitive.\n\
         To make case-sensitive again, pass --ignorecase=false.\n\
 ";
-constexpr auto FIND=\
-"-i, --find 'keyword'\n\
+constexpr auto FIND="\
+-i, --find 'keyword'\n\
 -I, --exclude-find 'keyword'\n\
         Filter only files with (or exclude) filename contains find keyword.\n\
         You can specifying this multiple times.\n\
@@ -320,8 +320,8 @@ constexpr auto FIND=\
             Example: --find ignore-case=true\n\
 ";
 [[deprecated("Recognized in --regex or --exlude-regex.")]] [[maybe_unused]]
-constexpr auto REGEXSYNTAX=\
-"-X, --regex-syntax [ecma | awk | grep | egrep | basic | extended]\n\
+constexpr auto REGEXSYNTAX="\
+-X, --regex-syntax [ecma | awk | grep | egrep | basic | extended]\n\
         Specify regular expression syntax type to use.\n\
         Available value are: 'ecma'(Default), 'awk', 'grep', 'egrep', 'basic', 'extended'.\n\
             'basic' use the basic POSIX regex grammar and\n\
@@ -329,16 +329,16 @@ constexpr auto REGEXSYNTAX=\
         You can also specifying this inside --regex or --exclude-regex, for example\n\
             --regex type=basic  or  --exclude-regex type=extended\n\
 ";
-constexpr auto REGEX=\
-"-r, --regex 'syntax'\n\
+constexpr auto REGEX="\
+-r, --regex 'syntax'\n\
 -R, --exclude-regex 'syntax'\n\
         Filter only files with (or exclude) filename match regular expression.\n\
         To set regex syntax type, pass type=[ecma | awk | grep | egrep | basic | extended]\n\
             Example: --regex type=grep  or  --regex=type=grep\n\
         You can specifying this multiple times.\n\
 ";
-constexpr auto EXT=\
-"-e, --ext \"'extension', 'extension', ...\"\n\
+constexpr auto EXT="\
+-e, --ext \"'extension', 'extension', ...\"\n\
 -E, --exclude-ext \"'extension', 'extension' ...\"\n\
         Filter only (or exclude) files that match specific extensions, separated by comma.\n\
             Example: --ext \"pdf, docx\" or --ext=pdf,docx\n\
@@ -347,10 +347,10 @@ constexpr auto EXT=\
         To enable get contents from other playlists, you must include the playlist extensions.\n\
             Example: --ext=mp4,mkv,mp3,m3u,m3u8,pls,wpl,xspf\n\
 ";
-constexpr auto SIZE=\
-"-s, --size < | > 'size'\n\
-            'min size'..'maz size'\n\
-            'min size'-'max size'\n\
+constexpr auto SIZE="\
+-s, --size < | > 'size'\n\
+           'min size'..'maz size'\n\
+           'min size'-'max size'\n\
 -S, --exclude-size < | > 'size'\n\
                    'min size'..'maz size'\n\
                    'min size'-'max size'\n\
@@ -362,10 +362,10 @@ constexpr auto SIZE=\
                 OR using range with '-' OR '..'\n\
                     --size 750 - 1.2gb; size=30..200.2; size 2gb .. 4gb\n\
 ";
-constexpr auto DATE=\
-"-z, --date = | < | > 'date and/or time'\n\
-            'min' .. 'max'\n\
-            'min' - 'max'\n\
+constexpr auto DATE="\
+-z, --date = | < | > 'date and/or time'\n\
+           'min' .. 'max'\n\
+           'min' - 'max'\n\
 -Z, --exclude-date = | < | > 'date and/or time'\n\
                    'min' .. 'max'\n\
                    'min' - 'max'\n\
@@ -378,10 +378,10 @@ constexpr auto DATE=\
                 OR\n\
                     --date=0:20..0:35:date=0:47/2022..0:56/2022\n\
 ";
-constexpr auto CREATED=\
-"-t, --created = | < | > 'date and/or time'\n\
-               'min' .. 'max'\n\
-               'min' - 'max'\n\
+constexpr auto CREATED="\
+-t, --created = | < | > 'date and/or time'\n\
+              'min' .. 'max'\n\
+              'min' - 'max'\n\
 -T, --exclude-created = | < | > 'date and/or time'\n\
                       'min' .. 'max'\n\
                       'min' - 'max'\n\
@@ -389,10 +389,10 @@ constexpr auto CREATED=\
         For more information about 'date and/or time' possible values, see below.\n\
         You can specifying this multiple times, for both single value or range values.\n\
 ";
-constexpr auto ACCESSED=\
-"-a, --accessed = | < | > 'date and/or time'\n\
-                'min' .. 'max'\n\
-                'min' - 'max'\n\
+constexpr auto ACCESSED="\
+-a, --accessed = | < | > 'date and/or time'\n\
+               'min' .. 'max'\n\
+               'min' - 'max'\n\
 -A, --exclude-accessed = | < | > 'date and/or time'\n\
                         'min' .. 'max'\n\
                         'min' - 'max'\n\
@@ -400,10 +400,10 @@ constexpr auto ACCESSED=\
         You can specifying this multiple times, for both single value or range values.\n\
         For more information about 'date and/or time' possible values, see below.\n\
 ";
-constexpr auto MODIFIED=\
-"-m, --modified = | < | > 'date and/or time'\n\
-                'min' .. 'max'\n\
-                'min' - 'max'\n\
+constexpr auto MODIFIED="\
+-m, --modified = | < | > 'date and/or time'\n\
+               'min' .. 'max'\n\
+               'min' - 'max'\n\
 -M, --exclude-modified = | < | > 'date and/or time'\n\
                        'min' .. 'max'\n\
                        'min' - 'max'\n\
@@ -411,19 +411,19 @@ constexpr auto MODIFIED=\
         For more information about 'date and/or time' possible values, see below.\n\
         You can specifying this multiple times, for both single value or range values.\n\
 ";
-constexpr auto CHANGED=\
-"-g, --changed = | < | > 'date and/or time'\n\
-               'min' .. 'max'\n\
-               'min' - 'max'\n\
+constexpr auto CHANGED="\
+-g, --changed = | < | > 'date and/or time'\n\
+              'min' .. 'max'\n\
+              'min' - 'max'\n\
 -G, --exclude-changed = | < | > 'date and/or time'\n\
-                       'min' .. 'max'\n\
-                       'min' - 'max'\n\
+                      'min' .. 'max'\n\
+                      'min' - 'max'\n\
         Filter only (or exclude) files that was changed on specified date[s] and/or time[s].\n\
         For more information about 'date and/or time' possible values, see below.\n\
         You can specifying this multiple times, for both single value or range values.\n\
 ";
-constexpr auto FIXFILENAME=\
-"-f, --out-filename 'filename'\n\
+constexpr auto FIXFILENAME="\
+-f, --out-filename 'filename'\n\
         Override output playlist filename, by default it will crreate \".m3u8\" playlist.\n\
         To create \".pls\", \".wpl\", or others type of playlist, pass it as extension filename.\n\
             Example: --out-filename=my_playlist.xspf.\n\
@@ -433,12 +433,12 @@ constexpr auto FIXFILENAME=\
         Here the example to convert from different type of playlist to another type:\n\
             Example: --ext=mp3,m3u old_musics.m3u --out-filename=old_music.html\n\
 ";
-constexpr auto NOOUTPUTFILE=\
-"-F, --no-ouput-file [yes | no]\n\
+constexpr auto NOOUTPUTFILE="\
+-F, --no-ouput-file [yes | no]\n\
         Choose to create playlist file or no. Default 'yes' if option was declared or if was build as library.\n\
 ";
-constexpr auto HELP_REST=\
-"\n\
+constexpr auto HELP_REST="\
+\n\
 Arguments can be surrounded by \"\" (eg. \"--verbose;benchmark\") to enable using character ';' or <ENTER> as multiline or another characters that belongs to Terminal or shell. To view how arguments was deduced you can pass option --debug=args.\n\
 Options can be joined, and option assignment separator [SPACE] can be replaced with '=' \
 and options can be separated by ':' or ';' after assignment. For the example:\n\n\
@@ -455,8 +455,8 @@ Note, you cannot join mnemonic option with full option, for the example:\n\n\
 Instead try to separate mnemonic and full option, like this:\n\n\
   tvplaylist -bO --ext=mp3:version\n\n\
 ";
-constexpr auto HELP_DATE_REST=\
-"Posible value for 'date and/or time' are: 'Year', 'Month Name' (mnemonic or full), 'Month Number', 'Day', 'WeekDay Name' (mnemonic or full), 'Hour' (if AM/PM defined then it is 12 hours, otherwise 24 hours), 'Minute', 'Second', AM or PM.\n\
+constexpr auto HELP_DATE_REST="\
+Posible value for 'date and/or time' are: 'Year', 'Month Name' (mnemonic or full), 'Month Number', 'Day', 'WeekDay Name' (mnemonic or full), 'Hour' (if AM/PM defined then it is 12 hours, otherwise 24 hours), 'Minute', 'Second', AM or PM.\n\
 Example:\n\
   Filter only files created in 2009:\n\
 	 --created=2009\n\

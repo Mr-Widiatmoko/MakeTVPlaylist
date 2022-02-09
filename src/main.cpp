@@ -3716,13 +3716,10 @@ then by default, arranged one episode per Title.\n"
 		if (pos != std::string::npos) {
 			auto opts = buff.substr(0, pos);
 			replace_all(opts, "\n     ", "\n");
-			//replace_all(opts, "--", ".B \\--");
-			//replace_all(opts, "-", ".B \\-");
 			file << ".TP\n" << opts << '\n';
 			
 			buff = buff.substr(pos + std::strlen(MARK));
 			replace_all(buff, MARK, "");
-			//replace_all(buff, "--", ".B \\--");
 			file << buff << '\n';
 		} else
 			file << buff << '\n';
@@ -4005,7 +4002,7 @@ auto main(const int argc, char* const argv[]) -> int
 	loadConfigInto(&args);
 	args.emplace_back(def::ARGS_SEPARATOR);
 	expandArgsInto(argc, argv, ARGS_START_INDEX, &args);
-	
+#undef ARGS_START_INDEX
 	unsigned long fileCountPerTurn{ 1 };
 
 	std::unordered_set<std::string_view> invalidArgs;
@@ -4980,8 +4977,6 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 		}
 		std::cout << "\nFor more information, please try to type \""
 			<< fs::path(argv[0]).filename().string() << " --help ['keyword']\"\n\n";
-					
-		return RETURN_VALUE
 	}
 	
 	if (bufferDirs.empty() and in::selectFiles.empty())
@@ -5014,9 +5009,9 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 		std::format_to(std::back_inserter(opt::state[OPT_FIXFILENAME]),
 					   "playlist_from_{0}{1}.m3u8",
 					   inputDirsCount == 0
-						 ? groupNumber(std::to_string(selectFiles.size())) + "_file"
+						 ? groupNumber(std::to_string(in::selectFiles.size())) + "_file"
 						 : dirOut + "_dir",
-					   inputDirsCount > 1 or selectFiles.size() > 1 ? "s" : "";
+					   inputDirsCount > 1 or in::selectFiles.size() > 1 ? "s" : "";
 		#else
 		opt::state[OPT_FIXFILENAME] =
 				opt::state[OPT_NOOUTPUTFILE] == "true" ? "" :
@@ -5030,32 +5025,65 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 		#endif
 	}
 	
-	#ifndef DEBUG
-	if (not opt::state[OPT_SHOWCONFIG].empty() or
-		not invalidArgs.empty() or opt::state[OPT_VERBOSE] == "all"
-		or opt::state[OPT_VERBOSE] == "info" or opt::state[OPT_BENCHMARK] == "true"
-		or opt::state[OPT_DEBUG] == "true" or opt::state[OPT_DEBUG] == "args")
-	#endif
+	if (const auto condToShowArgsParsed { not invalidArgs.empty()
+											or opt::state[OPT_DEBUG] == "true"
+											or opt::state[OPT_DEBUG] == "args" };
+		not opt::state[OPT_SHOWCONFIG].empty()
+		or opt::state[OPT_VERBOSE] 	== "all"
+		or opt::state[OPT_VERBOSE] 	== "info"
+		or opt::state[OPT_BENCHMARK]== "true"
+		or condToShowArgsParsed)
 	{ // MARK: Options Summary
 		constexpr auto WIDTH{ 20 };
+		#define LABEL(x)	x << std::setw(unsigned(WIDTH - std::strlen(x))) << ": "
 		#ifndef DEBUG
-		if (opt::state[OPT_DEBUG] == "true" or opt::state[OPT_DEBUG] == "args")
+		if (condToShowArgsParsed)
 		#endif
 		{
-			std::cout << "Original Arguments: ";
-			for (auto i{1}; i<argc; ++i)
-				std::cout << '"' << argv[i] << '"' << (i+1>=argc ? "" : ", ");
-			std::cout << '\n';
-			std::cout << "Parsed Arguments  : ";
+			std::string formatSuffix;
+			std::string formatPrefix;
+			
+			std::cout << LABEL("Original Arguments");
+			for (auto i{1}; i<argc; ++i) {
+				#if defined(_WIN32) || defined(_WIN64)
+				#else
+				if (invalidArgs.find(argv[i]) not_eq invalidArgs.end()) {
+					formatPrefix = "⚠️ \033[43m\033[1;30m";
+					formatSuffix = "\033[0m";
+				} else {
+					formatSuffix = "";
+					formatPrefix = "";
+				}
+				#endif
+				std::cout << '"' << formatPrefix << argv[i] << formatSuffix
+							<< '"' << (i+1>=argc ? "" : ", ");
+			}
+			std::cout << "\n\n";
+			std::cout << LABEL("Deduced Arguments");
 			for (auto i{0}; i<args.size(); ++i) {
 				if (args[i] == def::ARGS_SEPARATOR)
 					continue;
-				std::cout << '"' << args[i] << '"' << (i+1>=args.size() ? "" : ", ");
+				
+				#if defined(_WIN32) || defined(_WIN64)
+				#else
+				if (invalidArgs.find(args[i]) not_eq invalidArgs.end()) {
+					formatPrefix = "⚠️ \033[43m\033[1;30m";
+					formatSuffix = "\033[0m";
+				} else {
+					formatSuffix = "";
+					formatPrefix = "";
+				}
+				#endif
+				std::cout << '"' << formatPrefix << args[i] << formatSuffix
+							<< '"' << (i+1>=args.size() ? "" : ", ");
 			}
 			std::cout << '\n';
+			
+			if (not invalidArgs.empty())
+				return RETURN_VALUE
 		}
 	#define PRINT_OPT(x)	(x.empty() ? "false" : x)
-	#define LABEL(x)	x << std::setw(unsigned(WIDTH - std::strlen(x))) << ": "
+	
 	std::cout
 		<< LABEL(OPT_ARRANGEMENT) << opt::state[OPT_ARRANGEMENT] << '\n'
 		<< LABEL(OPT_EXECUTION) << opt::state[OPT_EXECUTION] << '\n'
@@ -5220,7 +5248,7 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 	std::vector<std::future<void>> asyncs;
 					   
 	{
-			std::vector<fs::path> list = std::move(in::listAdsDir);
+		std::vector<fs::path> list = std::move(in::listAdsDir);
 		
 		for (auto& child : list)
 			if (opt::state[OPT_EXECUTION] == OPT_EXECUTION_THREAD)

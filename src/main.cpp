@@ -73,6 +73,7 @@ let OPT_BENCHMARK 					{"benchmark"};				// b
 let OPT_OVERWRITE 					{"overwrite"};				// O
 let OPT_SKIPSUBTITLE 				{"skip-subtitle"};			// x
 let OPT_OUTDIR 						{"out-dir"};				// d
+let OPT_CURRENTDIR 					{"current-dir"};
 let OPT_ADSDIR 						{"ads-dir"};				// D
 let OPT_ADSCOUNT					{"ads-count"};				// C
 let OPT_EXECUTION					{"execution"};				// c
@@ -303,6 +304,10 @@ let OUTDIR="\
 -d, --out-dir \"directory path\"\n\
         Override output directory for playlist file.\n\
 ";
+let CURRENTDIR="\
+-d, --current-dir \"directory path\"\n\
+        Set current directory.\n\
+";
 let EXECUTION="\
 -c, --execution [thread | async | linear]\n\
         Specify execution, \"async\" is selected by default.\n\
@@ -528,7 +533,7 @@ typedef std::unordered_map<std::string, std::shared_ptr<ListPath>>
 
 constexpr ReadOnlyCString* OPTS[] = { &OPT_VERSION, &OPT_HELP, &OPT_ARRANGEMENT,
 	&OPT_SEARCH, &OPT_VERBOSE, &OPT_BENCHMARK, & OPT_OVERWRITE,
-	&OPT_SKIPSUBTITLE, &OPT_OUTDIR, &OPT_ADSDIR, &OPT_ADSCOUNT,
+	&OPT_SKIPSUBTITLE, &OPT_OUTDIR, &OPT_CURRENTDIR, &OPT_ADSDIR, &OPT_ADSCOUNT,
 	&OPT_EXECUTION, &OPT_LOADCONFIG, &OPT_WRITEDEFAULTS, &OPT_SHOWCONFIG,
 	&OPT_FIXFILENAME, &OPT_NOOUTPUTFILE, &OPT_OPEN, &OPT_OPENWITH,
 	&OPT_SIZE, &OPT_EXCLSIZE, &OPT_EXT, &OPT_EXCLEXT,
@@ -545,7 +550,7 @@ constexpr ReadOnlyCString* OPTS[] = { &OPT_VERSION, &OPT_HELP, &OPT_ARRANGEMENT,
 /// Conjunction with OPTS, to enable access OPTS[index] == HELPS[index]
 constexpr ReadOnlyCString* HELPS[] = { &VERSION, &A_HELP, &ARRANGEMENT,
 	&SEARCH, &VERBOSE, &BENCHMARK, & OVERWRITE,
-	&SKIPSUBTITLE, &OUTDIR, &ADSDIR, &ADSCOUNT,
+	&SKIPSUBTITLE, &OUTDIR, &CURRENTDIR, &ADSDIR, &ADSCOUNT,
 	&EXECUTION, &LOAD, &WRITE, &SHOW, &FIXFILENAME,
 	&NOOUTPUTFILE, &OPEN, &OPENWITH, &SIZE, &SIZE, &EXT, &EXT,
 	&FIND, &FIND, &REGEX, &REGEX, &EXCLHIDDEN,
@@ -562,7 +567,7 @@ static_assert((ARRAYLEN(OPTS) - 1) == (ARRAYLEN(HELPS) - 2),
 			  "Size need to be equal!, to be able accessed by index");
 
 constexpr ReadOnlyCString* SINGLE_VALUE_OPT[] = {&OPT_LOADCONFIG, &OPT_SHOWCONFIG,
-	&OPT_ARRANGEMENT, &OPT_OPEN, &OPENWITH,
+	&OPT_ARRANGEMENT, &OPT_OPEN, &OPENWITH, &OPT_CURRENTDIR,
 	&OPT_VERBOSE, &OPT_BENCHMARK, &OPT_OVERWRITE, &OPT_SKIPSUBTITLE,
 	&OPT_OUTDIR, &OPT_ADSCOUNT, &OPT_EXECUTION, &OPT_FIXFILENAME, &OPT_EXCLHIDDEN,
 	&OPT_EXT, &OPT_EXCLEXT};
@@ -578,7 +583,7 @@ constexpr ReadOnlyCString* MULTI_VALUE_OPT[] = {
 
 constexpr ReadOnlyCString* ALL_HELPS[] = {
 	&HELP, &A_HELP, &A_VERSION, &LOAD, &WRITE, &SHOW, &ARRANGEMENT, &SEARCH, &VERBOSE, &BENCHMARK,
-	&OVERWRITE, &SKIPSUBTITLE, &OUTDIR, &ADSDIR, &ADSCOUNT, &EXECUTION, &FIXFILENAME,
+	&OVERWRITE, &SKIPSUBTITLE, &OUTDIR, &CURRENTDIR, &ADSDIR, &ADSCOUNT, &EXECUTION, &FIXFILENAME,
 	&NOOUTPUTFILE, &OPEN, &OPENWITH, &EXCLHIDDEN,
 	
 	&SIZE, &EXT, &FIND, &REGEX, &DATE, &CREATED, &MODIFIED, &ACCESSED, &CHANGED,
@@ -2720,16 +2725,15 @@ func listDirInto(const fs::path& ori,
 		});
 }
 
-template <template <class ...> class Container, class ... Args>
 func listDirRecursivelyInto(const fs::path& path,
-						Container<fs::path, Args...>* const out,
-						const bool includeRegularFiles)
+							ListPath* const out,
+							const bool includeRegularFiles)
 {
 	if (not out or path.empty())
 		return;
 	
 	var head { path };
-	std::fill_n(std::inserter(*out, out->end()), 1, std::move(path));
+	out->emplace_back(std::move(path));
 	
 	/// Try to expand single dir and put into list
 	var list { ListEntry() };
@@ -2741,7 +2745,7 @@ func listDirRecursivelyInto(const fs::path& path,
 	func emplace{[&list, &out]()
 	{
 		for (var& d : list)
-			std::fill_n(std::inserter(*out, out->end()), 1, std::move(d.path()));
+			out->emplace_back(std::move(d.path()));
 	}};
 	
 	do {
@@ -2750,8 +2754,7 @@ func listDirRecursivelyInto(const fs::path& path,
 			dirs.clear();
 			listDirInto(head, &list, false, includeRegularFiles);
 			if (list.size() == 1)
-				std::fill_n(std::inserter(*out, out->end()), 1,
-							std::move(list[0].path()));
+				out->emplace_back(std::move(list[0].path()));
 			if (not list.empty()) {
 				for (var& child : list)
 					if (child.is_directory())
@@ -2882,15 +2885,15 @@ func findSubtitleFileInto(const fs::path& original,
 
 
 
-template <typename Container, typename T>
-func insertInto(Container* const out, const T& path)
+func insertInto(ListPath* const out, const fs::path& path)
 {
-	const var isFound { isValid(path) };
-	if (isFound)
-		std::fill_n(std::inserter(*out, out->end()), 1, std::move(path));
+	const var isOk { isValid(path) };
+	if (isOk)
+		out->emplace_back(std::move(path));
 
-	return isFound;
+	return isOk;
 }
+
 
 func checkForSeasonDir(const fs::path& path) -> void
 {
@@ -4293,6 +4296,22 @@ func main(const int argc, CString const argv[]) -> int
 				if (i + 1 == args.size())
 					return RETURN_VALUE
 			}
+			else if (isMatch(OPT_CURRENTDIR, '\0')) {
+				if (i + 1 < args.size()) {
+					i++;
+					try {
+						fs::current_path(args[i]);
+					} catch (fs::filesystem_error& e) {
+						std::cout << "⚠️  No such directory: \""
+									<< args[i]
+									<< "\"\n";
+						--i;
+					}
+				} else
+					std::cout << "⚠️  Expecting directory. Please see --help "
+								<< args[i].substr(2)
+								<< '\n';
+			}
 			else if (isMatch(OPT_DEBUG, 		'B', true)) {
 				if (i + 1 < args.size() and
 					isEqual(args[i + 1].c_str(), OPT_DEBUG_ARGS))
@@ -5073,7 +5092,7 @@ SIZE_NEEDED:		std::cout << "⚠️  Expecting operator '<' or '>' followed"\
 			else
 				for (var& f : list)
 					if (isValid(f) and isValidFile(f))
-						insertInto(&in::selectFiles, std::move(f));
+						insertInto(&in::selectFiles, f);
 		}
 		else
 			invalidArgs.emplace(args[i]);

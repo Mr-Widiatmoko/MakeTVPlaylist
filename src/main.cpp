@@ -4215,7 +4215,8 @@ func main(const int argc, CString const argv[]) -> int
 					opt::valueOf[with] = "true";
 			}
 			return result;
-		} }; args[i] == def::ARGS_SEPARATOR)
+		} };
+			args[i] == def::ARGS_SEPARATOR)
 				continue;
 			else if (isMatch(OPT_UPDATE, '\0', false, {"upgrade"})) {
 				#if defined(MAKE_LIB)
@@ -4316,6 +4317,7 @@ func main(const int argc, CString const argv[]) -> int
 								  "⚠️  For some reason, install fail!")
 								<< ".\n";
 				}
+				return RETURN_VALUE
 			}
 			else if (isMatch(OPT_UNINSTALL, '\0')) {
 				#if defined(MAKE_LIB)
@@ -4333,6 +4335,7 @@ func main(const int argc, CString const argv[]) -> int
 				std::cout << (not fs::exists(path) ? "✅  Uninstalled" :
 							  "⚠️  For some reason, uninstall fail!")
 							<< ".\n";
+				return RETURN_VALUE
 			}
 			else if (isMatch(OPT_UNINSTALLMAN, '\0')) {
 				installMan(false);

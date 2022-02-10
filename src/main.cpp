@@ -27,7 +27,7 @@
 #include <fstream>
 #include <random>
 #include <dirent.h>
-#define let constexpr auto
+#define let static constexpr auto
 let TRUE_FALSE						= {	"true",
 										"false"
 };
@@ -56,16 +56,16 @@ let OPT_WRITEDEFAULTS_ARGS 			= { "new",
 
 let OPT_LOADCONFIG					{"load-config"};			// L
 let OPT_ARRANGEMENT 				{"arrangement"};			// w
-let OPT_ARRANGEMENT_DEFAULT				{"default"};
-let OPT_ARRANGEMENT_UNORDERED			{"unordered"};
-let OPT_ARRANGEMENT_ASCENDING			{"ascending"};
-let OPT_ARRANGEMENT_PERTITLE			{"per-title"};
-let OPT_ARRANGEMENT_SHUFFLE				{"shuffle"};
-let OPT_ARRANGEMENT_SHUFFLE_DEFAULT		{"default-shuffle"};
-let OPT_ARRANGEMENT_SHUFFLE_PERTITLE	{"per-title-shuffle"};
-let OPT_ARRANGEMENT_DESCENDING			{"descending"};
-let OPT_ARRANGEMENT_DESCENDING_DEFAULT	{"default-descending"};
-let OPT_ARRANGEMENT_DESCENDING_PERTITLE	{"per-title-descending"};
+	let MODE_ARRANGEMENT_DEFAULT				{"default"};
+	let MODE_ARRANGEMENT_UNORDERED				{"unordered"};
+	let MODE_ARRANGEMENT_ASCENDING				{"ascending"};
+	let MODE_ARRANGEMENT_PERTITLE				{"per-title"};
+	let MODE_ARRANGEMENT_SHUFFLE				{"shuffle"};
+	let MODE_ARRANGEMENT_SHUFFLE_DEFAULT		{"default-shuffle"};
+	let MODE_ARRANGEMENT_SHUFFLE_PERTITLE		{"per-title-shuffle"};
+	let MODE_ARRANGEMENT_DESCENDING				{"descending"};
+	let MODE_ARRANGEMENT_DESCENDING_DEFAULT		{"default-descending"};
+	let MODE_ARRANGEMENT_DESCENDING_PERTITLE	{"per-title-descending"};
 let OPT_HELP 						{"help"};					// h
 let OPT_VERSION 					{"version"};				// v
 let OPT_VERBOSE 					{"verbose"};				// V
@@ -76,8 +76,8 @@ let OPT_OUTDIR 						{"out-dir"};				// d
 let OPT_ADSDIR 						{"ads-dir"};				// D
 let OPT_ADSCOUNT					{"ads-count"};				// C
 let OPT_EXECUTION					{"execution"};				// c
-let OPT_EXECUTION_THREAD			{"thread"};
-let OPT_EXECUTION_ASYNC				{"async"};
+	let MODE_EXECUTION_THREAD					{"thread"};
+	let MODE_EXECUTION_ASYNC					{"async"};
 let OPT_EXCLHIDDEN					{"exclude-hidden"};			// n
 let OPT_REGEXSYNTAX					{"regex-syntax"};		// X
 let OPT_REGEXSYNTAX_ARGS 			= {	"ecma",
@@ -499,9 +499,34 @@ If you want to test 'date and/or time' use --debug=date 'date and/or time' ['for
 	 or --debug=date now \"Date: %F, Time: %T.\"\n\
 It will showing internal tvplaylist date time recognizer, with format \"Weekday Year/Month/Day Hour:Minute:Second\".\n\
 ";
-#undef let
 
-constexpr const char* const* OPTS[] = { &OPT_VERSION, &OPT_HELP, &OPT_ARRANGEMENT,
+#define CString											char*
+#define ReadOnlyCString									const char* const
+typedef std::vector<std::string> 						ListString;
+typedef std::vector<std::filesystem::path> 				ListPath;
+typedef std::vector<std::filesystem::directory_entry> 	ListEntry;
+typedef std::vector<std::thread> 						ListThread;
+typedef std::vector<std::future<void>> 					ListAsync;
+typedef std::vector<std::regex> 						ListRegex;
+typedef std::vector<int> 								ListInt;
+typedef std::vector<unsigned short> 					ListUShort;
+typedef std::vector<short> 								ListShort;
+typedef std::vector<unsigned> 							ListUInt;
+typedef std::vector<std::pair<uintmax_t, uintmax_t>> 	ListPaitUIntMax;
+typedef std::vector<std::pair<float, std::string>> 		ListPairFloatString;
+struct Date;
+typedef std::vector<std::pair<char, Date>> 				ListPairCharDate;
+typedef std::vector<std::pair<Date, Date>> 				ListPairDate;
+typedef unsigned long long 								MAXNUM;
+typedef std::vector<MAXNUM> 							ListMAXNUM;
+typedef std::unordered_set<std::string> 				SetString;
+typedef std::unordered_set<std::string_view> 			SetStringView;
+typedef std::unordered_map<std::string, std::string> 	MapString;
+typedef std::unordered_map<std::string, std::shared_ptr<ListPath>>
+														MapStringPListPath;
+#define ARRAYLEN(x)	(sizeof(x)/sizeof(x[0]))
+
+constexpr ReadOnlyCString* OPTS[] = { &OPT_VERSION, &OPT_HELP, &OPT_ARRANGEMENT,
 	&OPT_SEARCH, &OPT_VERBOSE, &OPT_BENCHMARK, & OPT_OVERWRITE,
 	&OPT_SKIPSUBTITLE, &OPT_OUTDIR, &OPT_ADSDIR, &OPT_ADSCOUNT,
 	&OPT_EXECUTION, &OPT_LOADCONFIG, &OPT_WRITEDEFAULTS, &OPT_SHOWCONFIG,
@@ -518,7 +543,7 @@ constexpr const char* const* OPTS[] = { &OPT_VERSION, &OPT_HELP, &OPT_ARRANGEMEN
 };
 
 /// Conjunction with OPTS, to enable access OPTS[index] == HELPS[index]
-constexpr const char* const* HELPS[] = { &VERSION, &A_HELP, &ARRANGEMENT,
+constexpr ReadOnlyCString* HELPS[] = { &VERSION, &A_HELP, &ARRANGEMENT,
 	&SEARCH, &VERBOSE, &BENCHMARK, & OVERWRITE,
 	&SKIPSUBTITLE, &OUTDIR, &ADSDIR, &ADSCOUNT,
 	&EXECUTION, &LOAD, &WRITE, &SHOW, &FIXFILENAME,
@@ -533,17 +558,17 @@ constexpr const char* const* HELPS[] = { &VERSION, &A_HELP, &ARRANGEMENT,
 	&HELP_REST, &HELP_DATE_REST
 };
 
-static_assert((sizeof(OPTS)/sizeof(OPTS[0])) - 1 == (sizeof(HELPS)/sizeof(HELPS[0])) - 2,
+static_assert((ARRAYLEN(OPTS) - 1) == (ARRAYLEN(HELPS) - 2),
 			  "Size need to be equal!, to be able accessed by index");
 
-constexpr const char* const* SINGLE_VALUE_OPT[] = {&OPT_LOADCONFIG, &OPT_SHOWCONFIG,
+constexpr ReadOnlyCString* SINGLE_VALUE_OPT[] = {&OPT_LOADCONFIG, &OPT_SHOWCONFIG,
 	&OPT_ARRANGEMENT, &OPT_OPEN, &OPENWITH,
 	&OPT_VERBOSE, &OPT_BENCHMARK, &OPT_OVERWRITE, &OPT_SKIPSUBTITLE,
 	&OPT_OUTDIR, &OPT_ADSCOUNT, &OPT_EXECUTION, &OPT_FIXFILENAME, &OPT_EXCLHIDDEN,
 	&OPT_EXT, &OPT_EXCLEXT};
 
 [[maybe_unused]]
-constexpr const char* const* MULTI_VALUE_OPT[] = {
+constexpr ReadOnlyCString* MULTI_VALUE_OPT[] = {
 	&OPT_ADSDIR,
 	&OPT_SIZE, &OPT_EXCLSIZE,
 	&OPT_FIND, &OPT_EXCLFIND, &OPT_REGEX, &OPT_EXCLREGEX,
@@ -551,7 +576,7 @@ constexpr const char* const* MULTI_VALUE_OPT[] = {
 	&OPT_DCREATED, &OPT_DMODIFIED, &OPT_DACCESSED, &OPT_DCHANGED,
 	&OPT_DEXCLCREATED, &OPT_DEXCLMODIFIED, &OPT_DEXCLACCESSED, &OPT_DEXCLCHANGED,};
 
-constexpr const char* const* ALL_HELPS[] = {
+constexpr ReadOnlyCString* ALL_HELPS[] = {
 	&HELP, &A_HELP, &A_VERSION, &LOAD, &WRITE, &SHOW, &ARRANGEMENT, &SEARCH, &VERBOSE, &BENCHMARK,
 	&OVERWRITE, &SKIPSUBTITLE, &OUTDIR, &ADSDIR, &ADSCOUNT, &EXECUTION, &FIXFILENAME,
 	&NOOUTPUTFILE, &OPEN, &OPENWITH, &EXCLHIDDEN,
@@ -614,7 +639,7 @@ func groupNumber(std::string number)
 
 func trim(const std::string& s)
 {
-	var start { (unsigned long) 0}, end{s.size()};
+	var start { (unsigned long) 0 }, end{s.size()};
 	for (var i { 0 }; i<end; ++i)
 		if (not std::isspace(s[i])) {
 			start=i;
@@ -674,7 +699,7 @@ func isContains(const std::string& l, const std::string& r,
 	return k == r.size() ? i - k + 1 : std::string::npos;
 }
 
-func isEqual(const char* const l, const char* const r,
+func isEqual(ReadOnlyCString l, ReadOnlyCString r,
 			 const IgnoreCase ic = IgnoreCase::None,
 			 const unsigned long max = 0)
 {
@@ -684,8 +709,8 @@ func isEqual(const char* const l, const char* const r,
 	if (max == 0 and sz1 not_eq sz2) return false;
 	var total { max > 0 ? max : sz1 };
 	
-	const char* _l = l;
-	const char*_r = r;
+	const CString _l = l;
+	const CString _r = r;
 	while (total-- > 0) {
 		switch (ic){
 			case IgnoreCase::Both:
@@ -719,7 +744,7 @@ func isEqual(const std::string& l, const std::string& r,
 	if (max == 0 and l.size() - startLeft not_eq r.size() - startRight) return false;
 	var total { std::max(l.size() - startLeft, r.size() - startRight) };
 	for (var i { 0 }; i<(max > 0 ? std::min(max, total) : total); ++i)
-		switch (ic){
+		switch (ic) {
 			case IgnoreCase::Both:
 				if (std::tolower(l[i + startLeft]) not_eq std::tolower(r[i + startRight]))
 					return false;
@@ -739,17 +764,17 @@ func isEqual(const std::string& l, const std::string& r,
 	return true;
 }
 
-func isEqual(const char* const source,
-			 const std::initializer_list<const char*>& list,
+func isEqual(ReadOnlyCString source,
+			 const std::initializer_list<const CString>& list,
 			 const IgnoreCase ic = IgnoreCase::None,
 			 const unsigned long startLeft = 0,
 			 const unsigned long startRight = 0,
 			 const unsigned long max = 0)
 {
-	for (var& s : list) {
+	for (var& s : list)
 		if (isEqual(source, s, ic, startLeft, startRight, max))
 			return true;
-	}
+
 	return false;
 }
 
@@ -771,7 +796,7 @@ func isEqual(const std::string& source,
 func isInt(const std::string& s, int* const value = nullptr)
 {
 	var result { 0 };
-	if (var [p, ec] = std::from_chars(s.c_str(), s.c_str()+s.size(), result);
+	if (const var [p, ec] { std::from_chars(s.c_str(), s.c_str()+s.size(), result) };
 		ec == std::errc()) {
 		if (value)
 			*value = result;
@@ -799,7 +824,7 @@ func getLikely(const std::string_view& src, const std::string_view& with)
 	return scoreOpenent / score * 100;
 }
 
-func printHelp(const char* const arg = nullptr)
+func printHelp(ReadOnlyCString arg = nullptr)
 {
 	func print{[](const int i) {
 		std::cout << *HELPS[i];
@@ -819,8 +844,8 @@ func printHelp(const char* const arg = nullptr)
 				break;
 			}
 			i++;
-			if (i >= (sizeof(OPTS)/sizeof(OPTS[0])) - 1) {
-				var found { std::vector<std::string>() };
+			if (i >= (ARRAYLEN(OPTS) - 1)) {
+				var found { ListString() };
 				var k { 0 };
 				var indexFound { k };
 				for (var& opt : OPTS) {
@@ -834,10 +859,10 @@ func printHelp(const char* const arg = nullptr)
 					print(indexFound);
 				}
 				else {
-					var foundIndexes { std::vector<int>() };
+					var foundIndexes { ListInt() };
 					if (found.empty()) {
 						for (var h { 0 }; ; ++h) {
-							if (h >= (sizeof(ALL_HELPS)/sizeof(ALL_HELPS[0])) - 2)
+							if (h >= (ARRAYLEN(ALL_HELPS) - 2))
 								break;
 							if (isContains(*ALL_HELPS[h], arg, IgnoreCase::Both)
 								not_eq std::string::npos)
@@ -846,10 +871,15 @@ func printHelp(const char* const arg = nullptr)
 					}
 					
 					if (foundIndexes.empty())
-						std::cout << "⚠️ No option named \"" << arg << '\"';
+						std::cout << "⚠️ No option named \""
+									<< arg
+									<< '\"';
 					else {
-						std::cout << "Found " << foundIndexes.size()
-						<< " result containing \"" << arg << "\":\n\n";
+						std::cout << "Found "
+									<< foundIndexes.size()
+									<< " result containing \""
+									<< arg
+									<< "\":\n\n";
 						for (var& id : foundIndexes) {
 							print(id);
 							std::cout << '\n';
@@ -858,9 +888,11 @@ func printHelp(const char* const arg = nullptr)
 						
 					if (foundIndexes.empty() and not found.empty()) {
 						std::cout << ", do you mean ";
-						for (var k{0}; k<found.size(); ++k)
-							std::cout << '\"' << found[k] << '\"'
-							<< (k + 1 == found.size() ? "." : " or ");
+						for (var k { 0 }; k<found.size(); ++k)
+							std::cout << '\"'
+										<< found[k]
+										<< '\"'
+										<< (k + 1 == found.size() ? "." : " or ");
 					}
 				}
 				std::cout << '\n';
@@ -871,8 +903,8 @@ func printHelp(const char* const arg = nullptr)
 }
 
 
-typedef unsigned long long MAXNUM;
-func containInts(const std::string& s, std::vector<MAXNUM>* const out)
+
+func containInts(const std::string& s, ListMAXNUM* const out)
 {
 	var buffer { std::string() };
 	func make{[&]() -> void {
@@ -915,7 +947,7 @@ func parseExtCommaDelimited(const std::string& literal,
 				buffer.erase(buffer.begin());
 			else if (buffer[0] not_eq '.')
 				buffer.insert(buffer.begin(), '.');
-			//result->emplace_back(buffer);
+
 			std::fill_n(std::inserter(*result, result->end()), 1, std::move(buffer));
 			buffer = "";
 		} else
@@ -989,7 +1021,7 @@ struct Date
 		return std::mktime(&tm);
 	}
 
-	func string(const char* const format = nullptr, const bool UTC = false) const {
+	func string(ReadOnlyCString format = nullptr, const bool UTC = false) const {
 		var s { std::string() };
 		if (format and std::strlen(format) > 0) {
 			var tm { std::tm() };
@@ -1028,7 +1060,7 @@ struct Date
 	}
 	
 	static
-	func getWeekDayName(const unsigned short index, const char* const locale = nullptr)
+	func getWeekDayName(const unsigned short index, ReadOnlyCString locale = nullptr)
 		-> std::string
 	{
 		if (index >= 1 or index <= 7) {
@@ -1047,8 +1079,9 @@ struct Date
 	}
 	
 	static
-	func getWeekDayNames(const char* result[7], const char* const locale = nullptr) {
-		for (var i { 9 }, k{0}; i<16; ++i, ++k) {
+	func getWeekDayNames(const CString result[7], ReadOnlyCString locale = nullptr)
+	{
+		for (var i { 9 }, k { 0 }; i<16; ++i, ++k) {
 			var tm { std::tm() };
 			tm.tm_year = 2020-1900; // 2020
 			tm.tm_mon = 2-1; // February
@@ -1073,7 +1106,7 @@ struct Date
 		{
 			var curr_year { std::chrono::year(Y) };
 			
-			for (int cur_month{ aMonth > 0 ? aMonth : 1 };
+			for (var cur_month{ aMonth > 0 ? aMonth : 1 };
 				 cur_month not_eq (aYear > 0 ? aMonth + 1 : 13); ++cur_month)
 			
 				for (var d { aDay > 0 ? aDay : 1 };
@@ -1096,7 +1129,7 @@ struct Date
 	}
 
 private:
-	static constexpr var WEEKDAYS = {
+	let WEEKDAYS = {
 	/*en_US.UTF-8:*/ "sun", "mon", "tue", "wed", "thu", "fri", "sat",
 	/*id_ID       */ "min", "sen", "sel", "rab", "kam", "jum", "sab",
 	/*de_DE.UTF-8:*/ "so", "mo", "di", "mi", "do", "fr", "sa",
@@ -1121,7 +1154,7 @@ private:
 	/*id_ID.UTF-8:*/ "星期日", "星期一", "星期二", "星期三", "星期四", "星期五", "星期六",
 	};
 	
-	static constexpr var MONTHS = {
+	let MONTHS = {
 	/*en_US.UTF-8:*/ "jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec",
 	/*id_ID       */ "jan", "feb", "mar", "apr", "mei", "jun", "jul", "agu", "sep", "okt", "nov", "des",
 	/*de_DE.UTF-8:*/ "jan", "feb", "mär", "apr", "mai", "jun", "jul", "aug", "sep", "okt", "nov", "dez",
@@ -1260,20 +1293,20 @@ public:
 			}
 			return 0;
 		}};
-		var date { std::vector<unsigned short>() };
-		var time { std::vector<short>() };
-		var others { std::vector<std::string>() };
+		var date { ListUShort() };
+		var time { ListShort() };
+		var others { ListString() };
 		var last { '\0' };
-		for (var i { 0 }, k{ 0 }; i<s.size(); ++i)
+		for (var i { 0 }, k { 0 }; i<s.size(); ++i)
 			if (not std::isdigit(s[i])) {
 				if (s[i] == ':') {
-					var get { s.substr(k, i - k) };
+					const var get { s.substr(k, i - k) };
 					if (isDigit(get))
 						time.emplace_back(std::stoi(get));
 					else if (not get.empty())
 						others.emplace_back(get);
 				} else if (std::ispunct(s[i])) {
-					var get { s.substr(k, i - k) };
+					const var get { s.substr(k, i - k) };
 					if (isDigit(get)) {
 						if (last == ':')
 							time.emplace_back(std::stoi(get));
@@ -1283,10 +1316,10 @@ public:
 						others.emplace_back(get);
 				} else if (std::isspace(s[i])) {
 					if (k not_eq i) {
-						var get { s.substr(k, i - k) };
-						var isNumber { isDigit(get) };
+						const var get { s.substr(k, i - k) };
+						const var isNumber { isDigit(get) };
 						if (std::isalpha(last)) {
-							if (var pm { isPM(get) }; pm)
+							if (const var pm { isPM(get) }; pm)
 								time.emplace_back(pm);
 							else if (not get.empty())
 								others.emplace_back(get);
@@ -1302,8 +1335,8 @@ public:
 					continue;
 				} else {
 					if (i == s.size() - 1) {
-						var get { s.substr(k) };
-						if (var pm { isPM(get) }; pm)
+						const var get { s.substr(k) };
+						if (const var pm { isPM(get) }; pm)
 							time.emplace_back(pm);
 						else if (not get.empty())
 							others.emplace_back(get);
@@ -1317,8 +1350,8 @@ public:
 				k = i + 1;
 				
 			} else if (i == s.size() - 1) {
-				var get { s.substr(k) };
-				var isNumber { isDigit(get) };
+				const var get { s.substr(k) };
+				const var isNumber { isDigit(get) };
 				if (last == ':' and isNumber)
 					time.emplace_back(std::stoi(get));
 				else if ((std::ispunct(last) or last == '\0') and isNumber)
@@ -1375,7 +1408,9 @@ public:
 				}
 				continue;
 			} else
-				std::cout << "⚠️  Cannot understand literal \"" << s << "\"!.\n";
+				std::cout << "⚠️  Cannot understand literal \""
+							<< s
+							<< "\"!.\n";
 		}
 		
 		
@@ -1407,8 +1442,8 @@ public:
 			
 		if (year > 0 and year < 1000) {
 			const std::chrono::year_month_day ymd{floor<std::chrono::days>(std::chrono::system_clock::now())};
-			var Y { std::to_string(year) };
-			var nowy { std::to_string(int(ymd.year())) };
+			const var Y { std::to_string(year) };
+			const var nowy { std::to_string(int(ymd.year())) };
 			year = std::stoi(nowy.substr(0, nowy.size() - Y.size()) + Y);
 		}
 			
@@ -1418,7 +1453,9 @@ public:
 			}}.iso_encoding();
 			
 			if (weekDay > -1 and weekDay not_eq weekday)
-				std::cout << "⚠️  Invalid Weekday was defined for " << string("%B %d %Y") << "!\n";
+				std::cout << "⚠️  Invalid Weekday was defined for "
+							<< string("%B %d %Y")
+							<< "!\n";
 		}
 			
 		unsigned short* unit[] = {&hour, &minute, &second };
@@ -1426,30 +1463,30 @@ public:
 		for (var i { 0 }; var& t : time)
 			if (t < 0) {
 				hasPM = t == -2;
-			} else if (i < sizeof(unit)/sizeof(unit[0]))
+			} else if (i < ARRAYLEN(unit))
 				*unit[i++] = t;
 			else
 				std::cout << "⚠️  Invalid unit time on "
-					<< hour << ':'<< minute << ':' << second << '\n';
+							<< hour
+							<< ':'
+							<< minute
+							<< ':'
+							<< second
+							<< '\n';
 		if (hasPM)
 			hour += 12;
-		
-		
-#if DEBUG
-		std::cout << "input: \"" << s << "\" -> " << weekday << ' ' <<
-		year << '/' << month << '/' << day << ' ' << hour << ':' << minute << ':' << second << '\n';
-#endif
-
 	}
 
-	func isValid() -> bool {
+	func isValid() const -> bool
+	{
 		return not (year == 0 and month == 0 and day == 0 and hour == 0 and minute == 0 and second == 0 and weekday == 0)
 		and (weekday <= 7 or year >= 10 or month <= 12 or day <= 33 or hour <= 24 or minute <= 60 or second <= 60);
 	}
 
 };
 
-static const var SET_OF_ID3_TAGS { std::unordered_set<std::string>{
+static const var SET_OF_ID3_TAGS {
+	SetString {
 	"id3",
 	"version",								// both		2.3		2.4
 	"audio_encryption", 					// AENC
@@ -1543,7 +1580,7 @@ static const var SET_OF_ID3_TAGS { std::unordered_set<std::string>{
 }};
 struct ID3
 {
-	static constexpr const char* GENRES[] = {
+	static constexpr ReadOnlyCString GENRES[] = {
 		"Blues", "Classic rock", "Country", "Dance", "Disco", "Funk", "Grunge",
 		"Hip-Hop", "Jazz", "Metal", "New Age", "Oldies", "Other", "Pop",
 		"Rhythm and Blues", "Rap", "Reggae", "Rock", "Techno", "Industrial",
@@ -1582,11 +1619,11 @@ struct ID3
 	func parseInput(const std::string& keyword) const
 		-> std::shared_ptr<std::pair<std::string, std::string>>
 	{
-		var pos { keyword.find('=') };
+		const var pos { keyword.find('=') };
 		var found { pos > 2 and pos not_eq std::string::npos };
 		
 		if (found) {
-			var selectedTag { keyword.substr(0, pos) };
+			const var selectedTag { keyword.substr(0, pos) };
 			found = SET_OF_ID3_TAGS.find(selectedTag) not_eq SET_OF_ID3_TAGS.end();
 			if (found) {
 				std::string val { keyword.substr(pos + 1) };
@@ -1600,7 +1637,7 @@ struct ID3
 	
 	func get(const std::string& tag) const
 	{
-		var found { tags.find(tag) };
+		const var found { tags.find(tag) };
 		if (found not_eq tags.end())
 			return found->second;
 		else
@@ -1609,7 +1646,7 @@ struct ID3
 	
 	func set(const std::string& tag, const std::string& value)
 	{
-		var found { tags.find(tag) };
+		const var found { tags.find(tag) };
 		if (found not_eq tags.end())
 			found->second = value;
 		else
@@ -1641,7 +1678,7 @@ struct ID3
 	friend
 	func operator % (const ID3& l, const std::string& keyword) -> bool
 	{
-		var keyVal { l.parseInput(keyword) };
+		const var keyVal { l.parseInput(keyword) };
 		if (keyVal) {
 			if (keyVal->first == "id3") {
 				for (var& tag : l.tags)
@@ -1662,11 +1699,11 @@ struct ID3
 	
 private:
 	std::unordered_multimap<std::string_view, std::string> tags;
-	const char* path;
+	const CString path;
 	bool isCaseInsensitive;
 	
 	static
-	func btoi(const char* bytes, const int size, const int offset)
+	func btoi(ReadOnlyCString bytes, const int size, const int offset)
 	{
 		var result { (unsigned int) 0x00 };
 		for (var i { 0 }; i < size; ++i)
@@ -1680,11 +1717,11 @@ private:
 	
 	//#if 0
 	static
-	func itob(const int integer, char* result[4])
+	func itob(const int integer, CString result[4])
 	{
 		// We need to reverse the bytes because Intel uses little endian.
-		constexpr var size { 4 };
-		var aux { (char*) &integer };
+		let size { 4 };
+		var aux { (CString) &integer };
 		for (var i { size - 1 }; i >= 0; i--)
 			*result[size - 1 - i] = aux[i];
 	}
@@ -1724,30 +1761,30 @@ private:
 	}
 	
 	struct V2 {
-		static constexpr var SZ_HEADER 					= 10;
-		static constexpr var SZ_TAG 					= 3;
-		static constexpr var SZ_VERSION 				= 1;
-		static constexpr var SZ_REVISION				= 1;
-		static constexpr var SZ_FLAGS 					= 1;
-		static constexpr var SZ_HEADER_SIZE 			= 4;
-		static constexpr var SZ_EXTENDED_HEADER_SIZE 	= 4;
+		let SZ_HEADER 				= 10;
+		let SZ_TAG 					= 3;
+		let SZ_VERSION 				= 1;
+		let SZ_REVISION				= 1;
+		let SZ_FLAGS 				= 1;
+		let SZ_HEADER_SIZE 			= 4;
+		let SZ_EXTENDED_HEADER_SIZE = 4;
 		
 		
 		property char 	tag[SZ_TAG];
-		property char 	major_version,
-						minor_version,
+		property char 	majorVersion,
+						minorVersion,
 						flags;
 		property int 	tag_size,
 						extended_header_size;
 		
-		V2(const char* const buffer) :
-			major_version{0x0}, minor_version{0x0}, flags{0x0},
+		V2(ReadOnlyCString buffer) :
+			majorVersion{0x0}, minorVersion{0x0}, flags{0x0},
 			tag_size{0}, extended_header_size{0}
 		{
 			var position { 0 };
 			std::memcpy(tag, buffer, SZ_TAG);
-			major_version = buffer[position += SZ_TAG];
-			minor_version = buffer[position += SZ_VERSION];
+			majorVersion = buffer[position += SZ_TAG];
+			minorVersion = buffer[position += SZ_VERSION];
 			flags = buffer[position += SZ_REVISION];
 			tag_size = syncint_decode(
 				btoi(buffer, SZ_HEADER_SIZE, position += SZ_FLAGS));
@@ -1758,21 +1795,21 @@ private:
 		}
 		
 		struct Frame {
-			static constexpr var SZ_HEADER 						= 10;
-			static constexpr var SZ_ID 							= 4;
-			static constexpr var SZ_SIZE 						= 4;
-			static constexpr var SZ_FLAGS 						= 2;
-			static constexpr var SZ_ENCODING 					= 1;
-			static constexpr var SZ_LANGUAGE 					= 3;
-			static constexpr var SZ_SHORT_DESCRIPTION 			= 1;
+			let SZ_HEADER 					= 10;
+			let SZ_ID 						= 4;
+			let SZ_SIZE 					= 4;
+			let SZ_FLAGS 					= 2;
+			let SZ_ENCODING 				= 1;
+			let SZ_LANGUAGE 				= 3;
+			let SZ_SHORT_DESCRIPTION 		= 1;
 			
-			static constexpr var INVALID_FRAME 		= 0;
-			static constexpr var TEXT_FRAME 		= 1;
-			static constexpr var COMMENT_FRAME 		= 2;
-			static constexpr var APIC_FRAME 		= 3;
+			let INVALID_FRAME 	= 0;
+			let TEXT_FRAME 		= 1;
+			let COMMENT_FRAME 	= 2;
+			let APIC_FRAME 		= 3;
 			
-			static constexpr var ISO_ENCODING 		= 0;
-			static constexpr var UTF_16_ENCODING 	= 1;
+			let ISO_ENCODING 	= 0;
+			let UTF_16_ENCODING = 1;
 			
 			property char id[SZ_ID];
 			property char flags[SZ_FLAGS];
@@ -1784,7 +1821,7 @@ private:
 				return size not_eq 0;
 			}
 			
-			Frame(const char* const raw, int offset, const int major_version) :
+			Frame(ReadOnlyCString raw, int offset, const int major_version) :
 				size{0}
 			{
 				std::memcpy(id, raw + offset, SZ_ID);
@@ -1814,24 +1851,30 @@ private:
 	
 public:
 	
-	func write(const char* const a_path = nullptr)
+	func write(ReadOnlyCString a_path = nullptr)
 	{
 		if (not path and not a_path)
 			return;
 		var file { std::fstream(a_path ? a_path : path) };
+//		if (not file.good()) {
+//			std::cout << "⚠️  Cannot write \""
+//						<< (a_path ? a_path : path)
+//						<< "\"\n";
+//			return;
+//		}
 		
 		file.seekp(0, std::ios_base::end);
-		const var end { int(file.tellp()) };
+		const var end { (int) file.tellp() };
 		
 		file.seekp(end - 128);
-		var pos { int(file.tellp()) };
+		var pos { (int) file.tellp() };
 		
 		func set{[&file, &pos](ID3* const id3,
-							   const char* const key,
+							   ReadOnlyCString key,
 							   const int size,
-							   const char* const value = nullptr)
+							   ReadOnlyCString value = nullptr)
 		{
-			const char* currVal { nullptr };
+			const CString currVal { nullptr };
 			if (key and id3->tags.find(key) == id3->tags.end())
 				id3->add(key, value ? value : "");
 			else if (key)
@@ -1861,7 +1904,7 @@ public:
 		set(this, nullptr, 1);
 		set(this, "track", 1);
 		
-		if (var genre { get("genre") };
+		if (const var genre { get("genre") };
 			not genre.empty())
 			for (var i { 0 }; var& g : GENRES) {
 				if (genre == g) {
@@ -1897,7 +1940,7 @@ public:
 	
 	ID3(): path{nullptr} { }
 	
-	ID3(const char* const path, const bool case_insensitive = false)
+	ID3(ReadOnlyCString path, const bool case_insensitive = false)
 	{
 		this->path = path;
 		isCaseInsensitive = case_insensitive;
@@ -1916,23 +1959,23 @@ public:
 			var tag { V2(s_tag) };
 			if (char bytes[tag.tag_size + 10];
 				
-				tag.major_version not_eq 0
+				tag.majorVersion not_eq 0
 				and file.read(bytes, tag.tag_size + 10))
 			{
 				
-				add("version", "2." + std::to_string(tag.major_version)
-				+ (tag.minor_version > 0
-					? "." + std::to_string(tag.minor_version)
-					: ""));
+				add("version", "2." + std::to_string(tag.majorVersion)
+									+ (tag.minorVersion > 0
+										? "." + std::to_string(tag.minorVersion)
+										: ""));
 				
-				var isv24 { tag.major_version == 4 };
-				var isv23 { tag.major_version == 3 };
+				var isv24 { tag.majorVersion == 4 };
+				var isv23 { tag.majorVersion == 3 };
 				
 				var offset{ tag.extended_header_size };
 				
 				while (offset < tag.tag_size)
 				{
-					var frame { V2::Frame(bytes, offset, tag.major_version) };
+					var frame { V2::Frame(bytes, offset, tag.majorVersion) };
 					if (frame.isValid())
 					{
 						offset += frame.size + 10;
@@ -2144,7 +2187,11 @@ public:
 						else if (isEqual(frame.id, "WXXX"))
 							add("user_defined_url_link_frame", frame.data);
 						#if 0
-						std::cout << "Frame: " << frame.frame_id << " = " << frame.data << '\n';
+						std::cout << "Frame: "
+									<< frame.frame_id
+									<< " = "
+									<< frame.data
+									<< '\n';
 						
 						tag.frames.emplace_back(std::move(frame));
 						#endif
@@ -2163,7 +2210,7 @@ public:
 					buffer[i] = file.get();
 				
 				if (size == 1) {
-					int result = buffer[0];
+					var result { buffer[0] };
 					if (var genreIndex { 0 }; isGenre)
 						for (var& g : GENRES) {
 							if (result == genreIndex)
@@ -2190,10 +2237,10 @@ public:
 				add("comment", get(28));
 				get(/*Zero Track*/ 1);
 				add("track", get(1));
-				var genre { get(1, true) };
+				const var genre { get(1, true) };
 				var index { 0 };
-				if (var [p, ec] = std::from_chars(genre.c_str(),
-								genre.c_str()+genre.size(), index);
+				if (const var [p, ec] { std::from_chars(genre.c_str(),
+										genre.c_str()+genre.size(), index) };
 					ec == std::errc())
 					add("genre", GENRES[index]);
 				
@@ -2219,8 +2266,8 @@ public:
 #undef property
 
 namespace opt {
-	var EXCLUDE_EXT { std::unordered_set<std::string>() };
-	var DEFAULT_EXT { std::unordered_set<std::string>{
+	var EXCLUDE_EXT { SetString() };
+	var DEFAULT_EXT { SetString{
 		".mp4",  ".mkv", ".mov", ".m4v",  ".mpeg", ".mpg",  ".mts", ".ts",
 		".webm", ".flv", ".wmv", ".avi",  ".divx", ".xvid", ".dv",  ".3gp",
 		".tmvb", ".rm",  ".mpg4",".mqv",  ".ogm",  ".qt",
@@ -2231,50 +2278,50 @@ namespace opt {
 	var EXCLUDE_EXT_REPLACED { false };
 	var DEFAULT_EXT_REPLACED { false };
 
-	std::vector<std::regex> 	listRegex, 	listExclRegex;
+	ListRegex 	listRegex, 	listExclRegex;
 	
-	std::vector<std::string> 	listFind, 	listExclFind;
-	std::vector<std::string>	listFindDir,listExclFindDir;
+	ListString 	listFind, 	listExclFind,
+				listFindDir,listExclFindDir;
 
-	std::vector<std::pair<std::uintmax_t, std::uintmax_t>> listSize, listExclSize;
+	ListPaitUIntMax listSize, listExclSize;
 
-	std::vector<std::pair<char, Date>>
+	ListPairCharDate
 		listDCreated, 	  listDModified, 	 listDAccessed, 	listDChanged,
 		listDExclCreated, listDExclModified, listDExclAccessed, listDExclChanged;
-	std::vector<std::pair<Date, Date>>
+	ListPairDate
 		listDCreatedR, 	   listDModifiedR, 	   listDAccessedR, 	   listDChangedR,
 		listDExclCreatedR, listDExclModifiedR, listDExclAccessedR, listDExclChangedR;
 
 	namespace date {
-		const char* const* SINGLE_DATE[2][4] = {
+		ReadOnlyCString* SINGLE_DATE[2][4] = {
 			{ &OPT_DCREATED, &OPT_DACCESSED, &OPT_DMODIFIED, &OPT_DCHANGED },
 			{ &OPT_DEXCLCREATED, &OPT_DEXCLACCESSED, &OPT_DEXCLMODIFIED, &OPT_DEXCLCHANGED },
 		};
 
 			
-		const std::vector<std::pair<char, Date>>* const OPERATOR_DATE[2][4] = {
+		const ListPairCharDate* const OPERATOR_DATE[2][4] = {
 			{ &opt::listDCreated, &opt::listDAccessed, &opt::listDModified, &opt::listDChanged },
 			{ &opt::listDExclCreated, &opt::listDExclAccessed, &opt::listDExclModified, &opt::listDExclChanged },
 		};
 
 		
-		const std::vector<std::pair<Date, Date>>* const RANGE_DATE[2][4] = {
+		const ListPairDate* const RANGE_DATE[2][4] = {
 			{ &opt::listDCreatedR, &opt::listDAccessedR, &opt::listDModifiedR, &opt::listDChangedR },
 			{ &opt::listDExclCreatedR, &opt::listDExclAccessedR, &opt::listDExclModifiedR, &opt::listDExclChangedR },
 		};
 	}
 
-	var state { std::unordered_map<std::string, std::string>() };
+	var valueOf { MapString() };
 }
 
 
 
 func directory_iterator(const fs::path& path, const unsigned char type)
 {
-	var result { std::vector<fs::directory_entry>() };
+	var result { ListEntry() };
 		
-	if(var folder { opendir(path.string().c_str()) }; folder) {
-		var parentPath { path.string() + fs::path::preferred_separator };
+	if(const var folder { opendir(path.string().c_str()) }; folder) {
+		const var parentPath { path.string() + fs::path::preferred_separator };
 		struct dirent* entry;
 		readdir(folder);
 		readdir(folder);
@@ -2287,14 +2334,14 @@ func directory_iterator(const fs::path& path, const unsigned char type)
 				else {
 					var name { parentPath };
 					name += entry->d_name;
-					var path_name { fs::path(std::move(name)) };
+					const var path_name { fs::path(std::move(name)) };
 					var d { fs::directory_entry(std::move(path_name)) };
 					d.refresh();
 					if (((d.status().permissions() & ( fs::perms::owner_read
 													| fs::perms::group_read
 													| fs::perms::others_read))
 							== fs::perms::none)
-						or (opt::state[OPT_EXCLHIDDEN] == "true"
+						or (opt::valueOf[OPT_EXCLHIDDEN] == "true"
 							and entry->d_name[0] == '.'))
 						continue;
 					if (d.is_symlink()) {
@@ -2326,14 +2373,14 @@ func isValidFile(const fs::path& path)
 	if (not fs::exists(path))
 		return false;
 
-	if ((not opt::state[OPT_EXCLEXT].empty() and opt::state[OPT_EXCLEXT] not_eq "*")
+	if ((not opt::valueOf[OPT_EXCLEXT].empty() and opt::valueOf[OPT_EXCLEXT] not_eq "*")
 		and not opt::EXCLUDE_EXT_REPLACED) {
-		parseExtCommaDelimited(opt::state[OPT_EXCLEXT], &opt::EXCLUDE_EXT);
+		parseExtCommaDelimited(opt::valueOf[OPT_EXCLEXT], &opt::EXCLUDE_EXT);
 		opt::EXCLUDE_EXT_REPLACED = true;
 	}
-	if ((not opt::state[OPT_EXT].empty() and opt::state[OPT_EXT] not_eq "*")
+	if ((not opt::valueOf[OPT_EXT].empty() and opt::valueOf[OPT_EXT] not_eq "*")
 		 and not opt::DEFAULT_EXT_REPLACED) {
-		parseExtCommaDelimited(opt::state[OPT_EXT], &opt::DEFAULT_EXT);
+		parseExtCommaDelimited(opt::valueOf[OPT_EXT], &opt::DEFAULT_EXT);
 		opt::DEFAULT_EXT_REPLACED = true;
 	}
 	
@@ -2347,36 +2394,36 @@ func isValidFile(const fs::path& path)
 			return false;
 	}
 	
-	var fileExt { tolower(tmp.extension().string()) };
-	if (opt::state[OPT_EXT] not_eq "*"
+	const var fileExt { tolower(tmp.extension().string()) };
+	if (opt::valueOf[OPT_EXT] not_eq "*"
 		and opt::DEFAULT_EXT.find(fileExt)
 		== opt::DEFAULT_EXT.end())
 		return false;
 	
-	if (opt::state[OPT_EXCLEXT] not_eq "*"
-		and not opt::state[OPT_EXCLEXT].empty())
+	if (opt::valueOf[OPT_EXCLEXT] not_eq "*"
+		and not opt::valueOf[OPT_EXCLEXT].empty())
 		if (opt::EXCLUDE_EXT.find(fileExt)
 			not_eq opt::EXCLUDE_EXT.end())
 			return false;
 	
-	if (opt::state[OPT_DCREATED] 		not_eq ""
-		or opt::state[OPT_DACCESSED] 	not_eq ""
-		or opt::state[OPT_DMODIFIED] 	not_eq ""
-		or opt::state[OPT_DCHANGED] 	not_eq ""
-		or opt::state[OPT_DEXCLCREATED] not_eq ""
-		or opt::state[OPT_DEXCLACCESSED]not_eq ""
-		or opt::state[OPT_DEXCLMODIFIED]not_eq ""
-		or opt::state[OPT_DEXCLCHANGED] not_eq ""
+	if (opt::valueOf[OPT_DCREATED] 		not_eq ""
+		or opt::valueOf[OPT_DACCESSED] 	not_eq ""
+		or opt::valueOf[OPT_DMODIFIED] 	not_eq ""
+		or opt::valueOf[OPT_DCHANGED] 	not_eq ""
+		or opt::valueOf[OPT_DEXCLCREATED] not_eq ""
+		or opt::valueOf[OPT_DEXCLACCESSED]not_eq ""
+		or opt::valueOf[OPT_DEXCLMODIFIED]not_eq ""
+		or opt::valueOf[OPT_DEXCLCHANGED] not_eq ""
 		)
 	{
 		struct stat filestat;
 		stat(tmp.string().c_str(), &filestat);
 		
-		Date _ft[4] = { 				Date(&filestat.st_birthtime),
+		const Date _ft[4] = { 			Date(&filestat.st_birthtime),
 										Date(&filestat.st_atime),
 										Date(&filestat.st_mtime),
 										Date(&filestat.st_ctime) };
-		Date ft[2][4] = {
+		const Date ft[2][4] = {
 			{ _ft[0], _ft[1], _ft[2], _ft[3]},
 			{ _ft[0], _ft[1], _ft[2], _ft[3]}
 		};
@@ -2386,7 +2433,7 @@ func isValidFile(const fs::path& path)
 		for (var& z : { 0, 1 })
 		for (var& i : { 0, 1, 2, 3 })
 		{
-			if (opt::state[*opt::date::SINGLE_DATE[z][i]] not_eq "") {
+			if (opt::valueOf[*opt::date::SINGLE_DATE[z][i]] not_eq "") {
 				for (var& r : *opt::date::RANGE_DATE[z][i])
 					if (ft[z][i] >= r.first and ft[z][i] <= r.second ) {
 						found[z] = true;
@@ -2411,7 +2458,7 @@ func isValidFile(const fs::path& path)
 							break;
 						}
 					}
-			} // end st[] -> state[OPT_D?????]
+			} // end st[] -> valueOf[OPT_D?????]
 		}
 		
 		if (not found[0] or found[1])
@@ -2419,7 +2466,7 @@ func isValidFile(const fs::path& path)
 	}
 	
 	
-	if (var found { false }; not opt::state[OPT_REGEX].empty()) {
+	if (var found { false }; not opt::valueOf[OPT_REGEX].empty()) {
 		for (var filename { excludeExtension(tmp.filename()) };
 			 var& regex : opt::listRegex)
 			if (std::regex_search(filename, regex)) {
@@ -2430,17 +2477,17 @@ func isValidFile(const fs::path& path)
 			return false;
 	}
 	
-	if (not opt::state[OPT_EXCLREGEX].empty())
-		for (var filename { excludeExtension(tmp.filename()) };
+	if (not opt::valueOf[OPT_EXCLREGEX].empty())
+		for (const var filename { excludeExtension(tmp.filename()) };
 			 var& regex : opt::listExclRegex)
 			if (std::regex_search(filename, regex))
 				return false;
 	
 	if (not opt::listFind.empty() or not opt::listExclFind.empty()) // MARK: Find statement
 	{
-		var ismp3 { isEqual(fileExt.c_str(), {".mp3", ".aac", ".m4a"}) };
-		var filename { excludeExtension(tmp.filename()) };
-		var isCaseInsensitive { opt::state[OPT_CASEINSENSITIVE] == "true" };
+		const var ismp3 { isEqual(fileExt.c_str(), {".mp3", ".aac", ".m4a"}) };
+		const var filename { excludeExtension(tmp.filename()) };
+		const var isCaseInsensitive { opt::valueOf[OPT_CASEINSENSITIVE] == "true" };
 		
 		var id3 { ID3() };
 		if (ismp3)
@@ -2484,7 +2531,7 @@ func isValidFile(const fs::path& path)
 
 	if (var found { false };
 		not opt::listSize.empty()
-		or (opt::state[OPT_SIZEOPGT][0] not_eq '\0' and opt::state[OPT_SIZE] not_eq "0"))
+		or (opt::valueOf[OPT_SIZEOPGT][0] not_eq '\0' and opt::valueOf[OPT_SIZE] not_eq "0"))
 	{
 		const var fileSize { fs::file_size(tmp) };
 		
@@ -2495,16 +2542,16 @@ func isValidFile(const fs::path& path)
 			}
 		
 		if (not found)
-			found = opt::state[OPT_SIZEOPGT][0] == '>'
-						? fileSize > std::stoul(opt::state[OPT_SIZE])
-						: fileSize < std::stoul(opt::state[OPT_SIZE]);
+			found = opt::valueOf[OPT_SIZEOPGT][0] == '>'
+						? fileSize > std::stoul(opt::valueOf[OPT_SIZE])
+						: fileSize < std::stoul(opt::valueOf[OPT_SIZE]);
 		if (not found)
 			return false;
 	}
 	
 	if (var found { false };
 		not opt::listExclSize.empty()
-		or (opt::state[OPT_EXCLSIZEOPGT][0] not_eq '\0' and opt::state[OPT_EXCLSIZE] not_eq "0"))
+		or (opt::valueOf[OPT_EXCLSIZEOPGT][0] not_eq '\0' and opt::valueOf[OPT_EXCLSIZE] not_eq "0"))
 	{
 		const var fileSize { fs::file_size(tmp) };
 		
@@ -2513,9 +2560,9 @@ func isValidFile(const fs::path& path)
 				return false;
 		
 		if (not found)
-			found = opt::state[OPT_EXCLSIZEOPGT][0] == '>'
-						? fileSize > std::stoul(opt::state[OPT_EXCLSIZE])
-						: fileSize < std::stoul(opt::state[OPT_EXCLSIZE]);
+			found = opt::valueOf[OPT_EXCLSIZEOPGT][0] == '>'
+						? fileSize > std::stoul(opt::valueOf[OPT_EXCLSIZE])
+						: fileSize < std::stoul(opt::valueOf[OPT_EXCLSIZE]);
 		if (found)
 			return false;
 	}
@@ -2528,10 +2575,10 @@ func getAvailableFilename(const fs::path& original,
 						  const std::string& suffix = "")
 {
 	if (fs::exists(original)) {
-		var s { original.string() };
-		var ext { original.extension().string() };
-		var noext { s.substr(0, s.size() - ext.size()) };
-		var i { (unsigned) 0};
+		const var s { original.string() };
+		const var ext { original.extension().string() };
+		const var noext { s.substr(0, s.size() - ext.size()) };
+		var i { (unsigned) 0 };
 		while (true) {
 			var test { fs::path(noext + prefix + std::to_string(++i) + suffix + ext) };
 			
@@ -2546,13 +2593,14 @@ func getAvailableFilename(const fs::path& original,
 inline
 func sort(const fs::path& a, const fs::path& b, bool ascending)
 {
-	var afn { a.filename().string().substr(0,
+	const var afn { a.filename().string().substr(0,
 	a.filename().string().size() - a.extension().string().size()) };
 
-	var bfn { b.filename().string().substr(0,
+	const var bfn { b.filename().string().substr(0,
 	b.filename().string().size() - b.extension().string().size()) };
 
-	std::vector<MAXNUM> av, bv;
+	var av { ListMAXNUM() };
+	var bv { ListMAXNUM() };
 	containInts(afn, &av);
 	containInts(bfn, &bv);
 
@@ -2577,22 +2625,21 @@ func descending(const fs::path& a, const fs::path& b)
 }
 
 
-func sortFiles(std::vector<fs::path>* const selectFiles)
+func sortFiles(ListPath* const selectFiles)
 {
 	if (selectFiles->size() > 1) {
 		std::sort(selectFiles->begin(), selectFiles->end());
 		
-		var selectFilesDirs { std::unordered_map<std::string,
-			std::shared_ptr<std::vector<fs::path>>>() };
+		var selectFilesDirs { MapStringPListPath() };
 		for (var& f : *selectFiles) {
 			var parent { f.parent_path().string() };
 			if (var ptr { selectFilesDirs[parent] };
 				ptr)
 				ptr->emplace_back(f);
 			else {
-				var flist { std::vector<fs::path>{f} };
+				var flist { ListPath{f} };
 				
-				selectFilesDirs[parent] = std::make_shared<std::vector<fs::path>>
+				selectFilesDirs[parent] = std::make_shared<ListPath>
 													(std::move(flist));
 			}
 		}
@@ -2613,7 +2660,7 @@ func isDirNameValid(const fs::path& dir)
 		return true;
 	
 	const var filename { dir.filename().string() };
-	const var ignoreCase { opt::state[OPT_CASEINSENSITIVE] == "true" };
+	const var ignoreCase { opt::valueOf[OPT_CASEINSENSITIVE] == "true" };
 	for (var& keyword : opt::listFindDir)
 		if (isContains(filename, keyword, ignoreCase ? IgnoreCase::Left
 					   : IgnoreCase::None) not_eq std::string::npos)
@@ -2642,12 +2689,14 @@ func isValid(const fs::path& path)
 												| fs::perms::group_read
 												| fs::perms::others_read))
 			== fs::perms::none)
-	or (opt::state[OPT_EXCLHIDDEN] == "true" and path.filename().string()[0] == '.')
+	or (opt::valueOf[OPT_EXCLHIDDEN] == "true" and path.filename().string()[0] == '.')
 	);
 }
 
-func listDirInto(const fs::path& ori, std::vector<fs::directory_entry>* const out,
-			 const bool sorted=true, const bool includeRegularFiles = false)
+func listDirInto(const fs::path& ori,
+				 ListEntry* const out,
+				 const bool sorted = true,
+				 const bool includeRegularFiles = false)
 {
 	if (not out)
 		return;
@@ -2683,10 +2732,10 @@ func listDirRecursivelyInto(const fs::path& path,
 	std::fill_n(std::inserter(*out, out->end()), 1, std::move(path));
 	
 	/// Try to expand single dir and put into list
-	var list { std::vector<fs::directory_entry>() };
-	std::vector<fs::path> dirs;
-	var threads { std::vector<std::thread>() };
-	var asyncs { std::vector<std::future<void>>() };
+	var list { ListEntry() };
+	var dirs { ListPath() };
+	var threads { ListThread() };
+	var asyncs { ListAsync() };
 	
 	
 	func emplace{[&list, &out]()
@@ -2723,10 +2772,10 @@ func listDirRecursivelyInto(const fs::path& path,
 		for (var& d : dirs)
 			if (d.empty())
 				continue;
-			else if (opt::state[OPT_EXECUTION] == OPT_EXECUTION_THREAD)
+			else if (opt::valueOf[OPT_EXECUTION] == MODE_EXECUTION_THREAD)
 				threads.emplace_back(listDirInto, d, &list,
 									 false, includeRegularFiles);
-			else if (opt::state[OPT_EXECUTION] == OPT_EXECUTION_ASYNC)
+			else if (opt::valueOf[OPT_EXECUTION] == MODE_EXECUTION_ASYNC)
 				asyncs.emplace_back(std::async(
 						std::launch::async, listDirInto, d, &list,
 											   false, includeRegularFiles));
@@ -2734,12 +2783,12 @@ func listDirRecursivelyInto(const fs::path& path,
 				listDirInto(d, &list, false, includeRegularFiles);
 		
 		
-		if (opt::state[OPT_EXECUTION] == OPT_EXECUTION_THREAD) {
+		if (opt::valueOf[OPT_EXECUTION] == MODE_EXECUTION_THREAD) {
 			for (var& t : threads)
 				t.join();
 			threads.clear();
 		}
-		else if (opt::state[OPT_EXECUTION] == OPT_EXECUTION_ASYNC) {
+		else if (opt::valueOf[OPT_EXECUTION] == MODE_EXECUTION_ASYNC) {
 			for (var& a : asyncs)
 				a.wait();
 			asyncs.clear();
@@ -2754,7 +2803,7 @@ func isContainsSeasonDirs(const fs::path& path)
 	if (path.empty())
 		return false;
 	
-	var sortedDir { std::vector<fs::directory_entry>() };
+	var sortedDir { ListEntry() };
 	listDirInto(path, &sortedDir);
 	
 	if (sortedDir.size() <= 1)
@@ -2763,12 +2812,12 @@ func isContainsSeasonDirs(const fs::path& path)
 	var hasDirs { false };
 	
 	var isNum { true };
-	var lastNum { std::vector<MAXNUM>() };
+	var lastNum { ListMAXNUM() };
 	
 	for (var& child : sortedDir) {
 		hasDirs = true;
 		if (isNum) {
-			var iNames { std::vector<MAXNUM>() };
+			var iNames { ListMAXNUM() };
 			containInts(child.path().filename().string(), &iNames);
 			if (not iNames.empty()) {
 				if (lastNum.empty()) {
@@ -2794,31 +2843,31 @@ func isContainsSeasonDirs(const fs::path& path)
 }
 
 namespace in {
-	std::vector<fs::path> 	regularDirs,
+	ListPath 				regularDirs,
 							seasonDirs,
 							selectFiles,
 							listAdsDir;
 }
 
 namespace def {
-	const var SUBTITLES_EXT { std::vector<std::string>{ ".srt", ".ass", ".vtt" } };
+	const var SUBTITLES_EXT { ListString{ ".srt", ".ass", ".vtt" } };
 	const var FILENAME_IGNORE_CHAR { std::pair<char, char>{'.', ' '} };
 	
-	constexpr var ARG_SEP { ':' };
-	constexpr var ARG_ASSIGN { '=' };
+	let ARG_SEP { ':' };
+	let ARG_ASSIGN { '=' };
 
-	constexpr var ARGS_SEPARATOR {"\x0a\x0aARGS-SEPARATOR\x0a\x0a"};
+	let ARGS_SEPARATOR {"\x0a\x0aARGS-SEPARATOR\x0a\x0a"};
 
 	const std::string XML_CHARS_ALIAS[] = {"&quot", "&apos", "&lt", "&gt", "&amp"};
 	const std::string XML_CHARS_NORMAL[] = {"\"", "\\", "<", ">", "&"};
-	constexpr var NETWORK_PROTOCOLS = {"http:", "https:", "ftp:", "ftps:", "rtsp:", "mms:"};
+	let NETWORK_PROTOCOLS = {"http:", "https:", "ftp:", "ftps:", "rtsp:", "mms:"};
 }
 
 func findSubtitleFileInto(const fs::path& original,
-					  std::vector<fs::path>* const result)
+						  ListPath* const result)
 {
-	if (var parentPath { original.parent_path() }; not parentPath.empty()) {
-		var noext { excludeExtension(original.filename()) };
+	if (const var parentPath { original.parent_path() }; not parentPath.empty()) {
+		const var noext { excludeExtension(original.filename()) };
 		for (var& f : directory_iterator(parentPath, DT_REG))
 			if (isValid(f)
 				and f.path().string().size() >= original.string().size()
@@ -2836,7 +2885,7 @@ func findSubtitleFileInto(const fs::path& original,
 template <typename Container, typename T>
 func insertInto(Container* const out, const T& path)
 {
-	var isFound { isValid(path) };
+	const var isFound { isValid(path) };
 	if (isFound)
 		std::fill_n(std::inserter(*out, out->end()), 1, std::move(path));
 
@@ -2849,8 +2898,8 @@ func checkForSeasonDir(const fs::path& path) -> void
 		var hasDir { false };
 		
 		var isNum { true };
-		var lastNum { std::vector<MAXNUM>() };
-		var bufferNum { std::vector<fs::path>() };
+		var lastNum { ListMAXNUM() };
+		var bufferNum { ListPath() };
 		
 		func pullFromBufferNum{ [&bufferNum, &isNum]()
 		{
@@ -2861,7 +2910,7 @@ func checkForSeasonDir(const fs::path& path) -> void
 			}
 		}};
 		
-		var sortedDir { std::vector<fs::directory_entry>() };
+		var sortedDir { ListEntry() };
 		listDirInto(path, &sortedDir);
 		
 		if (sortedDir.size() == 1)
@@ -2871,29 +2920,29 @@ func checkForSeasonDir(const fs::path& path) -> void
 				hasDir = true;
 
 				if (isNum) {
-					var iNames { std::vector<MAXNUM>() };
+					var iNames { ListMAXNUM() };
 					containInts(child.path().filename().string(), &iNames);
 					if (not iNames.empty()) {
 						if (isContainsSeasonDirs(child.path())) {
 							isNum = false;
 						} else {
-						if (lastNum.empty()) {
-							lastNum = std::move(iNames);
-							bufferNum.emplace_back(child.path());
-							continue;
-						} else if (lastNum.size() == iNames.size()) {
-							var hasIncreased { false };
-							for (var xi { 0 }; xi < lastNum.size(); ++xi)
-								if (lastNum[xi] < iNames[xi]) {
-									hasIncreased = true;
-									break;
-								}
-							
-							if (hasIncreased) {
+							if (lastNum.empty()) {
+								lastNum = std::move(iNames);
 								bufferNum.emplace_back(child.path());
 								continue;
+							} else if (lastNum.size() == iNames.size()) {
+								var hasIncreased { false };
+								for (var xi { 0 }; xi < lastNum.size(); ++xi)
+									if (lastNum[xi] < iNames[xi]) {
+										hasIncreased = true;
+										break;
+									}
+								
+								if (hasIncreased) {
+									bufferNum.emplace_back(child.path());
+									continue;
+								}
 							}
-						}
 						}
 					}
 				}
@@ -2903,13 +2952,12 @@ func checkForSeasonDir(const fs::path& path) -> void
 			}
 		
 		if (isNum and hasDir) {
-			for (var it { in::regularDirs.begin() }; it not_eq in::regularDirs.end(); ) {
-				if (*it == path) {
+			for (var it { in::regularDirs.begin() };
+				 it not_eq in::regularDirs.end(); )
+				if (*it == path)
 					it = in::regularDirs.erase(it);
-				} else {
+				else
 					++it;
-				}
-			}
 			
 			insertInto(&in::seasonDirs, path);
 		} else
@@ -2931,7 +2979,7 @@ func getBytes(const std::string& s)
 	if (not isInt(value))
 		return result;
 	
-	var v { std::stof(value) };
+	const var v { std::stof(value) };
 	if (v <= 0)
 		return result;
 	
@@ -2952,12 +3000,12 @@ func getBytes(const std::string& s)
 func getRange(const std::string& argv, const std::string& separator)
 		-> std::shared_ptr<std::pair<uintmax_t, uintmax_t>>
 {
-	var pos { argv.find(separator) };
+	const var pos { argv.find(separator) };
 	if (pos == std::string::npos)
 		return nullptr;
 	
-	var first { argv.substr(0, pos) };
-	var second { argv.substr(pos + separator.size()) };
+	const var first { argv.substr(0, pos) };
+	const var second { argv.substr(pos + separator.size()) };
 
 	var from { getBytes(std::move(first)) };
 	from = std::max(from, static_cast<uintmax_t>(0));
@@ -2966,18 +3014,18 @@ func getRange(const std::string& argv, const std::string& separator)
 	return std::make_shared<std::pair<uintmax_t, uintmax_t>>(from, to);
 }
 
-func expandArgsInto(const int argc, char* const argv[],
-				const int startAt, std::vector<std::string>* const args)
+func expandArgsInto(const int argc, CString const argv[],
+				const int startAt, ListString* const args)
 {
 	var newFull { false };
 	var lastOptCode { (unsigned) 0 };
-	func push{ [&newFull, &args](const char* const arg,
+	func push{ [&newFull, &args](ReadOnlyCString arg,
 								 const unsigned index,
 								 const int last)
 	{
 		if (last < 0 or index - last <= 0) return;
 				
-		var size { (unsigned) (index - last) };
+		const var size { (unsigned) (index - last) };
 		var newArg { std::string() };
 
 		if (newFull)
@@ -3038,7 +3086,8 @@ func expandArgsInto(const int argc, char* const argv[],
 		
 		var equalOpCount { (unsigned) 0 };
 		var fallthrough { (unsigned) 0 };
-		var index { (unsigned) lastOptCode == 3 ? -1 : (isFull and lastOptCode not_eq 2 ? 1 : 0) };
+		var index { (unsigned) lastOptCode == 3 ? -1
+								: (isFull and lastOptCode not_eq 2 ? 1 : 0) };
 		var last { -1 };
 		while (++index < len) {
 			if (fallthrough > 0) {
@@ -3072,7 +3121,7 @@ func expandArgsInto(const int argc, char* const argv[],
 						last = index + 1;
 					}
 					equalOpCount++;
-				} else if (var foundEnter { arg[index] == 0x0a };
+				} else if (const var foundEnter { arg[index] == 0x0a };
 						   ((arg[index] == def::ARG_SEP or arg[index] == ';')
 						   and (index + 1 == std::strlen(arg) or
 								(index + 1 < std::strlen(arg) and std::isalpha(arg[index + 1])))
@@ -3134,10 +3183,17 @@ func timeLapse(std::chrono::system_clock::time_point& start,
 	}
 	
 	
-	std::string_view tu[]{ "microseconds", "milliseconds", "seconds",
-		"minutes", "hours" };
-	std::cout << msg << std::fixed << std::setprecision(2)
-		<< groupNumber(std::to_string(value)) << " " << tu[inc] << ".\n\n";
+	const std::string_view tu[] { 	"microseconds",
+									"milliseconds",
+									"seconds",
+									"minutes",
+									"hours" };
+	std::cout << msg
+				<< std::fixed << std::setprecision(2)
+				<< groupNumber(std::to_string(value))
+				<< " "
+				<< tu[inc]
+				<< ".\n\n";
 	
 	if (resetStart)
 		start = std::chrono::system_clock::now();
@@ -3148,15 +3204,15 @@ func parseKeyValue(std::string* const s, const bool isExclude)
 	if (not s or s->empty())
 		return false;
 		
-	const char* keyword { "" };
+	const CString keyword { "" };
 	var value { std::string() };
 	var isKeyValue { true };
 	for (var& key : {"dir", OPT_EXT, OPT_EXCLEXT,
 		OPT_CASEINSENSITIVE, OPT_EXCLHIDDEN, OPT_SIZE, OPT_EXCLSIZE,
 		"case-insensitive", "caseinsensitive",
-		"ignore-case", "ignorecase", OPT_DATE, OPT_EXCLDATE, OPT_DCREATED,
-		OPT_DCHANGED, OPT_DACCESSED, OPT_DMODIFIED,
-   OPT_DEXCLCREATED, OPT_DEXCLCHANGED, OPT_DEXCLMODIFIED, OPT_DEXCLACCESSED})
+		"ignore-case", "ignorecase", OPT_DATE, OPT_EXCLDATE,
+		OPT_DCREATED, OPT_DCHANGED, OPT_DACCESSED, OPT_DMODIFIED,
+		OPT_DEXCLCREATED, OPT_DEXCLCHANGED, OPT_DEXCLMODIFIED, OPT_DEXCLACCESSED})
 	{
 		const var sz { std::strlen(key) };
 		
@@ -3174,17 +3230,17 @@ func parseKeyValue(std::string* const s, const bool isExclude)
 		var pos { value.find("..") };
 		var next { 2 };
 		if (pos == std::string::npos) {
-			pos =value.find('-');
+			pos = value.find('-');
 			next = 1;
 		}
 		if (pos not_eq std::string::npos) {
-			var lower { getBytes(value.substr(0, pos))};
-			var upper { getBytes(value.substr(pos + next)) };
+			const var lower { getBytes(value.substr(0, pos))};
+			const var upper { getBytes(value.substr(pos + next)) };
 			if (lower > upper)
 				isKeyValue = false;
 			else {
-				opt::state[isExclude ? OPT_EXCLSIZEOPGT : OPT_SIZEOPGT] = '\0';
-				opt::state[keyword] = std::to_string(lower);
+				opt::valueOf[isExclude ? OPT_EXCLSIZEOPGT : OPT_SIZEOPGT] = '\0';
+				opt::valueOf[keyword] = std::to_string(lower);
 				
 				(isExclude ? opt::listExclSize : opt::listSize).emplace_back(std::make_pair(
 							   lower,
@@ -3193,12 +3249,12 @@ func parseKeyValue(std::string* const s, const bool isExclude)
 		}
 		else if (const var havePrefix { value[0] == '<' or value[0] == '>'};
 				 havePrefix) {
-			if (var number { getBytes(value.substr(havePrefix ? 1 : 0)) };
+			if (const var number { getBytes(value.substr(havePrefix ? 1 : 0)) };
 				number < 0)
 				isKeyValue = false;
 			else {
-				opt::state[isExclude ? OPT_EXCLSIZEOPGT : OPT_SIZEOPGT] =
-				opt::state[keyword] = std::to_string(number);
+				opt::valueOf[isExclude ? OPT_EXCLSIZEOPGT : OPT_SIZEOPGT] =
+				opt::valueOf[keyword] = std::to_string(number);
 				(isExclude ? opt::listExclSize : opt::listSize).clear();
 			}
 		}
@@ -3210,23 +3266,23 @@ func parseKeyValue(std::string* const s, const bool isExclude)
 		if (value.empty())
 			isKeyValue = false;
 		else {
-			if (opt::state[OPT_CASEINSENSITIVE] == "true")
+			if (opt::valueOf[OPT_CASEINSENSITIVE] == "true")
 				value = tolower(value);
 			(isExclude ? opt::listExclFindDir : opt::listFindDir).emplace_back(value);
 		}
 	}
 	else if (isEqual(keyword, {OPT_EXCLHIDDEN, OPT_EXT, OPT_EXCLEXT})) {
-		opt::state[keyword] = value;
+		opt::valueOf[keyword] = value;
 	}
 	else if (isEqual(keyword, {OPT_DATE, OPT_EXCLDATE,
 		OPT_DCREATED, OPT_DCHANGED, OPT_DACCESSED, OPT_DMODIFIED,
    OPT_DEXCLCREATED, OPT_DEXCLCHANGED, OPT_DEXCLMODIFIED, OPT_DEXCLACCESSED}))
    {
 	   const var havePrefix { value[0] == '<' or value[0] == '>'};
-	   if (var opGt { value[0] };
+	   if (const var opGt { value[0] };
 		   havePrefix or opGt == '=')
 	   {
-		   if (var date { Date(value) };
+		   if (const var date { Date(value) };
 			   not date.isValid())
 			   isKeyValue = false;
 		   else {
@@ -3235,19 +3291,19 @@ func parseKeyValue(std::string* const s, const bool isExclude)
 				   opt::listDChanged.emplace_back(std::make_pair(opGt, date));
 				   opt::listDModified.emplace_back(std::make_pair(opGt, date));
 				   opt::listDAccessed.emplace_back(std::make_pair(opGt, date));
-				   opt::state[OPT_DCREATED]  = "1";
-				   opt::state[OPT_DMODIFIED] = "1";
-				   opt::state[OPT_DACCESSED] = "1";
-				   opt::state[OPT_DCHANGED]  = "1";
+				   opt::valueOf[OPT_DCREATED]  = "1";
+				   opt::valueOf[OPT_DMODIFIED] = "1";
+				   opt::valueOf[OPT_DACCESSED] = "1";
+				   opt::valueOf[OPT_DCHANGED]  = "1";
 			   } else if (isEqual(keyword, OPT_EXCLDATE)) {
 				   opt::listDExclCreated.emplace_back(std::make_pair(opGt, date));
 				   opt::listDExclChanged.emplace_back(std::make_pair(opGt, date));
 				   opt::listDExclModified.emplace_back(std::make_pair(opGt, date));
 				   opt::listDExclAccessed.emplace_back(std::make_pair(opGt, date));
-				   opt::state[OPT_DEXCLCREATED]  = "1";
-				   opt::state[OPT_DEXCLMODIFIED] = "1";
-				   opt::state[OPT_DEXCLACCESSED] = "1";
-				   opt::state[OPT_DEXCLCHANGED]  = "1";
+				   opt::valueOf[OPT_DEXCLCREATED]  = "1";
+				   opt::valueOf[OPT_DEXCLMODIFIED] = "1";
+				   opt::valueOf[OPT_DEXCLACCESSED] = "1";
+				   opt::valueOf[OPT_DEXCLCHANGED]  = "1";
 			   } else {
 				 (isEqual(keyword, OPT_DCREATED) ? opt::listDCreated
 				: isEqual(keyword, OPT_DCHANGED) ? opt::listDChanged
@@ -3259,7 +3315,7 @@ func parseKeyValue(std::string* const s, const bool isExclude)
 				: opt::listDExclAccessed
 				).emplace_back(std::make_pair(opGt, date));
 
-				   opt::state[keyword] = "1";
+				   opt::valueOf[keyword] = "1";
 			   }
 		   }
 	   }
@@ -3283,11 +3339,11 @@ func parseKeyValue(std::string* const s, const bool isExclude)
 		   if (pos == std::string::npos)
 			   isKeyValue = false;
 		   else {
-			   if (var lower { Date(value.substr(0, pos)) };
+			   if (const var lower { Date(value.substr(0, pos)) };
 				   not lower.isValid())
 				   isKeyValue = false;
 			   else {
-				   if (var upper { Date(value.substr(pos + next)) };
+				   if (const var upper { Date(value.substr(pos + next)) };
 					   not upper.isValid() or lower > upper)
 					   isKeyValue = false;
 				   else {
@@ -3296,19 +3352,19 @@ func parseKeyValue(std::string* const s, const bool isExclude)
 						   opt::listDChangedR.emplace_back(std::make_pair(lower, upper));
 						   opt::listDModifiedR.emplace_back(std::make_pair(lower, upper));
 						   opt::listDAccessedR.emplace_back(std::make_pair(lower, upper));
-						   opt::state[OPT_DCREATED]  = "1";
-						   opt::state[OPT_DMODIFIED] = "1";
-						   opt::state[OPT_DACCESSED] = "1";
-						   opt::state[OPT_DCHANGED]  = "1";
+						   opt::valueOf[OPT_DCREATED]  = "1";
+						   opt::valueOf[OPT_DMODIFIED] = "1";
+						   opt::valueOf[OPT_DACCESSED] = "1";
+						   opt::valueOf[OPT_DCHANGED]  = "1";
 					   } else if (isEqual(keyword, OPT_EXCLDATE)) {
 						   opt::listDExclCreatedR.emplace_back(std::make_pair(lower, upper));
 						   opt::listDExclChangedR.emplace_back(std::make_pair(lower, upper));
 						   opt::listDExclModifiedR.emplace_back(std::make_pair(lower, upper));
 						   opt::listDExclAccessedR.emplace_back(std::make_pair(lower, upper));
-						   opt::state[OPT_DEXCLCREATED]  = "1";
-						   opt::state[OPT_DEXCLMODIFIED] = "1";
-						   opt::state[OPT_DEXCLACCESSED] = "1";
-						   opt::state[OPT_DEXCLCHANGED]  = "1";
+						   opt::valueOf[OPT_DEXCLCREATED]  = "1";
+						   opt::valueOf[OPT_DEXCLMODIFIED] = "1";
+						   opt::valueOf[OPT_DEXCLACCESSED] = "1";
+						   opt::valueOf[OPT_DEXCLCHANGED]  = "1";
 					   } else {
 							 (isEqual(keyword, OPT_DCREATED) ? opt::listDCreatedR
 							: isEqual(keyword, OPT_DCHANGED) ? opt::listDChangedR
@@ -3319,7 +3375,7 @@ func parseKeyValue(std::string* const s, const bool isExclude)
 							: isEqual(keyword, OPT_DEXCLMODIFIED) ? opt::listDExclModifiedR
 							: opt::listDExclAccessedR
 							).emplace_back(std::make_pair(lower, upper));
-						   opt::state[keyword] = "1";
+						   opt::valueOf[keyword] = "1";
 					   }
 				   }
 			   }
@@ -3327,7 +3383,7 @@ func parseKeyValue(std::string* const s, const bool isExclude)
 	   }
    }
    else if (0 not_eq std::strlen(keyword)) {
-	   opt::state[OPT_CASEINSENSITIVE] = value;
+	   opt::valueOf[OPT_CASEINSENSITIVE] = value;
 		if (isEqual(value, "true", IgnoreCase::Left)) {
 			for (var& k : opt::listFindDir) k = tolower(k);
 			for (var& k : opt::listExclFindDir) k = tolower(k);
@@ -3344,7 +3400,7 @@ func parseKeyValue(std::string* const s, const bool isExclude)
 
 template <typename  T>
 func getLinesInto(std::basic_istream<T>* const inputStream,
-			  std::vector<std::string>* const lines,
+			  ListString* const lines,
 			  const std::initializer_list<std::string>&& excludePrefix)
 {
 	var commentCount { 0 };
@@ -3397,7 +3453,7 @@ func getLinesInto(std::basic_istream<T>* const inputStream,
 		}
 		else if (buff.empty() and c == std::isspace(c))
 			continue;
-		else if (var peek { inputStream->peek() };
+		else if (const var peek { inputStream->peek() };
 				 c == '/' and (peek == '/' or peek == '*')) {
 			if (peek == '*')
 				commentCount++;
@@ -3423,11 +3479,11 @@ func getLinesInto(std::basic_istream<T>* const inputStream,
 
 enum class WriteConfigMode { New, Edit, Add, Remove };
 
-func writeConfig(const std::vector<std::string>* const args,
+func writeConfig(const ListString* const args,
 				 const WriteConfigMode mode)
 {
 	enum class ReadDirection { All, Old, Current };
-	func argsToLines{[&args](std::vector<std::string>* const lines,
+	func argsToLines{[&args](ListString* const lines,
 							 const ReadDirection direction,
 							 const bool removeOptPrefix = false)
 	{
@@ -3459,7 +3515,7 @@ func writeConfig(const std::vector<std::string>* const args,
 						OPT_INSTALL, OPT_UNINSTALL, OPT_UPDATE}))
 					or (offset == 1 and (s[1] == 'W')))
 				{
-					if (var next { i + 1 < args->size() ? (*args)[i + 1] : "" };
+					if (const var next { i + 1 < args->size() ? (*args)[i + 1] : "" };
 						OPT_WRITEDEFAULTS
 						and not isEqual(next.c_str(), OPT_WRITEDEFAULTS_ARGS,
 										IgnoreCase::Left))
@@ -3482,12 +3538,12 @@ func writeConfig(const std::vector<std::string>* const args,
 			lines->emplace_back(std::move(buffer));
 	}};
 	
-	var definedList { std::unordered_set<std::string>() };
-	var lines { std::vector<std::string>() };
+	var definedList { SetString() };
+	var lines { ListString() };
 	if (	mode == WriteConfigMode::Edit
 		or 	mode == WriteConfigMode::Remove)
 	{
-		var newLines { std::vector<std::string>() };
+		var newLines { ListString() };
 		argsToLines(&lines, ReadDirection::Old, false);
 		argsToLines(&newLines, ReadDirection::Current, false);
 	
@@ -3504,7 +3560,7 @@ func writeConfig(const std::vector<std::string>* const args,
 			}
 		} else {
 			for (var line { newLines.begin() }; line<newLines.end(); ++line)
-				if (var isOpt {
+				if (const var isOpt {
 					(line->size() > 3 and line->starts_with("--")
 						and std::isalpha((*line)[2]) and std::isalpha((*line)[3]))
 					or
@@ -3569,6 +3625,12 @@ func writeConfig(const std::vector<std::string>* const args,
 	}
 	
 	var file { std::fstream(CONFIG_PATH, std::ios::out) };
+//	if (not file.good()) {
+//		std::cout << "⚠️  Cannot write \""
+//					<< CONFIG_PATH
+//					<< "\"\n";
+//		return;
+//	}
 	#define DATE_FORMAT	"%A, %d %B %Y at %I:%M:%S %p"
 	if (mode == WriteConfigMode::New )
 		file << "# Configuration made in " << Date::now().string(DATE_FORMAT) << '\n';
@@ -3584,26 +3646,32 @@ func writeConfig(const std::vector<std::string>* const args,
 	file.close();
 }
 
-func loadConfigInto(std::vector<std::string>* const args)
+func loadConfigInto(ListString* const args)
 {
 	if (not args
-		or opt::state[OPT_LOADCONFIG].empty()
-		or not fs::exists(opt::state[OPT_LOADCONFIG])
-		or not fs::is_regular_file(opt::state[OPT_LOADCONFIG]))
+		or opt::valueOf[OPT_LOADCONFIG].empty()
+		or not fs::exists(opt::valueOf[OPT_LOADCONFIG])
+		or not fs::is_regular_file(opt::valueOf[OPT_LOADCONFIG]))
 		return;
 	
-	var file { std::ifstream(opt::state[OPT_LOADCONFIG], std::ios::in) };
+	var file { std::ifstream(opt::valueOf[OPT_LOADCONFIG], std::ios::in) };
+	if (not file.good()) {
+		std::cout << "⚠️  Cannot read \""
+					<< opt::valueOf[OPT_LOADCONFIG]
+					<< "\"\n";
+		return;
+	}
 	file.seekg(0);
 
-	var lines { std::vector<std::string>() };
+	var lines { ListString() };
 	getLinesInto(&file, &lines, {"--"});
 	
 	file.close();
 	
 	for (var found { false };
 		 const var& line : lines) {
-		for (const char* const *const opt : OPTS)
-			if (var isMnemonic {
+		for (ReadOnlyCString* const opt : OPTS)
+			if (const var isMnemonic {
 				(line.size() >= 2 and line[0] == '-' and std::isalpha(line[1])
 				 and (line.size() == 2 or (line[3] == '=' or line[3] == ' ')))
 				or (line.size() == 1 and std::isalpha(line[0]))
@@ -3643,7 +3711,7 @@ func loadConfigInto(std::vector<std::string>* const args)
 					if (col < line.size()) {
 						var value { line.substr(col) };
 						
-						var puncs { std::vector<unsigned>() };
+						var puncs { ListUInt() };
 						for (unsigned i { 0 }; i<value.size(); ++i)
 							if (value[i] == '"')
 								puncs.emplace_back(i);
@@ -3683,7 +3751,7 @@ func loadConfigInto(std::vector<std::string>* const args)
 
 func isNetworkTransportFile(const std::string& fullPath)
 {
-	for (const char* const protocol : def::NETWORK_PROTOCOLS)
+	for (ReadOnlyCString protocol : def::NETWORK_PROTOCOLS)
 		if (fullPath.starts_with(protocol))
 			return true;
 	return false;
@@ -3712,7 +3780,12 @@ func installMan(bool install)
 	if (not fs::exists(MANPATH))
 		std::system("mkdir " MANPATH);
 	var file { std::ofstream(MANPATH MANFILE) };
-	
+//	if (not file.good()) {
+//		std::cout << "⚠️  Cannot write \""
+//					<< MANPATH MANFILE
+//					<< "\"\n";
+//		return;
+//	}
 	file <<
 	".\" Manpage for tvplaylist.\n"
 	".\" Contact atapgenteng@yahoo.com to correct errors or typos.\n"
@@ -3727,8 +3800,8 @@ then by default, arranged one episode per Title.\n"
 	".SH OPTIONS\n"
 	;
 	
-	constexpr var MARK { "        " };
-	for (var i { 1 }; i<(sizeof(ALL_HELPS) / sizeof(ALL_HELPS[0])); ++i) {
+	let MARK { "        " };
+	for (var i { 1 }; i<ARRAYLEN(ALL_HELPS); ++i) {
 		var buff { std::string(*ALL_HELPS[i]) };
 		const var pos { buff.find(MARK) };
 		if (pos not_eq std::string::npos) {
@@ -3755,7 +3828,7 @@ then by default, arranged one episode per Title.\n"
 	#undef MANFILE
 }
 
-func loadPlaylistInto(const fs::path& path, std::vector<fs::path>* const outPaths)
+func loadPlaylistInto(const fs::path& path, ListPath* const outPaths)
 {
 	if (not outPaths or path.empty() or not fs::exists(path))
 		return;
@@ -3765,11 +3838,18 @@ func loadPlaylistInto(const fs::path& path, std::vector<fs::path>* const outPath
 		lastParent = fs::current_path();
 		fs::current_path(path.parent_path());
 		*file = std::ifstream(path.string(), std::ios::in);
+		if (not file->good()) {
+			std::cout << "⚠️  Cannot read \""
+						<< path.string()
+						<< "\"\n";
+			return;
+		}
 		file->seekg(0);
 	}};
 	
 	func epilogue{[&lastParent](std::ifstream* const file) {
-		file->close();
+		if (file->good())
+			file->close();
 		fs::current_path(lastParent);
 	}};
 	
@@ -3813,14 +3893,17 @@ func loadPlaylistInto(const fs::path& path, std::vector<fs::path>* const outPath
 	}};
 	
 	func after{[](std::ifstream* const file,
-				  const char* const keyword,
+				  ReadOnlyCString keyword,
 				  std::string* const before = nullptr)
 	{
+		if (not file->good())
+			return false;
+		
+		const var indexMax { (unsigned long) std::strlen(keyword) };
+		const var lastPos { file->tellg() };
 		char c;
 		var index { (unsigned long) 0 };
-		var indexMax { (unsigned long) std::strlen(keyword) };
 		var buff { std::string() };
-		const var lastPos { file->tellg() };
 		var commentCount { (unsigned) 0 };
 		while ((c = file->get()) and not file->eof()) {
 			if (commentCount > 0
@@ -3873,8 +3956,10 @@ func loadPlaylistInto(const fs::path& path, std::vector<fs::path>* const outPath
 	}};
 	
 	func getLines{[](std::ifstream* const file,
-					 std::vector<std::string>* const lines)
+					 ListString* const lines)
 	{
+		if (not file->good())
+			return;
 		var buff { std::string() };
 		var isComment { false };
 		char c;
@@ -3904,12 +3989,12 @@ func loadPlaylistInto(const fs::path& path, std::vector<fs::path>* const outPath
 	
 	func xml_tag{[&push, &after]
 		(std::ifstream* const file,
-		 std::initializer_list<const char* const>* const prefixes,
-		 std::initializer_list<const char* const>* const suffixes)
+		 std::initializer_list<ReadOnlyCString>* const prefixes,
+		 std::initializer_list<ReadOnlyCString>* const suffixes)
 	{
-		for (const char* const prefix : *prefixes)
+		for (ReadOnlyCString prefix : *prefixes)
 			if (after(file, prefix)) {
-				for (const char* const suffix : *suffixes)
+				for (ReadOnlyCString suffix : *suffixes)
 					if (var value { std::string() };
 						after(file, suffix, &value))
 					{
@@ -3919,7 +4004,7 @@ func loadPlaylistInto(const fs::path& path, std::vector<fs::path>* const outPath
 //						> to  &gt;
 //						& to  &amp;
 						if (value.find('&') not_eq std::string::npos)
-							for (var w { 0 }; w<sizeof(def::XML_CHARS_ALIAS) /sizeof(def::XML_CHARS_ALIAS[0]); ++w)
+							for (var w { 0 }; w<ARRAYLEN(def::XML_CHARS_ALIAS); ++w)
 								if (isContains(value, def::XML_CHARS_ALIAS[w],
 									IgnoreCase::Left) not_eq std::string::npos)
 								{
@@ -3934,8 +4019,8 @@ func loadPlaylistInto(const fs::path& path, std::vector<fs::path>* const outPath
 	}};
 	
 	func xml{[&prolog, &epilogue, &xml_tag, &push, &after]
-		(std::initializer_list<const char* const>&& prefixes,
-		 std::initializer_list<const char* const>&& suffixes)
+		(std::initializer_list<ReadOnlyCString>&& prefixes,
+		 std::initializer_list<ReadOnlyCString>&& suffixes)
 	{
 		var file { std::ifstream() };
 		prolog(&file);
@@ -3947,7 +4032,7 @@ func loadPlaylistInto(const fs::path& path, std::vector<fs::path>* const outPath
 	func pls{[&prolog, &epilogue, &getLines, &push]() {
 		var file { std::ifstream() };
 		prolog(&file);
-		var lines { std::vector<std::string>() };
+		var lines { ListString() };
 		getLines(&file, &lines);
 		for (var& line : lines)
 			if (var col { std::string::npos };
@@ -3963,7 +4048,7 @@ func loadPlaylistInto(const fs::path& path, std::vector<fs::path>* const outPath
 	func m3u{[&prolog, &epilogue, &getLines, &push]() {
 		var file { std::ifstream() };
 		prolog(&file);
-		var lines { std::vector<std::string>() };
+		var lines { ListString() };
 		getLines(&file, &lines);
 		for (var& line : lines)
 			push(line);
@@ -3996,39 +4081,41 @@ func loadPlaylistInto(const fs::path& path, std::vector<fs::path>* const outPath
 #define ARGS_START_INDEX	0
 void process(int argc, char *argv[], int *outc, char *outs[], unsigned long *maxLength)
 {
-	opt::state[OPT_NOOUTPUTFILE] = "true";
+	opt::valueOf[OPT_NOOUTPUTFILE] = "true";
 #else
 #define RETURN_VALUE	EXIT_SUCCESS;
 #define ARGS_START_INDEX	1
-func main(const int argc, char* const argv[]) -> int
+func main(const int argc, CString const argv[]) -> int
 {
 #endif
-	opt::state[OPT_SIZEOPGT] 	= '\0';
-	opt::state[OPT_SIZE] 		= '0';
-	opt::state[OPT_EXCLSIZEOPGT]= '\0';
-	opt::state[OPT_EXCLSIZE] 	= '0';
+	opt::valueOf[OPT_SIZEOPGT] 	= '\0';
+	opt::valueOf[OPT_SIZE] 		= '0';
+	opt::valueOf[OPT_EXCLSIZEOPGT]= '\0';
+	opt::valueOf[OPT_EXCLSIZE] 	= '0';
 
-	opt::state[OPT_EXECUTION]	= OPT_EXECUTION_ASYNC;
-	opt::state[OPT_REGEXSYNTAX] = "ecma";
-	opt::state[OPT_ARRANGEMENT] = OPT_ARRANGEMENT_DEFAULT;
+	opt::valueOf[OPT_EXECUTION]	= MODE_EXECUTION_ASYNC;
+	opt::valueOf[OPT_REGEXSYNTAX] = "ecma";
+	opt::valueOf[OPT_ARRANGEMENT] = MODE_ARRANGEMENT_DEFAULT;
 		
-	var args { std::vector<std::string>() };
+	var args { ListString() };
 	
-	opt::state[OPT_LOADCONFIG] = CONFIG_PATH ;
+	opt::valueOf[OPT_LOADCONFIG] = CONFIG_PATH ;
 	
 	loadConfigInto(&args);
 	args.emplace_back(def::ARGS_SEPARATOR);
 	expandArgsInto(argc, argv, ARGS_START_INDEX, &args);
 #undef ARGS_START_INDEX
-	var fileCountPerTurn{ (unsigned long) 1 };
-	var invalidArgs { std::unordered_set<std::string_view>() };
-	var bufferDirs { std::vector<fs::path>() };
+	var fileCountPerTurn { (unsigned long) 1 };
+	var invalidArgs { SetStringView() };
+	var bufferDirs { ListPath() };
 
 	for (var i { 0 }; i<args.size(); ++i) {
-		if (func isMatch{ [&args, &i](const char* const with,
-							  const char mnemonic,
-							  bool writeBoolean=false,
-							  const std::initializer_list<const char*>& others = {}) {
+		if (func isMatch{[&args, &i]
+				(ReadOnlyCString with,
+				 const char mnemonic,
+				 bool writeBoolean=false,
+				 const std::initializer_list<const CString>& others = {})
+		{
 			var result { false };
 			const var isWithStartWithDoubleStrip {
 				std::strlen(with) > 2 and with[0] == '-' and with[1] == '-' };
@@ -4056,9 +4143,8 @@ func main(const int argc, char* const argv[]) -> int
 			} else if (mnemonic not_eq '\0'
 					   and args[i].length() == 2
 					   and args[i][0] == '-')
-			{
 				result = args[i][1] == mnemonic;
-			}
+
 			if (result) {
 				if (args[i].length() == 2) { // convert mnemonic to full
 					args[i] = with;
@@ -4066,7 +4152,7 @@ func main(const int argc, char* const argv[]) -> int
 						args[i].insert(0, "--", 0, 2);
 				}
 				if (writeBoolean)
-					opt::state[with] = "true";
+					opt::valueOf[with] = "true";
 			}
 			return result;
 		} }; args[i] == def::ARGS_SEPARATOR)
@@ -4111,7 +4197,10 @@ func main(const int argc, char* const argv[]) -> int
 					or not fs::exists(INSTALL_PATH "/c++")
 						or not fs::exists(INSTALL_PATH "/cmake"))
 				{
-					std::cout << "⚠️  \"GIT\" or \"CMAKE\" required!.\nTo install:\n\t\"brew install git\"\n\t\"brew install cmake\"\n";
+					std::cout << "⚠️  \"GIT\" or \"CMAKE\" required!."
+								<< "\nTo install:"
+								<< "\n\t\"brew install git\""
+								<< "\n\t\"brew install cmake\"\n";
 					continue;
 				}
 				
@@ -4139,7 +4228,8 @@ func main(const int argc, char* const argv[]) -> int
 				#endif
 				#undef REPO_URI
 				std::cout << (fs::exists(path) ? "Updated" :
-							  "⚠️  For some reason, update fail!") << ".\n";
+							  "⚠️  For some reason, update fail!")
+							<< ".\n";
 				return RETURN_VALUE
 			}
 			else if (isMatch(OPT_INSTALL, '\0')) {
@@ -4163,7 +4253,8 @@ func main(const int argc, char* const argv[]) -> int
 					cmd += path;
 					std::system(cmd.c_str());
 					std::cout << (fs::exists(path) ? "Installed" :
-								  "⚠️  For some reason, install fail!") << ".\n";
+								  "⚠️  For some reason, install fail!")
+								<< ".\n";
 				}
 			}
 			else if (isMatch(OPT_UNINSTALL, '\0')) {
@@ -4180,7 +4271,8 @@ func main(const int argc, char* const argv[]) -> int
 					installMan(false);
 				#endif
 				std::cout << (not fs::exists(path) ? "Uninstalled" :
-							  "⚠️  For some reason, uninstall fail!") << ".\n";
+							  "⚠️  For some reason, uninstall fail!")
+							<< ".\n";
 			}
 			else if (isMatch(OPT_UNINSTALLMAN, '\0')) {
 				installMan(false);
@@ -4206,21 +4298,21 @@ func main(const int argc, char* const argv[]) -> int
 					isEqual(args[i + 1].c_str(), OPT_DEBUG_ARGS))
 				{
 					i++;
-					opt::state[OPT_DEBUG] = args[i];
+					opt::valueOf[OPT_DEBUG] = args[i];
 					if (args[i] == "id3")
 					{
 						if (i + 1 == args.size())
 							std::cout << "Usage: --debug=id3 [key[=]value ...] file [file ...]\n";
-						var keyVals { std::unordered_map<std::string, std::string>() };
-						var files { std::vector<fs::path>() };
+						var keyVals { MapString() };
+						var files { ListPath() };
 						while (++i < args.size()) {
-							if (var path { fs::path(args[i]) };
+							if (const var path { fs::path(args[i]) };
 								fs::exists(path)
 								and isEqual(path.extension().string().c_str(),
 											".mp3", IgnoreCase::Left))
 								files.emplace_back(std::move(path));
 							else {
-								if (var pos { args[i].find('=') };
+								if (const var pos { args[i].find('=') };
 									pos not_eq std::string::npos)
 									keyVals.emplace(std::make_pair(
 													args[i].substr(0, pos),
@@ -4239,7 +4331,9 @@ func main(const int argc, char* const argv[]) -> int
 							
 							if (not keyVals.empty())
 								mp3.write();
-							std::cout << "File " << file.filename() << ":\n"
+							std::cout << "File "
+										<< file.filename()
+										<< ":\n"
 							<< mp3.string() << '\n';
 						}
 						
@@ -4247,21 +4341,26 @@ func main(const int argc, char* const argv[]) -> int
 					}
 					if (args[i] == "date") {
 						if (i + 1 == args.size()) {
-							std::cout << "Usage: --debug=date 'date or/and time' ['output format']\n";
-							std::cout << HELP_DATE_REST << '\n';
+							std::cout << "Usage: --debug=date 'date or/and time' ['output format']\n"
+										<< HELP_DATE_REST
+										<< '\n';
 						}
 						else {
 							i++;
-							var input { args[i] };
+							const var input { args[i] };
 							var date { Date(input) };
 							
-							std::cout << '\"' << input << '\"' << "  -> \"";
+							std::cout << '\"'
+										<< input
+										<< '\"'
+										<< "  -> \""
 							
-							std::cout << date.string(i + 1 < args.size()
+										<< date.string(i + 1 < args.size()
 													 ? args[++i].c_str()
-													 : nullptr);
-							std::cout << "\" "
-								<< (date.isValid() ? "✅" : "❌") << '\n';
+													 : nullptr)
+										<< "\" "
+										<< (date.isValid() ? "✅" : "❌")
+										<< '\n';
 						}
 						
 						return RETURN_VALUE
@@ -4272,36 +4371,38 @@ func main(const int argc, char* const argv[]) -> int
 			else if (isMatch(OPT_OPENWITH, '\0')) {
 				if (i + 1 < args.size()) {
 					i++;
-					opt::state[OPT_OPENWITH] = trim(args[i]);
+					opt::valueOf[OPT_OPENWITH] = trim(args[i]);
 				} else
 					std::cout << "⚠️  Expecting application. Please see --help "
-					<< args[i].substr(2) << '\n';
+								<< args[i].substr(2)
+								<< '\n';
 			}
 			else if (isMatch(OPT_SHOWCONFIG, '\0', true, OPT_SHOWCONFIG_ALTERNATIVE));
 			else if (isMatch(OPT_WRITEDEFAULTS, 'W', true, OPT_WRITEDEFAULTS_ALTERNATIVE)) {
 				if (i + 1 < args.size()) {
 					if (isEqual(args[i + 1], "reset", IgnoreCase::Left)) {
 						fs::remove(CONFIG_PATH);
-						opt::state[OPT_WRITEDEFAULTS].clear();
+						opt::valueOf[OPT_WRITEDEFAULTS].clear();
 						i++;
 					}
 					else if (isEqual(args[i + 1].c_str(),
 									 OPT_WRITEDEFAULTS_ARGS, IgnoreCase::Left)) {
 						i++;
-						opt::state[OPT_WRITEDEFAULTS] = args[i];
+						opt::valueOf[OPT_WRITEDEFAULTS] = args[i];
 					}
-				} else opt::state[OPT_WRITEDEFAULTS] = "new";
+				} else opt::valueOf[OPT_WRITEDEFAULTS] = "new";
 			}
 			else if (isMatch(OPT_LOADCONFIG, 'L')) {
 				if (i + 1 < args.size() and fs::exists(args[i + 1])) {
 					i++;
-					opt::state[OPT_LOADCONFIG] = args[i];
+					opt::valueOf[OPT_LOADCONFIG] = args[i];
 					loadConfigInto(&args);
 					continue;
 				}
 				
 				std::cout << "⚠️  Expecting config file path. Please see --help "
-				<< args[i].substr(2) << '\n';
+							<< args[i].substr(2)
+							<< '\n';
 			}
 			else if (isMatch(OPT_ADSDIR, 'D')) {
 				if (i + 1 < args.size() and fs::exists(args[i + 1])) {
@@ -4311,7 +4412,8 @@ func main(const int argc, char* const argv[]) -> int
 				}
 				
 				std::cout << "⚠️  Expecting directory path. Please see --help "
-				<< args[i].substr(2) << '\n';
+							<< args[i].substr(2)
+							<< '\n';
 			}
 			else if (isMatch(OPT_ADSCOUNT, 'C')) {
 				if (var range { std::pair<int, int>() };
@@ -4321,21 +4423,26 @@ func main(const int argc, char* const argv[]) -> int
 					and isInt(args[i + 3], &(range.second)))
 				{
 					if (range.first < range.second) {
-						opt::state[OPT_ADSCOUNT] = range.first + '-' + range.second;
+						opt::valueOf[OPT_ADSCOUNT] = range.first + '-' + range.second;
 						i += 3;
 						continue;
 					}
-					std::cout << "⚠️  " << args[i] << " value range is up side down!. "
-					<< range.first << " greater than " << range.second << '\n';
+					std::cout << "⚠️  "
+								<< args[i]
+								<< " value range is up side down!. "
+								<< range.first
+								<< " greater than "
+								<< range.second
+								<< '\n';
 				}
 				else if (func push{[&args, &i] (unsigned long pos, unsigned long offset) {
-					var lower { args[i + 1].substr(0, pos) };
-					var upper { args[i + 1].substr(pos + offset) };
+					const var lower { args[i + 1].substr(0, pos) };
+					const var upper { args[i + 1].substr(pos + offset) };
 					   
 					int count[2] { 0, 0 };
 					if (isInt(lower, &count[0]) and isInt(upper, &count[1])
 						and count[0] < count[1]) {
-						opt::state[OPT_ADSCOUNT] = lower + '-' + upper;
+						opt::valueOf[OPT_ADSCOUNT] = lower + '-' + upper;
 						i++;
 						return true;
 					}
@@ -4359,12 +4466,13 @@ func main(const int argc, char* const argv[]) -> int
 					else if (var value { 0 };
 						isInt(args[i + 1], &value)) {
 						i++;
-						opt::state[OPT_ADSCOUNT] = std::to_string(value);
+						opt::valueOf[OPT_ADSCOUNT] = std::to_string(value);
 						continue;
 					}
 				}
 				std::cout << "⚠️  Expecting number of advertise. Please see --help "
-				<< args[i].substr(2) << '\n';
+							<< args[i].substr(2)
+							<< '\n';
 			}
 			else if (isMatch(OPT_NOOUTPUTFILE, 	'F', true)) {
 				if (i + 1 < args.size())
@@ -4372,53 +4480,54 @@ func main(const int argc, char* const argv[]) -> int
 					i++;
 					if (isEqual(args[i + 1].c_str(), {"true", "yes"},
 								IgnoreCase::Left))
-						opt::state[OPT_NOOUTPUTFILE] = "true";
+						opt::valueOf[OPT_NOOUTPUTFILE] = "true";
 					else if (isEqual(args[i + 1].c_str(), {"false", "no"},
 									 IgnoreCase::Left))
-						opt::state[OPT_NOOUTPUTFILE] = "false";
+						opt::valueOf[OPT_NOOUTPUTFILE] = "false";
 					else
 						i--;
 				}
 			}
 			else if (isMatch(OPT_ARRANGEMENT, 'w')) {
 				if (i + 1 < args.size()
-					   and (args[i + 1].starts_with(OPT_ARRANGEMENT_DEFAULT)
-						 or args[i + 1] == OPT_ARRANGEMENT_UNORDERED
-						 or args[i + 1] == OPT_ARRANGEMENT_PERTITLE
-						 or args[i + 1] == OPT_ARRANGEMENT_ASCENDING
-						 or args[i + 1] == OPT_ARRANGEMENT_SHUFFLE
-						 or args[i + 1] == OPT_ARRANGEMENT_SHUFFLE_PERTITLE
-						 or args[i + 1].starts_with(OPT_ARRANGEMENT_SHUFFLE_DEFAULT)
-						 or args[i + 1] == OPT_ARRANGEMENT_DESCENDING
-						 or args[i + 1] == OPT_ARRANGEMENT_DESCENDING_PERTITLE
-						 or args[i + 1].starts_with(OPT_ARRANGEMENT_DESCENDING_DEFAULT)))
+					   and (args[i + 1].starts_with(MODE_ARRANGEMENT_DEFAULT)
+						 or args[i + 1] == MODE_ARRANGEMENT_UNORDERED
+						 or args[i + 1] == MODE_ARRANGEMENT_PERTITLE
+						 or args[i + 1] == MODE_ARRANGEMENT_ASCENDING
+						 or args[i + 1] == MODE_ARRANGEMENT_SHUFFLE
+						 or args[i + 1] == MODE_ARRANGEMENT_SHUFFLE_PERTITLE
+						 or args[i + 1].starts_with(MODE_ARRANGEMENT_SHUFFLE_DEFAULT)
+						 or args[i + 1] == MODE_ARRANGEMENT_DESCENDING
+						 or args[i + 1] == MODE_ARRANGEMENT_DESCENDING_PERTITLE
+						 or args[i + 1].starts_with(MODE_ARRANGEMENT_DESCENDING_DEFAULT)))
 				{
 					i++;
 					var value { args[i] };
-					if (args[i].starts_with(OPT_ARRANGEMENT_DEFAULT)
-						or args[i].starts_with(OPT_ARRANGEMENT_DEFAULT)
-						or args[i].starts_with(OPT_ARRANGEMENT_DESCENDING_DEFAULT))
+					if (args[i].starts_with(MODE_ARRANGEMENT_DEFAULT)
+						or args[i].starts_with(MODE_ARRANGEMENT_DEFAULT)
+						or args[i].starts_with(MODE_ARRANGEMENT_DESCENDING_DEFAULT))
 					{
-						var pos { args[i].find('=') };
+						const var pos { args[i].find('=') };
 						value = args[i].substr(0, pos - 1);
-						var count_s { args[i].substr(pos + 1) };
+						const var count_s { args[i].substr(pos + 1) };
 						if (var count { 0 }; isInt(count_s, &count) and count > 1)
 							fileCountPerTurn = count;
 					}
 					
-					opt::state[OPT_ARRANGEMENT] = value;
+					opt::valueOf[OPT_ARRANGEMENT] = value;
 				} else
 					std::cout << "⚠️  Expecting arrangement type. Please see --help "
-					<< args[i].substr(2) << "\n";
+								<< args[i].substr(2)
+								<< "\n";
 			}
 			else if (isMatch(OPT_CASEINSENSITIVE, 'N', true, OPT_CASEINSENSITIVE_ALTERNATIVE))
 			{
 				if (i + 1 < args.size() and isEqual(args[i + 1].c_str(),
 													TRUE_FALSE,
 													IgnoreCase::Left))
-					opt::state[OPT_CASEINSENSITIVE] = args[++i];
+					opt::valueOf[OPT_CASEINSENSITIVE] = args[++i];
 				
-				if (opt::state[OPT_CASEINSENSITIVE] == "true") {
+				if (opt::valueOf[OPT_CASEINSENSITIVE] == "true") {
 					for (var& k : opt::listFindDir) k = tolower(k);
 					for (var& k : opt::listExclFindDir) k = tolower(k);
 					for (var& k : opt::listFind) k = tolower(k);
@@ -4427,10 +4536,10 @@ func main(const int argc, char* const argv[]) -> int
 			}
 			else if (isMatch(OPT_SEARCH, 'q')) {
 				if (i + 1 < args.size()) {
-					opt::state[OPT_NOOUTPUTFILE] = "true";
-					opt::state[OPT_VERBOSE] = "true";
-					opt::state[OPT_ARRANGEMENT] = OPT_ARRANGEMENT_ASCENDING;
-					opt::state[OPT_CASEINSENSITIVE] = "true";
+					opt::valueOf[OPT_NOOUTPUTFILE] = "true";
+					opt::valueOf[OPT_VERBOSE] = "true";
+					opt::valueOf[OPT_ARRANGEMENT] = MODE_ARRANGEMENT_ASCENDING;
+					opt::valueOf[OPT_CASEINSENSITIVE] = "true";
 					
 					i++;
 					
@@ -4441,7 +4550,7 @@ func main(const int argc, char* const argv[]) -> int
 						if (keyVal not_eq "or" and keyVal not_eq "and") {
 							parseKeyValue(&keyVal, keyVal.starts_with("exclude-"));
 							
-							if (constexpr var EXCL {"exclude="};
+							if (let EXCL {"exclude="};
 								keyVal.starts_with(EXCL))
 							{
 								var value { keyVal.substr(std::strlen(EXCL)) };
@@ -4488,7 +4597,7 @@ func main(const int argc, char* const argv[]) -> int
 						const var isTrue { parseKeyValue(&keyVal,
 											keyVal.starts_with("exclude-")) };
 						
-						if (constexpr var EXCL {"exclude="};
+						if (let EXCL {"exclude="};
 							keyVal.starts_with(EXCL))
 						{
 							var value { keyVal.substr(std::strlen(EXCL)) };
@@ -4497,7 +4606,7 @@ func main(const int argc, char* const argv[]) -> int
 							if (not value.empty()) {
 								(isExclude ? opt::listExclFind : opt::listFind)
 									.emplace_back(value);
-								opt::state[opt] = "1";
+								opt::valueOf[opt] = "1";
 							}
 						}
 						else if (not isTrue
@@ -4525,18 +4634,20 @@ func main(const int argc, char* const argv[]) -> int
 					
 					if (not buff.empty()) {
 						(isExclude ? opt::listExclFind : opt::listFind).emplace_back(buff);
-						opt::state[opt] = "1";
+						opt::valueOf[opt] = "1";
 					}
 				} else
 					std::cout << "⚠️  Expecting keyword after \""
-					<< args[i] << "\" option. Please see --help "
-					<< args[i].substr(2) << "\n";
+								<< args[i]
+								<< "\" option. Please see --help "
+								<< args[i].substr(2)
+								<< '\n';
 			}
 			else if (isMatch(OPT_REGEXSYNTAX, 	'X')) {
 				if (var found { false }; i + 1 < args.size()) {
 					for (var& s : OPT_REGEXSYNTAX_ARGS)
 						if (isEqual(args[i + 1].c_str(), s, IgnoreCase::Left)) {
-							opt::state[OPT_REGEXSYNTAX] = s;
+							opt::valueOf[OPT_REGEXSYNTAX] = s;
 							i++;
 							found = true;
 							break;
@@ -4545,21 +4656,23 @@ func main(const int argc, char* const argv[]) -> int
 						continue;
 				}
 				std::cout << "⚠️  Expecting regular expression syntax after \""
-							<< args[i] << "\" option. Please see --help "
-							<< args[i].substr(2) << "\n";
+							<< args[i]
+							<< "\" option. Please see --help "
+							<< args[i].substr(2)
+							<< '\n';
 			}
 			else if (	isMatch(OPT_REGEX, 		'r')
 					 or isMatch(OPT_EXCLREGEX, 	'R')) {
 				if (var found { false }; i + 1 < args.size())
 				{
-					if (var pos { args[i + 1].find('=') };
+					if (const var pos { args[i + 1].find('=') };
 						pos not_eq std::string::npos)
 					{
 						if (args[i + 1].substr(0, pos) == "type") {
-							var value { args[i + 1].substr(pos + 1) };
+							const var value { args[i + 1].substr(pos + 1) };
 							for (var& keyword : OPT_REGEXSYNTAX_ARGS)
 								if (keyword == value) {
-									opt::state[OPT_REGEXSYNTAX] = keyword;
+									opt::valueOf[OPT_REGEXSYNTAX] = keyword;
 									i++;
 									found = true;
 									break;
@@ -4580,14 +4693,16 @@ func main(const int argc, char* const argv[]) -> int
 						const var opt { args[i].substr(2) };
 						(opt == OPT_REGEX ? opt::listRegex : opt::listExclRegex)
 							.emplace_back(std::regex(args[i + 1],
-										getRegexSyntaxType(opt::state[OPT_REGEXSYNTAX])));
-						opt::state[opt] = "1";
+										getRegexSyntaxType(opt::valueOf[OPT_REGEXSYNTAX])));
+						opt::valueOf[opt] = "1";
 						i++;
 					}
 				} else
 					std::cout << "⚠️  Expecting regular expression after \""
-								<< args[i] << "\" option. Please see --help "
-								<< args[i].substr(2) << "\n";
+								<< args[i]
+								<< "\" option. Please see --help "
+								<< args[i].substr(2)
+								<< '\n';
 			}
 			else if (	isMatch(OPT_DATE, 			'z')
 					 or isMatch(OPT_EXCLDATE, 		'Z')
@@ -4603,26 +4718,26 @@ func main(const int argc, char* const argv[]) -> int
 			{
 				const var opt { args[i].substr(2) };
 				func as_single{[&](const char opGt) -> bool {
-					var date { Date(args[i + 1]) };
+					const var date { Date(args[i + 1]) };
 					if (date.isValid()) {
 						if (opt == OPT_DATE) {
 							opt::listDCreated.emplace_back(std::make_pair(opGt, date));
 							opt::listDChanged.emplace_back(std::make_pair(opGt, date));
 							opt::listDModified.emplace_back(std::make_pair(opGt, date));
 							opt::listDAccessed.emplace_back(std::make_pair(opGt, date));
-							opt::state[OPT_DCREATED]  = "1";
-							opt::state[OPT_DMODIFIED] = "1";
-							opt::state[OPT_DACCESSED] = "1";
-							opt::state[OPT_DCHANGED]  = "1";
+							opt::valueOf[OPT_DCREATED]  = "1";
+							opt::valueOf[OPT_DMODIFIED] = "1";
+							opt::valueOf[OPT_DACCESSED] = "1";
+							opt::valueOf[OPT_DCHANGED]  = "1";
 						} else if (opt == OPT_EXCLDATE) {
 							opt::listDExclCreated.emplace_back(std::make_pair(opGt, date));
 							opt::listDExclChanged.emplace_back(std::make_pair(opGt, date));
 							opt::listDExclModified.emplace_back(std::make_pair(opGt, date));
 							opt::listDExclAccessed.emplace_back(std::make_pair(opGt, date));
-							opt::state[OPT_DEXCLCREATED]  = "1";
-							opt::state[OPT_DEXCLMODIFIED] = "1";
-							opt::state[OPT_DEXCLACCESSED] = "1";
-							opt::state[OPT_DEXCLCHANGED]  = "1";
+							opt::valueOf[OPT_DEXCLCREATED]  = "1";
+							opt::valueOf[OPT_DEXCLMODIFIED] = "1";
+							opt::valueOf[OPT_DEXCLACCESSED] = "1";
+							opt::valueOf[OPT_DEXCLCHANGED]  = "1";
 						} else {
 						(opt == OPT_DCREATED ? opt::listDCreated
 						 : opt == OPT_DCHANGED ? opt::listDChanged
@@ -4634,7 +4749,7 @@ func main(const int argc, char* const argv[]) -> int
 						 : opt::listDExclAccessed
 						 ).emplace_back(std::make_pair(opGt, date));
 
-							opt::state[opt] = "1";
+							opt::valueOf[opt] = "1";
 						}
 						i++;
 						return true;
@@ -4663,7 +4778,10 @@ func main(const int argc, char* const argv[]) -> int
 					func push{[&](const Date& lower, const Date& upper) {
 						if (lower > upper) {
 							std::cout << "⚠️  Date range up side down!, "
-							<< lower.string() << " greater than " << upper.string() << '\n';
+										<< lower.string()
+										<< " greater than "
+										<< upper.string()
+										<< '\n';
 							return false;
 						}
 						if (opt == OPT_DATE) {
@@ -4671,19 +4789,19 @@ func main(const int argc, char* const argv[]) -> int
 							opt::listDChangedR.emplace_back(std::make_pair(lower, upper));
 							opt::listDModifiedR.emplace_back(std::make_pair(lower, upper));
 							opt::listDAccessedR.emplace_back(std::make_pair(lower, upper));
-							opt::state[OPT_DCREATED]  = "1";
-							opt::state[OPT_DMODIFIED] = "1";
-							opt::state[OPT_DACCESSED] = "1";
-							opt::state[OPT_DCHANGED]  = "1";
+							opt::valueOf[OPT_DCREATED]  = "1";
+							opt::valueOf[OPT_DMODIFIED] = "1";
+							opt::valueOf[OPT_DACCESSED] = "1";
+							opt::valueOf[OPT_DCHANGED]  = "1";
 						} else if (opt == OPT_EXCLDATE) {
 							opt::listDExclCreatedR.emplace_back(std::make_pair(lower, upper));
 							opt::listDExclChangedR.emplace_back(std::make_pair(lower, upper));
 							opt::listDExclModifiedR.emplace_back(std::make_pair(lower, upper));
 							opt::listDExclAccessedR.emplace_back(std::make_pair(lower, upper));
-							opt::state[OPT_DEXCLCREATED]  = "1";
-							opt::state[OPT_DEXCLMODIFIED] = "1";
-							opt::state[OPT_DEXCLACCESSED] = "1";
-							opt::state[OPT_DEXCLCHANGED]  = "1";
+							opt::valueOf[OPT_DEXCLCREATED]  = "1";
+							opt::valueOf[OPT_DEXCLMODIFIED] = "1";
+							opt::valueOf[OPT_DEXCLACCESSED] = "1";
+							opt::valueOf[OPT_DEXCLCHANGED]  = "1";
 						} else {
 						(opt == OPT_DCREATED ? opt::listDCreatedR
 						 : opt == OPT_DCHANGED ? opt::listDChangedR
@@ -4694,14 +4812,14 @@ func main(const int argc, char* const argv[]) -> int
 						 : opt == OPT_DEXCLMODIFIED ? opt::listDExclModifiedR
 						 : opt::listDExclAccessedR
 						 ).emplace_back(std::make_pair(lower, upper));
-							opt::state[opt] = "1";
+							opt::valueOf[opt] = "1";
 						}
 						return true;
 					}};
 					if (i + 3 < args.size() and
 						(args[i + 2] == "-" or args[i + 2] == "..")) {
-						if (var lower { Date(args[i + 1]) }; lower.isValid())
-							if (var upper { Date(args[i + 3]) }; upper.isValid())
+						if (const var lower { Date(args[i + 1]) }; lower.isValid())
+							if (const var upper { Date(args[i + 3]) }; upper.isValid())
 								if (push(lower, upper)) {
 									i += 3;
 									continue;
@@ -4723,9 +4841,9 @@ func main(const int argc, char* const argv[]) -> int
 						}
 							
 						if (pos not_eq std::string::npos) {
-							if (var lower { Date(args[i + 1].substr(0, pos)) };
+							if (const var lower { Date(args[i + 1].substr(0, pos)) };
 								lower.isValid())
-								if (var upper { Date(args[i + 1].substr(pos + next)) };
+								if (const var upper { Date(args[i + 1].substr(pos + next)) };
 									upper.isValid())
 								{
 									if (push(lower, upper)) {
@@ -4742,83 +4860,93 @@ func main(const int argc, char* const argv[]) -> int
 					}
 				}
 DATE_NEEDED:	std::cout << "⚠️  Expecting date and/or time after \""
-							<< args[i] << "\" option. Please see --help "
-							<< args[i].substr(2) << "\n";
+							<< args[i]
+							<< "\" option. Please see --help "
+							<< args[i].substr(2)
+							<< '\n';
 			}
 			else if (isMatch(OPT_OVERWRITE, 	'O', true)) {
 				if (i + 1 < args.size() and isEqual(args[i + 1].c_str(),
 													TRUE_FALSE, IgnoreCase::Left))
-					opt::state[OPT_OVERWRITE] = args[++i];
+					opt::valueOf[OPT_OVERWRITE] = args[++i];
 			}
 			else if (isMatch(OPT_BENCHMARK, 	'b', true)) {
 				if (i + 1 < args.size() and isEqual(args[i + 1].c_str(),
 													TRUE_FALSE, IgnoreCase::Left))
-					opt::state[OPT_OVERWRITE] = args[++i];
+					opt::valueOf[OPT_OVERWRITE] = args[++i];
 			}
 			else if (isMatch(OPT_SKIPSUBTITLE, 	'x', true)) {
 				if (i + 1 < args.size() and isEqual(args[i + 1].c_str(),
 													TRUE_FALSE, IgnoreCase::Left))
-					opt::state[OPT_OVERWRITE] = args[++i];
+					opt::valueOf[OPT_OVERWRITE] = args[++i];
 			}
 			else if (isMatch(OPT_EXCLHIDDEN, 	'n', true)) {
 				if (i + 1 < args.size() and isEqual(args[i + 1].c_str(),
 													TRUE_FALSE, IgnoreCase::Left))
-					opt::state[OPT_OVERWRITE] = args[++i];
+					opt::valueOf[OPT_OVERWRITE] = args[++i];
 			}
 			else if (isMatch(OPT_VERBOSE, 		'V', true)) {
 				if (i + 1 < args.size() and (args[i + 1] == "all" or args[i + 1] == "info"))
 				{
 					i++;
-					opt::state[OPT_VERBOSE] = args[i];
+					opt::valueOf[OPT_VERBOSE] = args[i];
 				}
 			}
 			else if (isMatch(OPT_EXECUTION, 	'c')) {
 				if (i + 1 < args.size()) {
 					i++;
-					if (args[i] == OPT_EXECUTION_ASYNC or args[i] == OPT_EXECUTION_THREAD)
-						opt::state[OPT_EXECUTION] = args[i];
+					if (args[i] == MODE_EXECUTION_ASYNC or args[i] == MODE_EXECUTION_THREAD)
+						opt::valueOf[OPT_EXECUTION] = args[i];
 					else
-						opt::state[OPT_EXECUTION] = "Linear";
+						opt::valueOf[OPT_EXECUTION] = "Linear";
 				} else
 					std::cout << "⚠️  Expecting 'thread', 'async', or 'none' after \""
-					<< args[i] << "\" option. Please see --help "
-					<< args[i].substr(2) << "\n";
+								<< args[i]
+								<< "\" option. Please see --help "
+								<< args[i].substr(2)
+								<< '\n';
 			}
 			else if (	isMatch(OPT_EXT, 	'e')
 					 or isMatch(OPT_EXCLEXT, 'E')) {
 				if (i + 1 < args.size()) {
 					i++;
-					opt::state[args[i - 1].substr(2)] = args[i] == "*.*" ? "*" : args[i];
+					opt::valueOf[args[i - 1].substr(2)] = args[i] == "*.*" ? "*" : args[i];
 				} else
 					std::cout << "Expecting extension after \""
-					<< args[i] << "\" option (eg: \"mp4, mkv\"). Please see --help "
-					<< args[i].substr(2) << "\n";
+								<< args[i]
+								<< "\" option (eg: \"mp4, mkv\"). Please see --help "
+								<< args[i].substr(2)
+								<< '\n';
 			}
 			else if (isMatch(OPT_FIXFILENAME, 	'f', false, {"fix-filename"})) {
 				if (i + 1 < args.size()) {
 					i++;
-					opt::state[OPT_FIXFILENAME] = args[i];
+					opt::valueOf[OPT_FIXFILENAME] = args[i];
 					if (not fs::path(args[i]).parent_path().string().empty())
 					{
-						opt::state[OPT_FIXFILENAME] = fs::path(args[i]).filename().string();
-						opt::state[OPT_OUTDIR] = fs::path(args[i]).parent_path().string();
+						opt::valueOf[OPT_FIXFILENAME] = fs::path(args[i]).filename().string();
+						opt::valueOf[OPT_OUTDIR] = fs::path(args[i]).parent_path().string();
 					}
 				} else
 					std::cout << "⚠️  Expecting file name after \""
-					<< args[i] << "\" option (eg: \"my_playlist.m3u8\"). Please see --help "
-					<< args[i].substr(2) << "\n";
+								<< args[i]
+								<< "\" option (eg: \"my_playlist.m3u8\"). Please see --help "
+								<< args[i].substr(2)
+								<< '\n';
 			}
 			else if (isMatch(OPT_OUTDIR, 		'd')) {
 				if (i + 1 < args.size()) {
 					i++;
-					opt::state[OPT_OUTDIR] = fs::absolute(args[i]);
-					if (var tmp { args[i] };
+					opt::valueOf[OPT_OUTDIR] = fs::absolute(args[i]);
+					if (const var tmp { args[i] };
 						tmp[tmp.size() - 1] not_eq fs::path::preferred_separator)
-						opt::state[OPT_OUTDIR] += fs::path::preferred_separator;
+						opt::valueOf[OPT_OUTDIR] += fs::path::preferred_separator;
 				} else
 					std::cout << "⚠️  Expecting directory after \""
-					<< args[i] << "\" option (eg: \"Downloads/\"). Please see --help "
-					<< args[i].substr(2) << "\n";
+								<< args[i]
+								<< "\" option (eg: \"Downloads/\"). Please see --help "
+								<< args[i].substr(2)
+								<< '\n';
 			}
 			else if (	isMatch(OPT_SIZE, 			's')
 					 or isMatch(OPT_EXCLSIZE, 	'S')) {
@@ -4846,8 +4974,8 @@ DATE_NEEDED:	std::cout << "⚠️  Expecting date and/or time after \""
 								i++;
 						}
 						
-						opt::state[isExclude ? OPT_EXCLSIZEOPGT : OPT_SIZEOPGT] = opGT;
-						opt::state[isExclude ? OPT_EXCLSIZE : OPT_SIZE] = std::to_string(std::move(value));
+						opt::valueOf[isExclude ? OPT_EXCLSIZEOPGT : OPT_SIZEOPGT] = opGT;
+						opt::valueOf[isExclude ? OPT_EXCLSIZE : OPT_SIZE] = std::to_string(std::move(value));
 						(isExclude ? opt::listExclSize : opt::listSize).clear();
 					} else {
 						var range { getRange(args[i + 1], std::move("-")) };
@@ -4906,14 +5034,16 @@ DATE_NEEDED:	std::cout << "⚠️  Expecting date and/or time after \""
 								goto SIZE_NEEDED;
 						}
 						
-						opt::state[isExclude ? OPT_EXCLSIZEOPGT : OPT_SIZEOPGT] = '\0';
-						opt::state[s_first] = first;
+						opt::valueOf[isExclude ? OPT_EXCLSIZEOPGT : OPT_SIZEOPGT] = '\0';
+						opt::valueOf[s_first] = first;
 
 						if (std::stoul(second) < std::stoul(first)) {
 							std::cout << "⚠️  Range is up side down! \""
-								<< groupNumber(first) << " bytes greater than "
-								<< groupNumber(second) << " bytes\"\n";
-							opt::state[s_first] = "0";
+										<< groupNumber(first)
+										<< " bytes greater than "
+										<< groupNumber(second)
+										<< " bytes\"\n";
+							opt::valueOf[s_first] = "0";
 						} else if (first not_eq "0" and second not_eq "0")
 							(isExclude ? opt::listExclSize : opt::listSize).emplace_back(std::make_pair(
 										   std::stoul(first),
@@ -4921,9 +5051,12 @@ DATE_NEEDED:	std::cout << "⚠️  Expecting date and/or time after \""
 					}
 				}
 				else
-SIZE_NEEDED:		std::cout << "⚠️  Expecting operator '<' or '>' followed\
-by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..to'\
- Please see --help " << OPT_SIZE << "\n";
+SIZE_NEEDED:		std::cout << "⚠️  Expecting operator '<' or '>' followed"\
+								"by size in KB, MB, or GB.\nOr use value in"\
+								"range using form 'from-to' OR 'from..to'"\
+								"Please see --help "
+								<< OPT_SIZE
+								<< '\n';
 		}
 		else if (isNetworkTransportFile(args[i]))
 			insertInto(&in::selectFiles, fs::path(args[i]));
@@ -4933,7 +5066,7 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 				 fs::is_regular_file(path)
 				 and isValid(path) and isValidFile(path))
 		{
-			var list { std::vector<fs::path>() };
+			var list { ListPath() };
 			loadPlaylistInto(path, &list);
 			if (list.empty())
 				insertInto(&in::selectFiles, fs::absolute(path));
@@ -4950,14 +5083,15 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 	if (not invalidArgs.empty()) {
 		std::string_view invalid_args[invalidArgs.size()];
 		std::move(invalidArgs.begin(), invalidArgs.end(), invalid_args);
-		std::cout << "⚠️  What " << (invalidArgs.size() > 1 ? "are these" : "is this") << ":\n";
+		std::cout << "⚠️  What "
+					<< (invalidArgs.size() > 1 ? "are these" : "is this")
+					<< ":\n";
 		for (var i { 0 }; i<invalidArgs.size(); ++i) {
-			var item { &invalid_args[i] };
+			const var item { &invalid_args[i] };
 			var others { std::string() };
 			if (item->size() > 4)
 			{
 				const var isStartWithDoubleStrip { item->starts_with("--") };
-				var possible { std::vector<std::pair<float, std::string>>() };
 				const var pos { item->find("=") };
 				var substr_item { std::string() };
 				var substr_next { std::string() };
@@ -4969,8 +5103,9 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 									isStartWithDoubleStrip ? 2 : 0, pos - 1));
 					substr_next = std::move(item->substr(pos));
 				}
+				var possible { ListPairFloatString() };
 				for (var& opt : OPTS)
-					if (var percentage { getLikely(substr_item, *opt) };
+					if (const var percentage { getLikely(substr_item, *opt) };
 						percentage > 80)
 						possible.emplace_back(std::make_pair(percentage, *opt));
 				
@@ -4988,10 +5123,15 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 				}
 			}
 				
-			std::cout << '"' << *item << '"' << (others.empty() ? " ❔" : others) << '\n';
+			std::cout << '"'
+						<< *item
+						<< '"'
+						<< (others.empty() ? " ❔" : others)
+						<< '\n';
 		}
 		std::cout << "\nFor more information, please try to type \""
-			<< fs::path(argv[0]).filename().string() << " --help ['keyword']\"\n\n";
+					<< fs::path(argv[0]).filename().string()
+					<< " --help ['keyword']\"\n\n";
 	}
 	
 	if (bufferDirs.empty() and in::selectFiles.empty())
@@ -5002,34 +5142,34 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 	std::copy(bufferDirs.begin(), bufferDirs.end(), inputDirs);
 
 	while (bufferDirs.size() == 1) {
-		opt::state[OPT_OUTDIR] = fs::absolute(bufferDirs[0]).string();
+		opt::valueOf[OPT_OUTDIR] = fs::absolute(bufferDirs[0]).string();
 		insertInto(&in::regularDirs, bufferDirs[0]);/// Assume single input dir is regularDir
-		if (isContainsSeasonDirs(opt::state[OPT_OUTDIR])) {
+		if (isContainsSeasonDirs(opt::valueOf[OPT_OUTDIR])) {
 			break;
 		}
 		bufferDirs.clear();
-		var sortedDirs { std::vector<fs::directory_entry>() };
-		listDirInto(fs::path(opt::state[OPT_OUTDIR]), &sortedDirs);
+		var sortedDirs { ListEntry() };
+		listDirInto(fs::path(opt::valueOf[OPT_OUTDIR]), &sortedDirs);
 				
 		for (var& child : sortedDirs)
 			insertInto(&bufferDirs, child.path());
 	}
 
-	if (var dirOut { inputDirsCount == 1
-			? transformWhiteSpace(fs::path(opt::state[OPT_OUTDIR]).filename().string())
+	if (const var dirOut { inputDirsCount == 1
+			? transformWhiteSpace(fs::path(opt::valueOf[OPT_OUTDIR]).filename().string())
 			: std::to_string(inputDirsCount)};
-		opt::state[OPT_FIXFILENAME].empty())
+		opt::valueOf[OPT_FIXFILENAME].empty())
 	{
 		#ifdef LIBCPP_FORMAT
-		std::format_to(std::back_inserter(opt::state[OPT_FIXFILENAME]),
+		std::format_to(std::back_inserter(opt::valueOf[OPT_FIXFILENAME]),
 					   "playlist_from_{0}{1}.m3u8",
 					   inputDirsCount == 0
 						 ? groupNumber(std::to_string(in::selectFiles.size())) + "_file"
 						 : dirOut + "_dir",
 					   inputDirsCount > 1 or in::selectFiles.size() > 1 ? "s" : "";
 		#else
-		opt::state[OPT_FIXFILENAME] =
-				opt::state[OPT_NOOUTPUTFILE] == "true" ? "" :
+		opt::valueOf[OPT_FIXFILENAME] =
+				opt::valueOf[OPT_NOOUTPUTFILE] == "true" ? "" :
 				"playlist_from_"
 				+ (inputDirsCount == 0
 				   ? groupNumber(std::to_string(in::selectFiles.size())) + "_file"
@@ -5041,15 +5181,15 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 	}
 	
 	if (const var condToShowArgsParsed { not invalidArgs.empty()
-											or opt::state[OPT_DEBUG] == "true"
-											or opt::state[OPT_DEBUG] == "args" };
-		not opt::state[OPT_SHOWCONFIG].empty()
-		or opt::state[OPT_VERBOSE] 	== "all"
-		or opt::state[OPT_VERBOSE] 	== "info"
-		or opt::state[OPT_BENCHMARK]== "true"
+											or opt::valueOf[OPT_DEBUG] == "true"
+											or opt::valueOf[OPT_DEBUG] == "args" };
+		not opt::valueOf[OPT_SHOWCONFIG].empty()
+		or opt::valueOf[OPT_VERBOSE] 	== "all"
+		or opt::valueOf[OPT_VERBOSE] 	== "info"
+		or opt::valueOf[OPT_BENCHMARK]	== "true"
 		or condToShowArgsParsed)
 	{ // MARK: Options Summary
-		constexpr var WIDTH { 20 };
+		let WIDTH { 20 };
 		#define LABEL(x)	x << std::setw(unsigned(WIDTH - std::strlen(x))) << ": "
 		#ifndef DEBUG
 		if (condToShowArgsParsed)
@@ -5070,11 +5210,15 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 					formatPrefix = "";
 				}
 				#endif
-				std::cout << '"' << formatPrefix << argv[i] << formatSuffix
-							<< '"' << (i+1>=argc ? "" : ", ");
+				std::cout << '"'
+							<< formatPrefix
+							<< argv[i]
+							<< formatSuffix
+							<< '"'
+							<< (i+1>=argc ? "" : ", ");
 			}
-			std::cout << "\n\n";
-			std::cout << LABEL("Deduced Arguments");
+			std::cout << "\n\n"
+						<< LABEL("Deduced Arguments");
 			for (var i { 0 }; i<args.size(); ++i) {
 				if (args[i] == def::ARGS_SEPARATOR)
 					continue;
@@ -5089,8 +5233,12 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 					formatPrefix = "";
 				}
 				#endif
-				std::cout << '"' << formatPrefix << args[i] << formatSuffix
-							<< '"' << (i+1>=args.size() ? "" : ", ");
+				std::cout << '"'
+							<< formatPrefix
+							<< args[i]
+							<< formatSuffix
+							<< '"'
+							<< (i+1>=args.size() ? "" : ", ");
 			}
 			std::cout << '\n';
 			
@@ -5100,26 +5248,27 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 	#define PRINT_OPT(x)	(x.empty() ? "false" : x)
 	
 	std::cout
-		<< LABEL(OPT_ARRANGEMENT) << opt::state[OPT_ARRANGEMENT] << '\n'
-		<< LABEL(OPT_EXECUTION) << opt::state[OPT_EXECUTION] << '\n'
-		<< LABEL(OPT_VERBOSE) << PRINT_OPT(opt::state[OPT_VERBOSE]) << '\n'
-		<< LABEL(OPT_BENCHMARK) << PRINT_OPT(opt::state[OPT_BENCHMARK]) << '\n'
-		<< LABEL(OPT_OVERWRITE) << PRINT_OPT(opt::state[OPT_OVERWRITE]) << '\n'
-		<< LABEL(OPT_NOOUTPUTFILE) << PRINT_OPT(opt::state[OPT_NOOUTPUTFILE]) << '\n'
-		<< LABEL(OPT_FIXFILENAME) << opt::state[OPT_FIXFILENAME] << '\n'
+		<< LABEL(OPT_ARRANGEMENT) << opt::valueOf[OPT_ARRANGEMENT] << '\n'
+		<< LABEL(OPT_EXECUTION) << opt::valueOf[OPT_EXECUTION] << '\n'
+		<< LABEL(OPT_VERBOSE) << PRINT_OPT(opt::valueOf[OPT_VERBOSE]) << '\n'
+		<< LABEL(OPT_BENCHMARK) << PRINT_OPT(opt::valueOf[OPT_BENCHMARK]) << '\n'
+		<< LABEL(OPT_OVERWRITE) << PRINT_OPT(opt::valueOf[OPT_OVERWRITE]) << '\n'
+		<< LABEL(OPT_NOOUTPUTFILE) << PRINT_OPT(opt::valueOf[OPT_NOOUTPUTFILE]) << '\n'
+		<< LABEL(OPT_FIXFILENAME) << opt::valueOf[OPT_FIXFILENAME] << '\n'
 		<< LABEL("Current Directory") << fs::current_path().string() << '\n'
-		<< LABEL(OPT_OUTDIR) << opt::state[OPT_OUTDIR] << '\n'
-		<< LABEL(OPT_EXCLHIDDEN) << PRINT_OPT(opt::state[OPT_EXCLHIDDEN]) << '\n'
-		<< LABEL(OPT_SKIPSUBTITLE) << PRINT_OPT(opt::state[OPT_SKIPSUBTITLE]) << '\n';
+		<< LABEL(OPT_OUTDIR) << opt::valueOf[OPT_OUTDIR] << '\n'
+		<< LABEL(OPT_EXCLHIDDEN) << PRINT_OPT(opt::valueOf[OPT_EXCLHIDDEN]) << '\n'
+		<< LABEL(OPT_SKIPSUBTITLE) << PRINT_OPT(opt::valueOf[OPT_SKIPSUBTITLE]) << '\n';
 	{
-		std::cout << LABEL(OPT_EXT) << opt::state[OPT_EXT];
+		std::cout << LABEL(OPT_EXT) << opt::valueOf[OPT_EXT];
 		if (var i { 0 };
-			opt::state[OPT_EXT].empty())
+			opt::valueOf[OPT_EXT].empty())
 			for (var& ext : opt::DEFAULT_EXT)
-				std::cout << ext << (++i < opt::DEFAULT_EXT.size() - 1 ? ", " : "");
+				std::cout << ext
+							<< (++i < opt::DEFAULT_EXT.size() - 1 ? ", " : "");
 		std::cout << '\n';
 	}
-	std::cout << LABEL("case-insensitive") << PRINT_OPT(opt::state[OPT_CASEINSENSITIVE]) << '\n';
+	std::cout << LABEL("case-insensitive") << PRINT_OPT(opt::valueOf[OPT_CASEINSENSITIVE]) << '\n';
 	
 	#undef PRINT_OPT
 			
@@ -5127,7 +5276,8 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 		std::cout << LABEL(S);
 		for (var i { 0 }; i<(S == OPT_FIND ? opt::listFind : opt::listExclFind).size(); ++i)
 			std::cout << (S == OPT_FIND ? opt::listFind : opt::listExclFind)[i]
-			<< (i < (S == OPT_FIND ? opt::listFind : opt::listExclFind).size() - 1 ? ", " : "");
+						<< (i < (S == OPT_FIND ? opt::listFind
+								 : opt::listExclFind).size() - 1 ? ", " : "");
 		std::cout << '\n';
 	}
 
@@ -5135,24 +5285,27 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 		std::cout << LABEL(S);
 		for (var i { 0 }; i<(S == OPT_REGEX ? opt::listRegex : opt::listExclRegex).size(); ++i)
 			std::cout << (S == OPT_REGEX ? opt::listRegex : opt::listExclRegex)[i].mark_count()
-			<< " expression"
-			<< (i < (S == OPT_REGEX ? opt::listRegex : opt::listExclRegex).size() - 1 ? ", " : "");
+						<< " expression"
+						<< (i < (S == OPT_REGEX ? opt::listRegex
+								 : opt::listExclRegex).size() - 1 ? ", " : "");
 		std::cout << '\n';
 	}
 
 	for (var& S : {OPT_SIZE, OPT_EXCLSIZE}) {
 		std::cout << LABEL(S);
-		if (opt::state[OPT_SIZEOPGT][0] not_eq '\0' or opt::state[OPT_EXCLSIZEOPGT][0] not_eq '\0')
+		if (opt::valueOf[OPT_SIZEOPGT][0] not_eq '\0' or opt::valueOf[OPT_EXCLSIZEOPGT][0] not_eq '\0')
 			std::cout << ((S == OPT_SIZE ? opt::listSize : opt::listExclSize).empty()
-					or opt::state[S == OPT_SIZE ? OPT_SIZEOPGT
+					or opt::valueOf[S == OPT_SIZE ? OPT_SIZEOPGT
 							  : OPT_EXCLSIZEOPGT][0] not_eq '\0'
-					? (opt::state[S == OPT_SIZE ? OPT_SIZEOPGT
+					? (opt::valueOf[S == OPT_SIZE ? OPT_SIZEOPGT
 							 : OPT_EXCLSIZEOPGT][0] == '<' ? "< " : "> ")
-					+ opt::state[S] : "");
+					+ opt::valueOf[S] : "");
 		for (var i { 0 }; i<(S == OPT_SIZE ? opt::listSize : opt::listExclSize).size(); ++i)
 			std::cout << (S == OPT_SIZE ? opt::listSize : opt::listExclSize)[i].first
-			<< ".." << (S == OPT_SIZE ? opt::listSize : opt::listExclSize)[i].second
-			<< (i < (S == OPT_SIZE ? opt::listSize : opt::listExclSize).size() - 1 ? ", " : "");
+						<< ".."
+						<< (S == OPT_SIZE ? opt::listSize : opt::listExclSize)[i].second
+						<< (i < (S == OPT_SIZE ? opt::listSize
+								 : opt::listExclSize).size() - 1 ? ", " : "");
 		std::cout << '\n';
 	}
 			
@@ -5160,56 +5313,65 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 		const char * const* st[8] = { &OPT_DCREATED, &OPT_DCHANGED, &OPT_DACCESSED, &OPT_DMODIFIED,
 			&OPT_DEXCLCREATED, &OPT_DEXCLCHANGED, &OPT_DEXCLACCESSED, &OPT_DEXCLMODIFIED };
 		
-		const std::vector<std::pair<char, Date>>* const ot[8] = {
+		const ListPairCharDate* const ot[8] = {
 			&opt::listDCreated, &opt::listDAccessed, &opt::listDModified, &opt::listDChanged,
 			&opt::listDExclCreated, &opt::listDExclAccessed, &opt::listDExclModified, &opt::listDExclChanged };
 
 		
-		const std::vector<std::pair<Date, Date>>* const rt[8] = {
+		const ListPairDate* const rt[8] = {
 			&opt::listDCreatedR, &opt::listDAccessedR, &opt::listDModifiedR, &opt::listDChangedR,
 			&opt::listDExclCreatedR, &opt::listDExclAccessedR, &opt::listDExclModifiedR, &opt::listDExclChangedR };
 		
 		for (var i { 0 }; i<8; ++i) {
 			std::cout << LABEL(*st[i]);
-			for (var k { 0 }; k<ot[i]->size(); ++k) {
-				std::cout << '\"' << ot[i]->at(k).first << ' ' << ot[i]->at(k).second.string() << "\", ";
-			}
+			for (var k { 0 }; k<ot[i]->size(); ++k)
+				std::cout << '\"'
+							<< ot[i]->at(k).first
+							<< ' '
+							<< ot[i]->at(k).second.string()
+							<< "\", ";
 			
-			for (var k { 0 }; k<rt[i]->size(); ++k) {
-				std::cout << '\"' << rt[i]->at(k).first.string() << "\" .. \"" << rt[i]->at(k).second.string() << "\", ";
-			}
+			for (var k { 0 }; k<rt[i]->size(); ++k)
+				std::cout << '\"'
+							<< rt[i]->at(k).first.string()
+							<< "\" .. \""
+							<< rt[i]->at(k).second.string()
+							<< "\", ";
 			std::cout << '\n';
 		}
 	}
-	
-	std::cout << LABEL("Inputs");
+			
+	{
+		std::cout << LABEL("Inputs");
 		for (var i { 0 }; i<inputDirsCount + in::selectFiles.size(); ++i) {
-			if (i < inputDirsCount) {
+			if (i < inputDirsCount)
 				std::cout << inputDirs[i];
-			} else {
+			else
 				std::cout << in::selectFiles[i - inputDirsCount];
-			}
 			
 			std::cout  << (i < (inputDirsCount + in::selectFiles.size()) - 1 ? ", " : "");
 		}
-	std::cout << "\n";
-	
-	std::cout << LABEL(OPT_ADSCOUNT) << opt::state[OPT_ADSCOUNT] << '\n';
-	std::cout << LABEL(OPT_ADSDIR);
-	var i { -1 };
-	for (i++; var& d : in::listAdsDir)
-		std::cout << d.string() << (i < in::listAdsDir.size() - 1 ? ", " : "\n");
+		std::cout << "\n";
+	}
 			
-	std::cout << "\n";
-	
-	std::cout << LABEL(OPT_OPENWITH) << opt::state[OPT_OPENWITH] << '\n';
+	std::cout << LABEL(OPT_ADSCOUNT) << opt::valueOf[OPT_ADSCOUNT] << '\n';
+	{
+		std::cout << LABEL(OPT_ADSDIR);
+		var i { -1 };
+		for (i++; var& d : in::listAdsDir)
+			std::cout << d.string()
+						<< (i < in::listAdsDir.size() - 1 ? ", " : "\n");
+				
+		std::cout << "\n";
+	}
+	std::cout << LABEL(OPT_OPENWITH) << opt::valueOf[OPT_OPENWITH] << '\n';
 	#undef LABEL
 	} // END Info
 					   
 	if (not invalidArgs.empty())
 		return RETURN_VALUE
 					   
-	if (const var mode { opt::state[OPT_WRITEDEFAULTS] };
+	if (const var mode { opt::valueOf[OPT_WRITEDEFAULTS] };
 		not mode.empty())
 		writeConfig(&args,
 					  mode == "edit" 	? WriteConfigMode::Edit
@@ -5217,30 +5379,35 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 					: mode == "remove" 	? WriteConfigMode::Remove
 					: WriteConfigMode::New);
 
-	if (not opt::state[OPT_SHOWCONFIG].empty()) {
-		func displayFile{[](const char* const path) {
+	if (not opt::valueOf[OPT_SHOWCONFIG].empty()) {
+		func displayFile{[](ReadOnlyCString path) {
 			if (not fs::exists(fs::path(path)))
 				return;
 			
-			std::cout << "\nContent of file \"" << path << "\":\n";
+			std::cout << "\nContent of file \""
+						<< path
+						<< "\":\n";
 			var file { std::ifstream(path) };
-			std::cout << file.rdbuf() << '\n';
+			if (not file.good())
+				return;
+			std::cout << file.rdbuf()
+						<< '\n';
 			file.close();
 		}};
 			
 		displayFile(CONFIG_PATH);
-		var otherFile { opt::state[OPT_LOADCONFIG].c_str() };
+		var otherFile { opt::valueOf[OPT_LOADCONFIG].c_str() };
 		if (not isEqual(CONFIG_PATH, otherFile))
 			displayFile(otherFile);
 	}
 					   
-    if (	not opt::state[OPT_SHOWCONFIG].empty()
-		or 	not opt::state[OPT_WRITEDEFAULTS].empty())
+    if (	not opt::valueOf[OPT_SHOWCONFIG].empty()
+		or 	not opt::valueOf[OPT_WRITEDEFAULTS].empty())
         return RETURN_VALUE
 
 	{///Clean up <key=val> dir=??? in listFind and listExclFind
-		func cleanUp{[](std::vector<std::string>* list) -> void {
-			var tmp { std::vector<std::string>() };
+		func cleanUp{[](ListString* list) -> void {
+			var tmp { ListString() };
 			for (var i { 0 }; i<list->size(); ++i)
 				if (list->at(i)[0] not_eq char(1))
 					tmp.emplace_back(std::move(list->at(i)));
@@ -5250,35 +5417,35 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 		cleanUp(&opt::listExclFind);
 	}
 					   
-	if (opt::state[OPT_OUTDIR].empty()) {
+	if (opt::valueOf[OPT_OUTDIR].empty()) {
 		if (in::selectFiles.empty())
-			opt::state[OPT_OUTDIR] = fs::current_path().string();
+			opt::valueOf[OPT_OUTDIR] = fs::current_path().string();
 		else
-			opt::state[OPT_OUTDIR] = fs::path(in::selectFiles[0]).parent_path().string();
+			opt::valueOf[OPT_OUTDIR] = fs::path(in::selectFiles[0]).parent_path().string();
 	}
 	
 	var start { std::chrono::system_clock::now() };
 
-	var threads { std::vector<std::thread>() };
-	var asyncs { std::vector<std::future<void>>() };
+	var threads { ListThread() };
+	var asyncs { ListAsync() };
 					   
 	{
 		const var list { std::move(in::listAdsDir) };
 		
 		for (var& child : list)
-			if (opt::state[OPT_EXECUTION] == OPT_EXECUTION_THREAD)
+			if (opt::valueOf[OPT_EXECUTION] == MODE_EXECUTION_THREAD)
 				threads.emplace_back([&, child]() {
 					listDirRecursivelyInto(child, &in::listAdsDir, false); });
-			else if (opt::state[OPT_EXECUTION] == OPT_EXECUTION_ASYNC)
+			else if (opt::valueOf[OPT_EXECUTION] == MODE_EXECUTION_ASYNC)
 				asyncs.emplace_back(std::async(std::launch::async, [&, child]() {
 					listDirRecursivelyInto(child, &in::listAdsDir, false); }));
 			else
 				listDirRecursivelyInto(child, &in::listAdsDir, false);
 	}
 	
-	for (const var isByPass { opt::state[OPT_ARRANGEMENT] == OPT_ARRANGEMENT_ASCENDING };
+	for (const var isByPass { opt::valueOf[OPT_ARRANGEMENT] == MODE_ARRANGEMENT_ASCENDING };
 		 var& child : bufferDirs)
-		if (opt::state[OPT_EXECUTION] == OPT_EXECUTION_THREAD) {
+		if (opt::valueOf[OPT_EXECUTION] == MODE_EXECUTION_THREAD) {
 			if (isByPass)
 				threads.emplace_back([&, child]() {
 					listDirRecursivelyInto(child, &in::regularDirs, false);
@@ -5286,7 +5453,7 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 			else
 				threads.emplace_back(checkForSeasonDir, child);
 		}
-		else if (opt::state[OPT_EXECUTION] == OPT_EXECUTION_ASYNC)
+		else if (opt::valueOf[OPT_EXECUTION] == MODE_EXECUTION_ASYNC)
 			if (isByPass)
 				asyncs.emplace_back(std::async(std::launch::async, [&, child]() {
 					listDirRecursivelyInto(child, &in::regularDirs, false);
@@ -5302,31 +5469,31 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 				checkForSeasonDir(child);
 		}
 
-	if (opt::state[OPT_EXECUTION] == OPT_EXECUTION_THREAD) {
+	if (opt::valueOf[OPT_EXECUTION] == MODE_EXECUTION_THREAD) {
 		for (var& t : threads)
 			t.join();
 		threads.clear();
-	} else if (opt::state[OPT_EXECUTION] == OPT_EXECUTION_ASYNC) {
+	} else if (opt::valueOf[OPT_EXECUTION] == MODE_EXECUTION_ASYNC) {
 		for (var& a : asyncs)
 			a.wait();
 		asyncs.clear();
 	}
 
 	
-	var maxDirSize { std::max(in::regularDirs.size(), in::seasonDirs.size()) };
+	const var maxDirSize { std::max(in::regularDirs.size(), in::seasonDirs.size()) };
 
 	const var BY_PASS {
-			   opt::state[OPT_ARRANGEMENT] == OPT_ARRANGEMENT_PERTITLE
-			or opt::state[OPT_ARRANGEMENT] == OPT_ARRANGEMENT_SHUFFLE_PERTITLE
-			or opt::state[OPT_ARRANGEMENT] == OPT_ARRANGEMENT_ASCENDING
-			or opt::state[OPT_ARRANGEMENT] == OPT_ARRANGEMENT_SHUFFLE
-			or opt::state[OPT_ARRANGEMENT] == OPT_ARRANGEMENT_DESCENDING
-			or opt::state[OPT_ARRANGEMENT] == OPT_ARRANGEMENT_DESCENDING_PERTITLE
+			   opt::valueOf[OPT_ARRANGEMENT] == MODE_ARRANGEMENT_PERTITLE
+			or opt::valueOf[OPT_ARRANGEMENT] == MODE_ARRANGEMENT_SHUFFLE_PERTITLE
+			or opt::valueOf[OPT_ARRANGEMENT] == MODE_ARRANGEMENT_ASCENDING
+			or opt::valueOf[OPT_ARRANGEMENT] == MODE_ARRANGEMENT_SHUFFLE
+			or opt::valueOf[OPT_ARRANGEMENT] == MODE_ARRANGEMENT_DESCENDING
+			or opt::valueOf[OPT_ARRANGEMENT] == MODE_ARRANGEMENT_DESCENDING_PERTITLE
 		};
 					   
-	if (	opt::state[OPT_ARRANGEMENT] == OPT_ARRANGEMENT_DEFAULT
-		or 	opt::state[OPT_ARRANGEMENT] == OPT_ARRANGEMENT_SHUFFLE_DEFAULT
-		or 	opt::state[OPT_ARRANGEMENT] == OPT_ARRANGEMENT_DESCENDING_DEFAULT)
+	if (	opt::valueOf[OPT_ARRANGEMENT] == MODE_ARRANGEMENT_DEFAULT
+		or 	opt::valueOf[OPT_ARRANGEMENT] == MODE_ARRANGEMENT_SHUFFLE_DEFAULT
+		or 	opt::valueOf[OPT_ARRANGEMENT] == MODE_ARRANGEMENT_DESCENDING_DEFAULT)
 	{
 		std::sort(in::regularDirs.begin(), in::regularDirs.end());
 		std::sort(in::seasonDirs.begin(), in::seasonDirs.end());
@@ -5335,7 +5502,7 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 	}
 
 	#ifndef DEBUG
-	if (opt::state[OPT_BENCHMARK] == "true" or opt::state[OPT_DEBUG] == "true")
+	if (opt::valueOf[OPT_BENCHMARK] == "true" or opt::valueOf[OPT_DEBUG] == "true")
 	#endif
 	{
 		if (inputDirsCount > 0)
@@ -5349,7 +5516,7 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 
 
 	#ifndef DEBUG
-	if (opt::state[OPT_DEBUG] == "true")
+	if (opt::valueOf[OPT_DEBUG] == "true")
 	#endif
 	for (var i { 0 }; i<maxDirSize; ++i)
 		for (var& select : {1, 2}) {
@@ -5364,10 +5531,10 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 		}
 	
 	
-	var records { std::unordered_map<std::string, std::shared_ptr<std::vector<fs::path>>>() };
+	var records { MapStringPListPath() };
 	
 	func filterChildFiles{ [&records](const fs::path& dir, bool recurive=false) {
-		var bufferFiles { std::vector<fs::path>() };
+		var bufferFiles { ListPath() };
 		
 		func putToRecord{[&bufferFiles, &dir, &records](bool wantToSort) {
 			if (bufferFiles.empty())
@@ -5377,22 +5544,22 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 				std::sort(bufferFiles.begin(), bufferFiles.end(), ascending);
 			
 			records.emplace(std::make_pair(dir.string(),
-										   std::make_shared<std::vector<fs::path>>(
+										   std::make_shared<ListPath>(
 												std::move(bufferFiles))
 										   ));
 		}};
 		
 		if (recurive) {
-			var dirs { std::vector<fs::path>() };
+			var dirs { ListPath() };
 			listDirRecursivelyInto(dir, &dirs, false);
 			std::sort(dirs.begin(), dirs.end());
 			
 			for (var& d : dirs) {
-				var tmp { std::vector<fs::path>() };
+				var tmp { ListPath() };
 				
 				for (var& f : directory_iterator(d, DT_REG))
 					if (isValidFile(f.path())) {
-						var list { std::vector<fs::path>() };
+						var list { ListPath() };
 						loadPlaylistInto(f.path().string(), &list);
 						if (list.empty())
 							tmp.emplace_back(std::move(f));
@@ -5412,7 +5579,7 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 		
 		for (var& f : directory_iterator(dir, DT_REG))
 			if (isValidFile(f.path())) {
-				var list { std::vector<fs::path>() };
+				var list { ListPath() };
 				loadPlaylistInto(f.path().string(), &list);
 				if (list.empty())
 					bufferFiles.emplace_back(std::move(f));
@@ -5435,11 +5602,11 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 				if (const var dir { x == 1 ? in::regularDirs[i] : (x == 2 ? in::seasonDirs[i]
 															  : in::listAdsDir[i]) };
 					not dir.empty() and isDirNameValid(dir)) {
-					if (opt::state[OPT_EXECUTION] == OPT_EXECUTION_THREAD)
+					if (opt::valueOf[OPT_EXECUTION] == MODE_EXECUTION_THREAD)
 						threads.emplace_back([&, dir]() {
 							filterChildFiles(dir, x == 2);
 						});
-					else if (opt::state[OPT_EXECUTION] == OPT_EXECUTION_ASYNC)
+					else if (opt::valueOf[OPT_EXECUTION] == MODE_EXECUTION_ASYNC)
 						asyncs.emplace_back(std::async(std::launch::async, [&, dir]() {
 							filterChildFiles(dir, x == 2);
 						}));
@@ -5447,45 +5614,48 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 						filterChildFiles(dir, x == 2);
 				}
 					   
-	if (opt::state[OPT_EXECUTION] == OPT_EXECUTION_THREAD)
+	if (opt::valueOf[OPT_EXECUTION] == MODE_EXECUTION_THREAD)
 		for (var& t : threads)
 			t.join();
-	else if (opt::state[OPT_EXECUTION] == OPT_EXECUTION_ASYNC)
+	else if (opt::valueOf[OPT_EXECUTION] == MODE_EXECUTION_ASYNC)
 		for (var& a : asyncs)
 			a.wait();
 
 	var outputFile { std::ofstream() };
 	var outputName { fs::path() };
 	
-	const var dontWrite { opt::state[OPT_NOOUTPUTFILE] == "true" };
+	const var dontWrite { opt::valueOf[OPT_NOOUTPUTFILE] == "true" };
 	if (not dontWrite) {
-		outputName = opt::state[OPT_OUTDIR] + fs::path::preferred_separator
-		   + opt::state[OPT_FIXFILENAME];
+		outputName = opt::valueOf[OPT_OUTDIR] + fs::path::preferred_separator
+		   + opt::valueOf[OPT_FIXFILENAME];
 			
-		if (fs::exists(outputName) and opt::state[OPT_OVERWRITE] == "true")
+		if (fs::exists(outputName) and opt::valueOf[OPT_OVERWRITE] == "true")
 		   fs::remove(outputName);
 		else
 		   outputName = getAvailableFilename(outputName);
 		   
 		outputFile = std::ofstream(outputName, std::ios::out);
+//		if (not outputFile.good()) {
+//			std::cout << "⚠️  Cannot write \""
+//						<< outputName
+//						<< "\"\n";
+//			return RETURN_VALUE
+//		}
 	}
 				  
 	var outExt { std::string() };
 	if (not dontWrite) {
 		outExt = tolower(outputName.extension().string());
 
-		if (outExt == ".pls") {
+		if (outExt == ".pls")
 		   outputFile << "[playlist]\n";
-		}
-		else if (outExt == ".m3u") {
+		else if (outExt == ".m3u")
 		   outputFile << "#EXTM3U\n";
-		}
-		else if (outExt == ".xspf") {
+		else if (outExt == ".xspf")
 		   outputFile << "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"\
 		   "<playlist version=\"1\" xmlns=\"http://xspf.org/ns/0/\">\n"\
 		   "\t<trackList>\n";
-		}
-		else if (outExt == ".xml") {
+		else if (outExt == ".xml")
 		   outputFile << "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"\
 		   "<!DOCTYPE plist PUBLIC \"-//Apple Computer//DTD PLIST 1.0//EN\" "\
 		   "\"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">\n"\
@@ -5498,9 +5668,7 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 		   "\t<key>Tracks</key>\n"\
 		   "\t<dict>"
 		   ;
-		}
 		else if (outExt == ".wpl")
-		{
 		   outputFile << "<?wpl version=\"1.0\"?>\n"\
 			   "<smil>\n"\
 			   "\t<head>\n"\
@@ -5509,23 +5677,19 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 			   "\t</head>\n"\
 			   "\t<body>\n"\
 			   "\t\t<seq>\n";
-		}
-		else if (outExt == ".smil") {
+		else if (outExt == ".smil")
 		   outputFile << "<?wpl version=\"1.0\"?>\n"\
 			   "<smil>\n"\
 			   "\t<body>\n"\
 			   "\t\t<seq>\n";
-		}
-		else if (outExt == ".b4s") {
+		else if (outExt == ".b4s")
 		   outputFile << "<?xml version=\"1.0\" standalone=\"yes\"?>\n"\
 		   "<WindampXML>\n"\
 		   "\t<playlist>\n";
-		}
-		else if (isEqual(outExt.c_str(), {".asx", ".wax", ".wvx"})) {
+		else if (isEqual(outExt.c_str(), {".asx", ".wax", ".wvx"}))
 		   outputFile << "<asx version=\"3.0\"?>\n"\
 			   "\t\t<title>" << outputName.filename().string() << "</title>\n";
-		}
-		else if (isEqual(outExt.c_str(), {".htm", ".html", ".xhtml"})) {
+		else if (isEqual(outExt.c_str(), {".htm", ".html", ".xhtml"}))
 		   outputFile << "<html xmlns=\"http://www.w3.org/1999/xhtml\" lang=\"en\">\n"\
 		   "<head>\n"\
 		   "\t<meta http-equiv=\"Content-Type\" content=\"text/html\" />\n"\
@@ -5542,7 +5706,6 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 		   "</head>\n"\
 		   "</body>\n"\
 		   "\t<table>\n";
-		}
 		#if 0
 		else if (outExt == ".pdf") {
 			const var date { Date::now().string("%Y%m%d%H%M%S") };
@@ -5561,7 +5724,7 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 		#endif
 	}
 
-	var playlistCount { (unsigned long) 0};
+	var playlistCount { (unsigned long) 0 };
 	std::random_device rd;  //Will be used to obtain a seed for the random number engine
 	std::mt19937 mersenneTwisterEngine(rd()); //Standard mersenne_twister_engine seeded with rd()
 	std::uniform_int_distribution<> distrib;
@@ -5569,15 +5732,15 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 	unsigned long adsCount[2] {0, 0};
 
 	#ifndef DEBUG
-	const var isVerbose { 	opt::state[OPT_VERBOSE]	== "all"
-						or 	opt::state[OPT_VERBOSE]	== "true"
-						or 	opt::state[OPT_DEBUG] 	== "true" };
+	const var isVerbose { 	opt::valueOf[OPT_VERBOSE]	== "all"
+						or 	opt::valueOf[OPT_VERBOSE]	== "true"
+						or 	opt::valueOf[OPT_DEBUG] 	== "true" };
 	#endif
 	func putIntoPlaylist{ [&](const fs::path& file)
 	{
 		enum class Type { None, Regular, Subtitle, Advertise };
 		
-		func putIt{ [&](const fs::path& file, const char* title = nullptr,
+		func putIt{ [&](const fs::path& file, ReadOnlyCString title = nullptr,
 						Type type = Type::None)
 		{
 			playlistCount++;
@@ -5586,7 +5749,7 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 				if (outc)
 					*outc += 1;
 				if (maxLength) {
-					if (var sz { fs::absolute(file).string().size() + 1 };
+					if (const var sz { fs::absolute(file).string().size() + 1 };
 						*maxLength < sz)
 						*maxLength = sz;
 				}
@@ -5637,9 +5800,7 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 				if (isEqual(outExt.c_str(), {".wpl", ".b4s", ".smil",
 											".asx", ".wax", ".wvx"}))
 				{
-					for (var w { 0 }; w <
-						 (sizeof(def::XML_CHARS_ALIAS) / sizeof(def::XML_CHARS_ALIAS[0]));
-						 ++w)
+					for (var w { 0 }; w<ARRAYLEN(def::XML_CHARS_ALIAS); ++w)
 					if (isContains(fullPath, def::XML_CHARS_NORMAL[w],
 						   IgnoreCase::Left) not_eq std::string::npos)
 					{
@@ -5650,14 +5811,14 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 
 					if (not isEqual(outExt.c_str(), {".wpl", ".smil"}))
 					{
-						var tmp { fs::path(fullPath).filename() };
+						const var tmp { fs::path(fullPath).filename() };
 						name = tmp.string().substr(0,
 							tmp.string().size() - tmp.extension().string().size());
 					}
 				}
 			   
 				if (outExt == ".pls") {
-					var indexString { std::to_string(playlistCount) };
+					const var indexString { std::to_string(playlistCount) };
 					prefix = "File" + indexString + '=';
 					suffix = "\nTitle" + indexString + '=';
 					suffix += title;
@@ -5690,7 +5851,7 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 					suffix = "\"/>\n\t</entry>";
 				}
 				else if (outExt == ".xml") {
-					var key { std::to_string(1000 - playlistCount) };
+					const var key { std::to_string(1000 - playlistCount) };
 					prefix = "\t\t<key>" + key + "</key>\n"\
 					   "\t\t<dict>\n"\
 					   "\t\t\t<key>Track ID</key><integer>" + key + "</integer>\n"\
@@ -5744,7 +5905,8 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 			#ifndef DEBUG
 			if (isVerbose)
 			#endif
-				std::cout << fullPath << '\n';
+				std::cout << fullPath
+							<< '\n';
 		}};
 		
 		#if defined(_WIN32) || defined(_WIN64)
@@ -5758,8 +5920,8 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 		putIt(file, OS_NAME " Path", Type::Regular);
 		   
 
-		if (opt::state[OPT_SKIPSUBTITLE] not_eq "true") {
-			var subtitleFiles { std::vector<fs::path>() };
+		if (opt::valueOf[OPT_SKIPSUBTITLE] not_eq "true") {
+			var subtitleFiles { ListPath() };
 			findSubtitleFileInto(file, &subtitleFiles);
 			for (var& sf : subtitleFiles)
 				putIt(std::move(sf), "Subtitle Path on " OS_NAME, Type::Subtitle);
@@ -5802,14 +5964,14 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 				}
 		distrib = std::uniform_int_distribution<>(0, int(in::listAdsDir.size() - 1));
 			
-		if (var count_s { opt::state[OPT_ADSCOUNT] };
+		if (const var count_s { opt::valueOf[OPT_ADSCOUNT] };
 			count_s.empty()) {
 			adsCount[0] = in::regularDirs.size() + in::seasonDirs.size();
 			adsCount[0] = in::listAdsDir.size() % adsCount[0] == 0
 						? std::min(decltype(in::listAdsDir.size())(3), in::listAdsDir.size())
 						: in::listAdsDir.size() % adsCount[0];
 		} else {
-			if (var pos { count_s.find('-') };
+			if (const var pos { count_s.find('-') };
 				pos == std::string::npos)
 				adsCount[0] = std::stoul(count_s);
 			else {
@@ -5825,9 +5987,7 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 	{
 		std::move(in::seasonDirs.begin(), in::seasonDirs.end(),
 					  std::back_inserter(in::regularDirs));
-			in::seasonDirs.clear();
-		
-		maxDirSize = in::regularDirs.size();
+		in::seasonDirs.clear();
 		
 		std::sort(in::regularDirs.begin(), in::regularDirs.end());
 			
@@ -5835,16 +5995,16 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 			if (dir.empty())
 				continue;
 			if (const var found { records[dir] }; found) {
-				if (opt::state[OPT_ARRANGEMENT] == OPT_ARRANGEMENT_PERTITLE)
+				if (opt::valueOf[OPT_ARRANGEMENT] == MODE_ARRANGEMENT_PERTITLE)
 					std::sort(found->begin(), found->end(), ascending);
-				else if (opt::state[OPT_ARRANGEMENT] == OPT_ARRANGEMENT_DESCENDING_PERTITLE)
+				else if (opt::valueOf[OPT_ARRANGEMENT] == MODE_ARRANGEMENT_DESCENDING_PERTITLE)
 					std::sort(found->begin(), found->end(), descending);
 					
 				for (var& f : *found)
 				{
-					if (opt::state[OPT_ARRANGEMENT] == OPT_ARRANGEMENT_ASCENDING
-						or opt::state[OPT_ARRANGEMENT] == OPT_ARRANGEMENT_DESCENDING
-						or opt::state[OPT_ARRANGEMENT] == OPT_ARRANGEMENT_SHUFFLE)
+					if (opt::valueOf[OPT_ARRANGEMENT] == MODE_ARRANGEMENT_ASCENDING
+						or opt::valueOf[OPT_ARRANGEMENT] == MODE_ARRANGEMENT_DESCENDING
+						or opt::valueOf[OPT_ARRANGEMENT] == MODE_ARRANGEMENT_SHUFFLE)
 						in::selectFiles.emplace_back(std::move(f));
 					else
 						putIntoPlaylist(std::move(f));
@@ -5852,14 +6012,14 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 			}
 		}
 	
-		if (opt::state[OPT_ARRANGEMENT] == OPT_ARRANGEMENT_PERTITLE)
+		if (opt::valueOf[OPT_ARRANGEMENT] == MODE_ARRANGEMENT_PERTITLE)
 			sortFiles(&in::selectFiles);
 			
-		else if (opt::state[OPT_ARRANGEMENT] == OPT_ARRANGEMENT_SHUFFLE)
+		else if (opt::valueOf[OPT_ARRANGEMENT] == MODE_ARRANGEMENT_SHUFFLE)
 			std::shuffle(in::selectFiles.begin(), in::selectFiles.end(), mersenneTwisterEngine);
 			
-		else if (	opt::state[OPT_ARRANGEMENT] == OPT_ARRANGEMENT_DESCENDING
-				 or opt::state[OPT_ARRANGEMENT] == OPT_ARRANGEMENT_DESCENDING_PERTITLE)
+		else if (	opt::valueOf[OPT_ARRANGEMENT] == MODE_ARRANGEMENT_DESCENDING
+				 or opt::valueOf[OPT_ARRANGEMENT] == MODE_ARRANGEMENT_DESCENDING_PERTITLE)
 			std::sort(in::selectFiles.begin(), in::selectFiles.end(), descending);
 			
 		else
@@ -5887,7 +6047,7 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 						continue;
 
 					else if (const var found { records[dir] }; found) {
-						if (opt::state[OPT_ARRANGEMENT] == OPT_ARRANGEMENT_SHUFFLE_PERTITLE)
+						if (opt::valueOf[OPT_ARRANGEMENT] == MODE_ARRANGEMENT_SHUFFLE_PERTITLE)
 						{
 							std::shuffle(found->begin(), found->end(),
 										 mersenneTwisterEngine);
@@ -5897,10 +6057,10 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 						}
 						
 						if (indexFile == 0) {
-							if (opt::state[OPT_ARRANGEMENT] == OPT_ARRANGEMENT_SHUFFLE_DEFAULT)
+							if (opt::valueOf[OPT_ARRANGEMENT] == MODE_ARRANGEMENT_SHUFFLE_DEFAULT)
 								std::shuffle(found->begin(), found->end(), mersenneTwisterEngine);
 							
-							else if (opt::state[OPT_ARRANGEMENT] == OPT_ARRANGEMENT_DESCENDING_DEFAULT)
+							else if (opt::valueOf[OPT_ARRANGEMENT] == MODE_ARRANGEMENT_DESCENDING_DEFAULT)
 								std::sort(found->begin(), found->end(), descending);
 						}
 							
@@ -5913,7 +6073,7 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 					}
 				} ///end pass loop
 			
-			if (opt::state[OPT_ARRANGEMENT] == OPT_ARRANGEMENT_SHUFFLE_PERTITLE)
+			if (opt::valueOf[OPT_ARRANGEMENT] == MODE_ARRANGEMENT_SHUFFLE_PERTITLE)
 				break;
 			
 			if (indexFile < in::selectFiles.size())
@@ -5927,39 +6087,32 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 	}
 	
 	#ifndef DEBUG
-	if (opt::state[OPT_BENCHMARK] == "true" or opt::state[OPT_DEBUG] == "true")
+	if (opt::valueOf[OPT_BENCHMARK] == "true" or opt::valueOf[OPT_DEBUG] == "true")
 	#endif
 		timeLapse(start, groupNumber(std::to_string(playlistCount)) + " valid files took ");
 					   
 	if (dontWrite)
 		return RETURN_VALUE
 					   
-	if (outExt == ".pls") {
-		outputFile << "\nNumberOfEntries=" << playlistCount
-			<< "\nVersion=2\n";
-	}
-	else if (outExt == ".b4s") {
+	if (outExt == ".pls")
+		outputFile << "\nNumberOfEntries="
+					<< playlistCount
+					<< "\nVersion=2\n";
+	else if (outExt == ".b4s")
 		outputFile << "\t</playlist>\n</WinampXML>\n";
-	}
-	else if (outExt == ".xspf") {
+	else if (outExt == ".xspf")
 		outputFile << "\t</trackList>\n</playlist>\n";
-	}
-	else if (isEqual(outExt.c_str(), {".wpl", ".smil"})) {
+	else if (isEqual(outExt.c_str(), {".wpl", ".smil"}))
 		outputFile << "\t\t</seq>\n\t</body>\n</smil>\n";
-	}
-	else if (isEqual(outExt.c_str(), {".asx", ".wax", ".wvx"})) {
+	else if (isEqual(outExt.c_str(), {".asx", ".wax", ".wvx"}))
 		outputFile << "</asx>\n";
-	}
-	else if (outExt == ".xml") {
+	else if (outExt == ".xml")
 		outputFile << "\t</dict>\n</dict>\n</plist>\n";
-	}
-	else if (isEqual(outExt.c_str(), {".htm", ".html", ".xhtml"})) {
+	else if (isEqual(outExt.c_str(), {".htm", ".html", ".xhtml"}))
 		outputFile << "\t</table>\n</body>\n</html>\n";
-	}
 	#if 0
-	else if (outExt == ".pdf") {
+	else if (outExt == ".pdf")
 		outputFile << "%%EOF\n";
-	}
 	#endif
 		
 	outputFile.flush();
@@ -5970,23 +6123,30 @@ by size in KB, MB, or GB.\nOr use value in range using form 'from-to' OR 'from..
 		fs::remove(outputName);
 	else {
 		const var outputFullpath { fs::absolute(outputName).string() };
-		std::cout << outputFullpath << '\n';
+		std::cout << outputFullpath
+					<< '\n';
 		
-		if (const var app { opt::state[OPT_OPENWITH] };
-			opt::state[OPT_OPEN] == "true" or not app.empty())
+		if (const var app { opt::valueOf[OPT_OPENWITH] };
+			opt::valueOf[OPT_OPEN] == "true" or not app.empty())
 		{
 			#if defined(_WIN32) || defined(_WIN64)
 			if (app.empty())
 				std::cout << "📢 Open in Windows is Under construction.\n";
 			else
-				std::system(std::string("\"" + app + "\" \"" + outputFullpath + "\"").c_str());
+				std::system(std::string(
+							"\"" + app + "\" \"" + outputFullpath + "\"").c_str());
 			#else
 			std::system(std::string((not app.empty() ? "\"" + app + "\"" : "open")
-						+ " \"" + outputFullpath + "\"").c_str());
+						+ " \""
+						+ outputFullpath
+						+ "\"").c_str());
 			#endif
 		}
 	}
 }
+#undef CString
+#undef ReadOnlyCString
+#undef let
 #undef var
 #undef func
 #undef RETURN_VALUE

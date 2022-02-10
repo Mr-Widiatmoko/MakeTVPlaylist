@@ -475,7 +475,7 @@ let NO_OUTPUT_FILE="\
 ";
 let HELP_REST="\
 \n\
-Arguments can be surrounded by \"\" (eg. \"--verbose;benchmark\") to enable using character ';' or <ENTER> as multiline or another characters that belongs to Terminal or shell. To view how arguments was deduced you can pass option --list or --debug=args.\n\
+Arguments can be surrounded by \"\" (eg. \"--verbose;benchmark\") to enable using character ';' or <ENTER> as multiline or another characters that belongs to Terminal or shell. To view how arguments was deduced you can pass option --debug=args.\n\
 Options can be joined, and option assignment separator [SPACE] can be replaced with '=' \
 and options can be separated by ':' or ';' after assignment. For the example:\n\n\
   tvplaylist -hOVvc=async:xs<1.3gb:e=mp4,mkv:f=My-playlist.txt\n\n\
@@ -5394,17 +5394,21 @@ SIZE_NEEDED:		std::cout << "⚠️  Expecting operator '<' or '>' followed"\
 		<< LABEL(OPT_OVERWRITE) << PRINT_OPT(opt::valueOf[OPT_OVERWRITE]) << '\n'
 		<< LABEL(OPT_NOOUTPUTFILE) << PRINT_OPT(opt::valueOf[OPT_NOOUTPUTFILE]) << '\n'
 		<< LABEL(OPT_OUTFILENAME) << opt::valueOf[OPT_OUTFILENAME] << '\n'
-		<< LABEL("Current Directory") << fs::current_path().string() << '\n'
+		<< LABEL(OPT_CURRENTDIR) << fs::current_path().string() << '\n'
 		<< LABEL(OPT_OUTDIR) << opt::valueOf[OPT_OUTDIR] << '\n'
 		<< LABEL(OPT_EXCLHIDDEN) << PRINT_OPT(opt::valueOf[OPT_EXCLHIDDEN]) << '\n'
 		<< LABEL(OPT_SKIPSUBTITLE) << PRINT_OPT(opt::valueOf[OPT_SKIPSUBTITLE]) << '\n';
-	{
-		std::cout << LABEL(OPT_EXT) << opt::valueOf[OPT_EXT];
+
+	for (var& opt : { OPT_EXT, OPT_EXCLEXT }) {
+		std::cout << LABEL(opt) << opt::valueOf[opt];
 		if (var i { 0 };
-			opt::valueOf[OPT_EXT].empty())
-			for (var& ext : opt::DEFAULT_EXT)
+			opt::valueOf[opt].empty())
+			for (var& ext : opt == OPT_EXT ? opt::DEFAULT_EXT : opt::EXCLUDE_EXT)
 				std::cout << ext
-							<< (++i < opt::DEFAULT_EXT.size() - 1 ? ", " : "");
+							<< (++i < (opt == OPT_EXT
+									   ? opt::DEFAULT_EXT.size()
+									   : opt::EXCLUDE_EXT.size()
+									   ) - 1 ? ", " : "");
 		std::cout << '\n';
 	}
 	std::cout << LABEL("case-insensitive") << PRINT_OPT(opt::valueOf[OPT_CASEINSENSITIVE]) << '\n';
@@ -5429,6 +5433,8 @@ SIZE_NEEDED:		std::cout << "⚠️  Expecting operator '<' or '>' followed"\
 								 : opt::listExclRegex).size() - 1 ? ", " : "");
 		std::cout << '\n';
 	}
+			
+	std::cout << LABEL(OPT_REGEXSYNTAX) << opt::valueOf[OPT_REGEXSYNTAX] << '\n';
 
 	for (var& S : {OPT_SIZE, OPT_EXCLSIZE}) {
 		std::cout << LABEL(S);
@@ -5490,7 +5496,7 @@ SIZE_NEEDED:		std::cout << "⚠️  Expecting operator '<' or '>' followed"\
 			
 			std::cout  << (i < (inputDirsCount + in::selectFiles.size()) - 1 ? ", " : "");
 		}
-		std::cout << "\n";
+		std::cout << '\n';
 	}
 			
 	std::cout << LABEL(OPT_ADSCOUNT) << opt::valueOf[OPT_ADSCOUNT] << '\n';
@@ -5499,9 +5505,8 @@ SIZE_NEEDED:		std::cout << "⚠️  Expecting operator '<' or '>' followed"\
 		var i { -1 };
 		for (i++; var& d : in::listAdsDir)
 			std::cout << d.string()
-						<< (i < in::listAdsDir.size() - 1 ? ", " : "\n");
-				
-		std::cout << "\n";
+						<< (i < in::listAdsDir.size() - 1 ? ", " : "");
+		std::cout << '\n';
 	}
 	std::cout << LABEL(OPT_OPENWITH) << opt::valueOf[OPT_OPENWITH] << '\n';
 	#undef LABEL

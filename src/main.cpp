@@ -32,6 +32,7 @@ let TRUE_FALSE						= {	"true",
 										"false"
 };
 
+let OPT_LIST						{"list"};
 let OPT_INSTALLMAN					{"install-man"};
 let OPT_UNINSTALLMAN				{"uninstall-man"};
 let OPT_OPEN						{"open"};
@@ -97,7 +98,7 @@ let OPT_CASEINSENSITIVE_ALTERNATIVE = {	"case-insensitive",
 
 let OPT_SEARCH						{"search"};					// q
 
-let OPT_FIXFILENAME 				{"out-filename"};			// f
+let OPT_OUTFILENAME 				{"out-filename"};			// f
 let OPT_NOOUTPUTFILE 				{"no-output-file"};			// F
 
 let OPT_SIZE						{"size"};					// s
@@ -169,12 +170,16 @@ let OPEN="\
         Open generated playlist file with default app.\n\
         See also: --open-with\n\
 ";
-let OPENWITH="\
+let OPEN_WITH="\
 --open-with 'application'\n\
         Open with specified application.\n\
         See also: --open\n\
 ";
-
+let LIST="\
+--list\n\
+        Display list of options state, then exit.\n\
+        See also: --debug=args\n\
+";
 let SHOW="\
 --show-defaults\n\
 --show-config\n\
@@ -244,13 +249,13 @@ let A_VERSION="\
         Display version.\n\
 ";
 
-let ADSDIR="\
+let ADS_DIR="\
 -D, --ads-dir 'directory constains advertise'\n\
         Add advertise directory. Ads file will be inserted between each ordered files.\n\
         You can specifying this multiple times.\n\
         To set the numbers how many ads shown use --ads-count.\n\
 ";
-let ADSCOUNT="\
+let ADS_COUNT="\
 -C, --ads-count 'fixed count'\n\
                  'min count' .. 'max count'\n\
                  'min count' - 'max count'\n\
@@ -296,15 +301,15 @@ let OVERWRITE="\
 -O, --overwrite\n\
         Overwrite output playlist file.\n\
 ";
-let SKIPSUBTITLE="\
+let SKIP_SUBTITLE="\
 -x, --skip-subtitle\n\
         Dont include subtitle file.\n\
 ";
-let OUTDIR="\
+let OUT_DIR="\
 -d, --out-dir \"directory path\"\n\
         Override output directory for playlist file.\n\
 ";
-let CURRENTDIR="\
+let CURRENT_DIR="\
 -d, --current-dir \"directory path\"\n\
         Set current directory.\n\
 ";
@@ -312,7 +317,7 @@ let EXECUTION="\
 -c, --execution [thread | async | linear]\n\
         Specify execution, \"async\" is selected by default.\n\
 ";
-let EXCLHIDDEN="\
+let EXCLUDE_HIDDEN="\
 -n, --exclude-hidden\n\
         Exclude hidden folders or files (not for Windows).\n\
 ";
@@ -344,7 +349,7 @@ let FIND="\
             Example: --find ignore-case=true\n\
 ";
 [[deprecated("Recognized in --regex or --exlude-regex.")]] [[maybe_unused]]
-let REGEXSYNTAX="\
+let REGEX_SYNTAX="\
 -X, --regex-syntax [ecma | awk | grep | egrep | basic | extended]\n\
         Specify regular expression syntax type to use.\n\
         Available value are: 'ecma'(Default), 'awk', 'grep', 'egrep', 'basic', 'extended'.\n\
@@ -363,13 +368,20 @@ let REGEX="\
 ";
 let EXT="\
 -e, --ext \"'extension', 'extension', ...\"\n\
+          += \"'extension', 'extension', ...\"\n\
+          -= \"'extension', 'extension', ...\"\n\
 -E, --exclude-ext \"'extension', 'extension' ...\"\n\
+                  += \"'extension', 'extension', ...\"\n\
+                  -= \"'extension', 'extension', ...\"\n\
         Filter only (or exclude) files that match specific extensions, separated by comma.\n\
             Example: --ext \"pdf, docx\" or --ext=pdf,docx\n\
         To process all files use character *.\n\
             Example: --ext=* \n\
         To enable get contents from other playlists, you must include the playlist extensions.\n\
             Example: --ext=mp4,mkv,mp3,m3u,m3u8,pls,wpl,xspf\n\
+        To add[s] or remove[s] from existing extensions, use operator += or -=.\n\
+            Example: --ext-=mp3,mpa,aac:ext+=flac,ape\n\
+        You can specifying this multiple times for operators += and -= only.\n\
 ";
 let SIZE="\
 -s, --size < | > 'size'\n\
@@ -446,7 +458,7 @@ let CHANGED="\
         For more information about 'date and/or time' possible values, see below.\n\
         You can specifying this multiple times, for both single value or range values.\n\
 ";
-let FIXFILENAME="\
+let OUT_FILENAME="\
 -f, --out-filename 'filename'\n\
         Override output playlist filename, by default it will crreate \".m3u8\" playlist.\n\
         To create \".pls\", \".wpl\", or others type of playlist, pass it as extension filename.\n\
@@ -457,13 +469,13 @@ let FIXFILENAME="\
         Here the example to convert from different type of playlist to another type:\n\
             Example: --ext=mp3,m3u old_musics.m3u --out-filename=old_music.html\n\
 ";
-let NOOUTPUTFILE="\
+let NO_OUTPUT_FILE="\
 -F, --no-ouput-file [yes | no]\n\
         Choose to create playlist file or no. Default 'yes' if option was declared or if was build as library.\n\
 ";
 let HELP_REST="\
 \n\
-Arguments can be surrounded by \"\" (eg. \"--verbose;benchmark\") to enable using character ';' or <ENTER> as multiline or another characters that belongs to Terminal or shell. To view how arguments was deduced you can pass option --debug=args.\n\
+Arguments can be surrounded by \"\" (eg. \"--verbose;benchmark\") to enable using character ';' or <ENTER> as multiline or another characters that belongs to Terminal or shell. To view how arguments was deduced you can pass option --list or --debug=args.\n\
 Options can be joined, and option assignment separator [SPACE] can be replaced with '=' \
 and options can be separated by ':' or ';' after assignment. For the example:\n\n\
   tvplaylist -hOVvc=async:xs<1.3gb:e=mp4,mkv:f=My-playlist.txt\n\n\
@@ -480,7 +492,7 @@ Instead try to separate mnemonic and full option, like this:\n\n\
   tvplaylist -bO --ext=mp3:version\n\n\
 ";
 let HELP_DATE_REST="\
-Posible value for 'date and/or time' are: 'Year', 'Month Name' (mnemonic or full), 'Month Number', 'Day', 'WeekDay Name' (mnemonic or full), 'Hour' (if AM/PM defined then it is 12 hours, otherwise 24 hours), 'Minute', 'Second', AM or PM.\n\
+Posible value for 'date and/or time' are: 'Year', 'Month Name' (mnemonic or full), 'Month Number', 'Day', 'WeekDay Name' (mnemonic or full), 'Hour' (if AM/PM defined then it is 12 hours, otherwise 24 hours), 'Minute', 'Second', AM or PM, now, today.\n\
 Example:\n\
   Filter only files created in 2009:\n\
 	 --created=2009\n\
@@ -535,7 +547,7 @@ constexpr ReadOnlyCString* OPTS[] = { &OPT_VERSION, &OPT_HELP, &OPT_ARRANGEMENT,
 	&OPT_SEARCH, &OPT_VERBOSE, &OPT_BENCHMARK, & OPT_OVERWRITE,
 	&OPT_SKIPSUBTITLE, &OPT_OUTDIR, &OPT_CURRENTDIR, &OPT_ADSDIR, &OPT_ADSCOUNT,
 	&OPT_EXECUTION, &OPT_LOADCONFIG, &OPT_WRITEDEFAULTS, &OPT_SHOWCONFIG,
-	&OPT_FIXFILENAME, &OPT_NOOUTPUTFILE, &OPT_OPEN, &OPT_OPENWITH,
+	&OPT_LIST, &OPT_OUTFILENAME, &OPT_NOOUTPUTFILE, &OPT_OPEN, &OPT_OPENWITH,
 	&OPT_SIZE, &OPT_EXCLSIZE, &OPT_EXT, &OPT_EXCLEXT,
 	&OPT_FIND, &OPT_EXCLFIND, &OPT_REGEX, &OPT_EXCLREGEX, &OPT_EXCLHIDDEN,
 	&OPT_INSTALL, &OPT_UNINSTALL, &OPT_UPDATE,
@@ -550,10 +562,10 @@ constexpr ReadOnlyCString* OPTS[] = { &OPT_VERSION, &OPT_HELP, &OPT_ARRANGEMENT,
 /// Conjunction with OPTS, to enable access OPTS[index] == HELPS[index]
 constexpr ReadOnlyCString* HELPS[] = { &VERSION, &A_HELP, &ARRANGEMENT,
 	&SEARCH, &VERBOSE, &BENCHMARK, & OVERWRITE,
-	&SKIPSUBTITLE, &OUTDIR, &CURRENTDIR, &ADSDIR, &ADSCOUNT,
-	&EXECUTION, &LOAD, &WRITE, &SHOW, &FIXFILENAME,
-	&NOOUTPUTFILE, &OPEN, &OPENWITH, &SIZE, &SIZE, &EXT, &EXT,
-	&FIND, &FIND, &REGEX, &REGEX, &EXCLHIDDEN,
+	&SKIP_SUBTITLE, &OUT_DIR, &CURRENT_DIR, &ADS_DIR, &ADS_COUNT,
+	&EXECUTION, &LOAD, &WRITE, &SHOW, &LIST, &OUT_FILENAME,
+	&NO_OUTPUT_FILE, &OPEN, &OPEN_WITH, &SIZE, &SIZE, &EXT, &EXT,
+	&FIND, &FIND, &REGEX, &REGEX, &EXCLUDE_HIDDEN,
 	&INSTALL, &UNINSTALL, &UPDATE,
 	&DATE, &DATE,
 	&CREATED, &MODIFIED, &ACCESSED, &CHANGED,
@@ -567,10 +579,10 @@ static_assert((ARRAYLEN(OPTS) - 1) == (ARRAYLEN(HELPS) - 2),
 			  "Size need to be equal!, to be able accessed by index");
 
 constexpr ReadOnlyCString* SINGLE_VALUE_OPT[] = {&OPT_LOADCONFIG, &OPT_SHOWCONFIG,
-	&OPT_ARRANGEMENT, &OPT_OPEN, &OPENWITH, &OPT_CURRENTDIR,
+	&OPT_ARRANGEMENT, &OPT_OPEN, &OPEN_WITH, &OPT_CURRENTDIR,
 	&OPT_VERBOSE, &OPT_BENCHMARK, &OPT_OVERWRITE, &OPT_SKIPSUBTITLE,
-	&OPT_OUTDIR, &OPT_ADSCOUNT, &OPT_EXECUTION, &OPT_FIXFILENAME, &OPT_EXCLHIDDEN,
-	&OPT_EXT, &OPT_EXCLEXT};
+	&OPT_OUTDIR, &OPT_ADSCOUNT, &OPT_EXECUTION, &OPT_OUTFILENAME, &OPT_EXCLHIDDEN,
+	&OPT_EXT, &OPT_EXCLEXT, &OPT_LIST};
 
 [[maybe_unused]]
 constexpr ReadOnlyCString* MULTI_VALUE_OPT[] = {
@@ -582,9 +594,9 @@ constexpr ReadOnlyCString* MULTI_VALUE_OPT[] = {
 	&OPT_DEXCLCREATED, &OPT_DEXCLMODIFIED, &OPT_DEXCLACCESSED, &OPT_DEXCLCHANGED,};
 
 constexpr ReadOnlyCString* ALL_HELPS[] = {
-	&HELP, &A_HELP, &A_VERSION, &LOAD, &WRITE, &SHOW, &ARRANGEMENT, &SEARCH, &VERBOSE, &BENCHMARK,
-	&OVERWRITE, &SKIPSUBTITLE, &OUTDIR, &CURRENTDIR, &ADSDIR, &ADSCOUNT, &EXECUTION, &FIXFILENAME,
-	&NOOUTPUTFILE, &OPEN, &OPENWITH, &EXCLHIDDEN,
+	&HELP, &A_HELP, &A_VERSION, &LOAD, &WRITE, &SHOW, &LIST, &ARRANGEMENT, &SEARCH, &VERBOSE, &BENCHMARK,
+	&OVERWRITE, &SKIP_SUBTITLE, &OUT_DIR, &CURRENT_DIR, &ADS_DIR, &ADS_COUNT, &EXECUTION, &OUT_FILENAME,
+	&NO_OUTPUT_FILE, &OPEN, &OPEN_WITH, &EXCLUDE_HIDDEN,
 	
 	&SIZE, &EXT, &FIND, &REGEX, &DATE, &CREATED, &MODIFIED, &ACCESSED, &CHANGED,
 	
@@ -944,20 +956,30 @@ func parseExtCommaDelimited(const std::string& literal,
 							Container<std::string, Args...>* const result)
 {
 	var buffer { std::string() };
+	
+	func emplace{[&buffer, &result]() {
+		if (buffer.size() > 2 and buffer[0] == '*' and buffer[1] == '.')
+			buffer.erase(buffer.begin());
+		else if (buffer.size() > 1 and buffer[0] not_eq '.')
+			buffer.insert(buffer.begin(), '.');
+
+		if (buffer.empty())
+			return;
+		
+		std::fill_n(std::inserter(*result, result->end()), 1, std::move(buffer));
+		buffer = "";
+	}};
+	
 	for (var& c : literal) {
 		if (std::isspace(c))
 			continue;
-		else if (c == ',' and buffer.size() > 2) {
-			if (buffer[0] == '*' and buffer[1] == '.')
-				buffer.erase(buffer.begin());
-			else if (buffer[0] not_eq '.')
-				buffer.insert(buffer.begin(), '.');
-
-			std::fill_n(std::inserter(*result, result->end()), 1, std::move(buffer));
-			buffer = "";
-		} else
+		else if (c == ',')
+			emplace();
+		else
 			buffer += std::tolower(c);
 	}
+	
+	emplace();
 }
 
 #define property
@@ -1302,7 +1324,7 @@ public:
 		var time { ListShort() };
 		var others { ListString() };
 		var last { '\0' };
-		for (var i { 0 }, k { 0 }; i<s.size(); ++i)
+		for (var i { (unsigned) 0 }, k { (unsigned) 0 }; i<s.size(); ++i)
 			if (not std::isdigit(s[i])) {
 				if (s[i] == ':') {
 					const var get { s.substr(k, i - k) };
@@ -2268,7 +2290,7 @@ public:
 		file.close();
 	}
 };
-#undef property
+
 
 namespace opt {
 	var EXCLUDE_EXT { SetString() };
@@ -3017,7 +3039,7 @@ func getRange(const std::string& argv, const std::string& separator)
 	return std::make_shared<std::pair<uintmax_t, uintmax_t>>(from, to);
 }
 
-func expandArgsInto(const int argc, CString const argv[],
+func deduceArgsInto(const int argc, CString const argv[],
 				const int startAt, ListString* const args)
 {
 	var newFull { false };
@@ -3049,6 +3071,21 @@ func expandArgsInto(const int argc, CString const argv[],
 		startAt < argc
 		and std::string(argv[startAt]).find("\x0a") not_eq std::string::npos
 	};
+	
+	func isNextOption{[](ReadOnlyCString arg) {
+		var tmp { arg };
+		
+		while (tmp++) {
+			if (std::isalpha(*tmp))
+				return true;
+			else if (std::isspace(*tmp))
+				continue;
+			else
+				break;
+		}
+		return false;
+	}};
+	
 	for (var i { startAt }; i<argc; ++i) {
 		var arg { argv[i] };
 		
@@ -3103,18 +3140,27 @@ func expandArgsInto(const int argc, CString const argv[],
 				}
 				continue;
 			}
-			if (last < 0 and std::isalpha(arg[index])) {
+			if (const var c { arg[index] };
+				last < 0 and std::isalpha(c)) {
 				if (isMnemonic) {
 					lastOptCode = 1;
 					var new_s { std::string() };
 					new_s += '-';
-					new_s += arg[index];
+					new_s += c;
 					args->emplace_back(new_s);
 				} else if (isFull) {
 					last = index;
 				}
 			} else {
-				if (equalOpCount == 0 and (arg[index] == def::ARG_ASSIGN or std::isspace(arg[index]))) {
+				if (const var isArithmetic { c == '+' or c == '-' };
+					equalOpCount == 0
+					and (c == def::ARG_ASSIGN
+						 or std::isspace(c)
+						 or (index + 1 < len
+							 and isArithmetic
+							 and arg[index + 1] == '=')
+					))
+				{
 					if (isFull) {
 						lastOptCode = 2;
 						push(arg, index, last);
@@ -3124,10 +3170,19 @@ func expandArgsInto(const int argc, CString const argv[],
 						last = index + 1;
 					}
 					equalOpCount++;
-				} else if (const var foundEnter { arg[index] == 0x0a };
-						   ((arg[index] == def::ARG_SEP or arg[index] == ';')
-						   and (index + 1 == std::strlen(arg) or
-								(index + 1 < std::strlen(arg) and std::isalpha(arg[index + 1])))
+					
+					if (const var lastNewFull { newFull };
+						isArithmetic)
+					{
+						newFull = false;
+						push(arg, index + 2, index);
+						newFull = lastNewFull;
+						index++;
+					}
+				} else if (const var foundEnter { c == 0x0a };
+						   ((c == def::ARG_SEP or c == ';')
+						   and (index + 1 == len or
+								(index + 1 < len and isNextOption(arg + index + 1) ))
 						   )
 						   or foundEnter)
 				{
@@ -3141,18 +3196,20 @@ func expandArgsInto(const int argc, CString const argv[],
 					if (isFull) {
 						lastOptCode = 2;
 						newFull = foundEnter ? false :
-						index + 1 < std::strlen(arg) and std::isalpha(arg[index + 1]);
+						index + 1 < std::strlen(arg) and isNextOption(arg + index + 1);
 					}
 					equalOpCount = 0;
-				} else if (isFull and last > 0 and (arg[index] == '<' or arg[index] == '>')) {
-					if (arg[last - 1] == def::ARG_ASSIGN or arg[last - 1] == '<' or arg[last - 1] == '>')
+				} else if (isFull and last > 0 and (c == '<' or c == '>')) {
+					if (arg[last - 1] == def::ARG_ASSIGN
+						or arg[last - 1] == '<'
+						or arg[last - 1] == '>')
 						continue;
 					
 					lastOptCode = 0;
 					push(arg, index, last);
 					last = index;
 				} else {
-					if (arg[index] == '"') {
+					if (c == '"') {
 						if (fallthrough == 0) {
 							push(arg, index, last);
 							last = -1;
@@ -4106,11 +4163,11 @@ func main(const int argc, CString const argv[]) -> int
 	
 	loadConfigInto(&args);
 	args.emplace_back(def::ARGS_SEPARATOR);
-	expandArgsInto(argc, argv, ARGS_START_INDEX, &args);
+	deduceArgsInto(argc, argv, ARGS_START_INDEX, &args);
 #undef ARGS_START_INDEX
 	var fileCountPerTurn { (unsigned long) 1 };
 	var invalidArgs { SetStringView() };
-	var bufferDirs { ListPath() };
+	var bufferInputDirs { ListPath() };
 
 	for (var i { 0 }; i<args.size(); ++i) {
 		if (func isMatch{[&args, &i]
@@ -4139,7 +4196,7 @@ func main(const int argc, CString const argv[]) -> int
 						{
 							args[i] = with;
 							if (not isOtherStartWithDoubleStrip)
-								args[i].insert(0, "--", 0, 2);
+								args[i].insert(0, "--");
 							result = true;
 							break;
 						}
@@ -4152,7 +4209,7 @@ func main(const int argc, CString const argv[]) -> int
 				if (args[i].length() == 2) { // convert mnemonic to full
 					args[i] = with;
 					if (not isWithStartWithDoubleStrip)
-						args[i].insert(0, "--", 0, 2);
+						args[i].insert(0, "--");
 				}
 				if (writeBoolean)
 					opt::valueOf[with] = "true";
@@ -4230,7 +4287,7 @@ func main(const int argc, CString const argv[]) -> int
 				}
 				#endif
 				#undef REPO_URI
-				std::cout << (fs::exists(path) ? "Updated" :
+				std::cout << (fs::exists(path) ? "✅  Updated" :
 							  "⚠️  For some reason, update fail!")
 							<< ".\n";
 				return RETURN_VALUE
@@ -4255,7 +4312,7 @@ func main(const int argc, CString const argv[]) -> int
 					cmd += "\" ";
 					cmd += path;
 					std::system(cmd.c_str());
-					std::cout << (fs::exists(path) ? "Installed" :
+					std::cout << (fs::exists(path) ? "✅  Installed" :
 								  "⚠️  For some reason, install fail!")
 								<< ".\n";
 				}
@@ -4273,7 +4330,7 @@ func main(const int argc, CString const argv[]) -> int
 					std::system("rm -f " INSTALL_FULLPATH);
 					installMan(false);
 				#endif
-				std::cout << (not fs::exists(path) ? "Uninstalled" :
+				std::cout << (not fs::exists(path) ? "✅  Uninstalled" :
 							  "⚠️  For some reason, uninstall fail!")
 							<< ".\n";
 			}
@@ -4312,6 +4369,7 @@ func main(const int argc, CString const argv[]) -> int
 								<< args[i].substr(2)
 								<< '\n';
 			}
+			else if (isMatch(OPT_LIST, '\0', true));
 			else if (isMatch(OPT_DEBUG, 		'B', true)) {
 				if (i + 1 < args.size() and
 					isEqual(args[i + 1].c_str(), OPT_DEBUG_ARGS))
@@ -4925,11 +4983,59 @@ DATE_NEEDED:	std::cout << "⚠️  Expecting date and/or time after \""
 								<< args[i].substr(2)
 								<< '\n';
 			}
-			else if (	isMatch(OPT_EXT, 	'e')
-					 or isMatch(OPT_EXCLEXT, 'E')) {
+			else if (	isMatch(OPT_EXT,		'e')
+					 or isMatch(OPT_EXCLEXT, 	'E')) {
 				if (i + 1 < args.size()) {
+					const var opt { args[i].substr(2) == OPT_EXT ? OPT_EXT : OPT_EXCLEXT };
 					i++;
-					opt::valueOf[args[i - 1].substr(2)] = args[i] == "*.*" ? "*" : args[i];
+					if (args[i].size() == 2 and args[i][1] == '=' and i + 1 < args.size())
+					{
+						enum class OP { Add, Sub };
+						
+						const var op { args[i][0] == '+' ? OP::Add : OP::Sub };
+						
+						i++;
+						
+						var newList { ListString() };
+						parseExtCommaDelimited(args[i], &newList);
+						
+						if (not opt::valueOf[opt].empty()) {
+							if (op == OP::Sub) {
+								var list { ListString() };
+								parseExtCommaDelimited(opt::valueOf[opt], &list);
+								opt::valueOf[opt].clear();
+								
+								for (var& ext : newList) {
+									const var iterator { std::find(list.begin(), list.end(), ext) };
+									if (iterator not_eq list.end())
+										list.erase(iterator);
+								}
+								
+								for (var& ext : list) {
+									if (not opt::valueOf[opt].empty())
+										opt::valueOf[opt] += ",";
+									opt::valueOf[opt] += std::move(ext);
+								}
+							} else
+								for (var& ext : newList)
+									opt::valueOf[opt] += std::move(ext);
+							
+						} else {
+							var extensions { opt == OPT_EXT ? &opt::DEFAULT_EXT
+															: &opt::EXCLUDE_EXT };
+							for (var& ext : newList)
+								if (op == OP::Sub)
+									extensions->erase(std::move(ext));
+								else
+									extensions->insert(std::move(ext));
+							(opt == OPT_EXT
+								? opt::DEFAULT_EXT_REPLACED
+								: opt::EXCLUDE_EXT_REPLACED) = true;
+						}
+					}
+					else
+						opt::valueOf[opt] = args[i] == "*.*" ? "*" : args[i];
+					
 				} else
 					std::cout << "Expecting extension after \""
 								<< args[i]
@@ -4937,14 +5043,20 @@ DATE_NEEDED:	std::cout << "⚠️  Expecting date and/or time after \""
 								<< args[i].substr(2)
 								<< '\n';
 			}
-			else if (isMatch(OPT_FIXFILENAME, 	'f', false, {"fix-filename"})) {
+			else if (isMatch(OPT_OUTFILENAME, 	'f', false, {"fix-filename"})) {
 				if (i + 1 < args.size()) {
 					i++;
-					opt::valueOf[OPT_FIXFILENAME] = args[i];
-					if (not fs::path(args[i]).parent_path().string().empty())
+					opt::valueOf[OPT_OUTFILENAME] = args[i];
+					if (var parent { fs::path(args[i]).parent_path().string() };
+						not parent.empty())
 					{
-						opt::valueOf[OPT_FIXFILENAME] = fs::path(args[i]).filename().string();
-						opt::valueOf[OPT_OUTDIR] = fs::path(args[i]).parent_path().string();
+						opt::valueOf[OPT_OUTFILENAME] = fs::path(args[i]).filename().string();
+						parent += fs::path::preferred_separator;
+						args.insert(args.begin() + 1 + i, std::move(parent));
+						
+						parent = "--";
+						parent += OPT_OUTDIR;
+						args.insert(args.begin() + 1 + i, std::move(parent));
 					}
 				} else
 					std::cout << "⚠️  Expecting file name after \""
@@ -4956,7 +5068,10 @@ DATE_NEEDED:	std::cout << "⚠️  Expecting date and/or time after \""
 			else if (isMatch(OPT_OUTDIR, 		'd')) {
 				if (i + 1 < args.size()) {
 					i++;
-					opt::valueOf[OPT_OUTDIR] = fs::absolute(args[i]);
+					const var dir { fs::path(args[i]) };
+					if (not fs::exists(dir))
+						fs::create_directories(dir);
+					opt::valueOf[OPT_OUTDIR] = fs::absolute(dir);
 					if (const var tmp { args[i] };
 						tmp[tmp.size() - 1] not_eq fs::path::preferred_separator)
 						opt::valueOf[OPT_OUTDIR] += fs::path::preferred_separator;
@@ -4967,7 +5082,7 @@ DATE_NEEDED:	std::cout << "⚠️  Expecting date and/or time after \""
 								<< args[i].substr(2)
 								<< '\n';
 			}
-			else if (	isMatch(OPT_SIZE, 			's')
+			else if (	isMatch(OPT_SIZE, 		's')
 					 or isMatch(OPT_EXCLSIZE, 	'S')) {
 				if (bool isExclude{ args[i].substr(2) == OPT_EXCLSIZE };
 					i + 1 < args.size()) {
@@ -5080,7 +5195,7 @@ SIZE_NEEDED:		std::cout << "⚠️  Expecting operator '<' or '>' followed"\
 		else if (isNetworkTransportFile(args[i]))
 			insertInto(&in::selectFiles, fs::path(args[i]));
 		else if (fs::is_directory(args[i]))
-			insertInto(&bufferDirs, fs::path(args[i]));
+			insertInto(&bufferInputDirs, fs::path(args[i]));
 		else if (const var path { fs::path(args[i]) };
 				 fs::is_regular_file(path)
 				 and isValid(path) and isValidFile(path))
@@ -5153,31 +5268,33 @@ SIZE_NEEDED:		std::cout << "⚠️  Expecting operator '<' or '>' followed"\
 					<< " --help ['keyword']\"\n\n";
 	}
 	
-	if (bufferDirs.empty() and in::selectFiles.empty())
-		insertInto(&bufferDirs, fs::current_path());
+	if (bufferInputDirs.empty() and in::selectFiles.empty())
+		insertInto(&bufferInputDirs, fs::current_path());
 	
-	const var inputDirsCount { bufferDirs.size() };
+	/// Saving state for original inputDirs
+	const var inputDirsCount { bufferInputDirs.size() };
 	fs::path inputDirs[inputDirsCount + 1];
-	std::copy(bufferDirs.begin(), bufferDirs.end(), inputDirs);
+	std::copy(bufferInputDirs.begin(), bufferInputDirs.end(), inputDirs);
 
-	while (bufferDirs.size() == 1) {
-		opt::valueOf[OPT_OUTDIR] = fs::absolute(bufferDirs[0]).string();
-		insertInto(&in::regularDirs, bufferDirs[0]);/// Assume single input dir is regularDir
-		if (isContainsSeasonDirs(opt::valueOf[OPT_OUTDIR])) {
+	/// Expand InputDir if only one dir.
+	while (bufferInputDirs.size() == 1) {
+		var dir { fs::absolute(bufferInputDirs[0]).string() };
+		insertInto(&in::regularDirs, bufferInputDirs[0]);/// Assume single input dir is regularDir
+		if (isContainsSeasonDirs(dir)) {
 			break;
 		}
-		bufferDirs.clear();
+		bufferInputDirs.clear();
 		var sortedDirs { ListEntry() };
-		listDirInto(fs::path(opt::valueOf[OPT_OUTDIR]), &sortedDirs);
+		listDirInto(fs::path(dir), &sortedDirs);
 				
 		for (var& child : sortedDirs)
-			insertInto(&bufferDirs, child.path());
+			insertInto(&bufferInputDirs, child.path());
 	}
 
 	if (const var dirOut { inputDirsCount == 1
 			? transformWhiteSpace(fs::path(opt::valueOf[OPT_OUTDIR]).filename().string())
 			: std::to_string(inputDirsCount)};
-		opt::valueOf[OPT_FIXFILENAME].empty())
+		opt::valueOf[OPT_OUTFILENAME].empty())
 	{
 		#ifdef LIBCPP_FORMAT
 		std::format_to(std::back_inserter(opt::valueOf[OPT_FIXFILENAME]),
@@ -5187,7 +5304,7 @@ SIZE_NEEDED:		std::cout << "⚠️  Expecting operator '<' or '>' followed"\
 						 : dirOut + "_dir",
 					   inputDirsCount > 1 or in::selectFiles.size() > 1 ? "s" : "";
 		#else
-		opt::valueOf[OPT_FIXFILENAME] =
+		opt::valueOf[OPT_OUTFILENAME] =
 				opt::valueOf[OPT_NOOUTPUTFILE] == "true" ? "" :
 				"playlist_from_"
 				+ (inputDirsCount == 0
@@ -5199,6 +5316,7 @@ SIZE_NEEDED:		std::cout << "⚠️  Expecting operator '<' or '>' followed"\
 		#endif
 	}
 	
+	#ifndef DEBUG
 	if (const var condToShowArgsParsed { not invalidArgs.empty()
 											or opt::valueOf[OPT_DEBUG] == "true"
 											or opt::valueOf[OPT_DEBUG] == "args" };
@@ -5206,7 +5324,9 @@ SIZE_NEEDED:		std::cout << "⚠️  Expecting operator '<' or '>' followed"\
 		or opt::valueOf[OPT_VERBOSE] 	== "all"
 		or opt::valueOf[OPT_VERBOSE] 	== "info"
 		or opt::valueOf[OPT_BENCHMARK]	== "true"
+		or opt::valueOf[OPT_LIST]		== "true"
 		or condToShowArgsParsed)
+	#endif
 	{ // MARK: Options Summary
 		let WIDTH { 20 };
 		#define LABEL(x)	x << std::setw(unsigned(WIDTH - std::strlen(x))) << ": "
@@ -5273,7 +5393,7 @@ SIZE_NEEDED:		std::cout << "⚠️  Expecting operator '<' or '>' followed"\
 		<< LABEL(OPT_BENCHMARK) << PRINT_OPT(opt::valueOf[OPT_BENCHMARK]) << '\n'
 		<< LABEL(OPT_OVERWRITE) << PRINT_OPT(opt::valueOf[OPT_OVERWRITE]) << '\n'
 		<< LABEL(OPT_NOOUTPUTFILE) << PRINT_OPT(opt::valueOf[OPT_NOOUTPUTFILE]) << '\n'
-		<< LABEL(OPT_FIXFILENAME) << opt::valueOf[OPT_FIXFILENAME] << '\n'
+		<< LABEL(OPT_OUTFILENAME) << opt::valueOf[OPT_OUTFILENAME] << '\n'
 		<< LABEL("Current Directory") << fs::current_path().string() << '\n'
 		<< LABEL(OPT_OUTDIR) << opt::valueOf[OPT_OUTDIR] << '\n'
 		<< LABEL(OPT_EXCLHIDDEN) << PRINT_OPT(opt::valueOf[OPT_EXCLHIDDEN]) << '\n'
@@ -5420,7 +5540,8 @@ SIZE_NEEDED:		std::cout << "⚠️  Expecting operator '<' or '>' followed"\
 			displayFile(otherFile);
 	}
 					   
-    if (	not opt::valueOf[OPT_SHOWCONFIG].empty()
+    if (		opt::valueOf[OPT_LIST] == "true"
+		or	not opt::valueOf[OPT_SHOWCONFIG].empty()
 		or 	not opt::valueOf[OPT_WRITEDEFAULTS].empty())
         return RETURN_VALUE
 
@@ -5441,6 +5562,7 @@ SIZE_NEEDED:		std::cout << "⚠️  Expecting operator '<' or '>' followed"\
 			opt::valueOf[OPT_OUTDIR] = fs::current_path().string();
 		else
 			opt::valueOf[OPT_OUTDIR] = fs::path(in::selectFiles[0]).parent_path().string();
+		opt::valueOf[OPT_OUTDIR] += fs::path::preferred_separator;
 	}
 	
 	var start { std::chrono::system_clock::now() };
@@ -5463,7 +5585,7 @@ SIZE_NEEDED:		std::cout << "⚠️  Expecting operator '<' or '>' followed"\
 	}
 	
 	for (const var isByPass { opt::valueOf[OPT_ARRANGEMENT] == MODE_ARRANGEMENT_ASCENDING };
-		 var& child : bufferDirs)
+		 var& child : bufferInputDirs)
 		if (opt::valueOf[OPT_EXECUTION] == MODE_EXECUTION_THREAD) {
 			if (isByPass)
 				threads.emplace_back([&, child]() {
@@ -5640,21 +5762,25 @@ SIZE_NEEDED:		std::cout << "⚠️  Expecting operator '<' or '>' followed"\
 		for (var& a : asyncs)
 			a.wait();
 
-	var outputFile { std::ofstream() };
-	var outputName { fs::path() };
+	struct Output {
+		property std::ofstream	file;
+		property fs::path 		name;
+		property std::string	extension;
+	} output;
+
 	
 	const var dontWrite { opt::valueOf[OPT_NOOUTPUTFILE] == "true" };
 	if (not dontWrite) {
-		outputName = opt::valueOf[OPT_OUTDIR] + fs::path::preferred_separator
-		   + opt::valueOf[OPT_FIXFILENAME];
+		output.name = opt::valueOf[OPT_OUTDIR] + opt::valueOf[OPT_OUTFILENAME];
 			
-		if (fs::exists(outputName) and opt::valueOf[OPT_OVERWRITE] == "true")
-		   fs::remove(outputName);
+		if (fs::exists(output.name) and opt::valueOf[OPT_OVERWRITE] == "true")
+		   fs::remove(output.name);
 		else
-		   outputName = getAvailableFilename(outputName);
+		   output.name = getAvailableFilename(output.name);
 		   
-		outputFile = std::ofstream(outputName, std::ios::out);
-//		if (not outputFile.good()) {
+		output.extension = tolower(output.name.extension().string());
+		output.file = std::ofstream(output.name, std::ios::out);
+//		if (not output.file.good()) {
 //			std::cout << "⚠️  Cannot write \""
 //						<< outputName
 //						<< "\"\n";
@@ -5662,20 +5788,17 @@ SIZE_NEEDED:		std::cout << "⚠️  Expecting operator '<' or '>' followed"\
 //		}
 	}
 				  
-	var outExt { std::string() };
 	if (not dontWrite) {
-		outExt = tolower(outputName.extension().string());
-
-		if (outExt == ".pls")
-		   outputFile << "[playlist]\n";
-		else if (outExt == ".m3u")
-		   outputFile << "#EXTM3U\n";
-		else if (outExt == ".xspf")
-		   outputFile << "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"\
+		if (output.extension == ".pls")
+		   output.file << "[playlist]\n";
+		else if (output.extension == ".m3u")
+		   output.file << "#EXTM3U\n";
+		else if (output.extension == ".xspf")
+		   output.file << "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"\
 		   "<playlist version=\"1\" xmlns=\"http://xspf.org/ns/0/\">\n"\
 		   "\t<trackList>\n";
-		else if (outExt == ".xml")
-		   outputFile << "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"\
+		else if (output.extension == ".xml")
+		   output.file << "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"\
 		   "<!DOCTYPE plist PUBLIC \"-//Apple Computer//DTD PLIST 1.0//EN\" "\
 		   "\"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">\n"\
 		   "<plist version=\"1.0\">\n"\
@@ -5687,34 +5810,34 @@ SIZE_NEEDED:		std::cout << "⚠️  Expecting operator '<' or '>' followed"\
 		   "\t<key>Tracks</key>\n"\
 		   "\t<dict>"
 		   ;
-		else if (outExt == ".wpl")
-		   outputFile << "<?wpl version=\"1.0\"?>\n"\
+		else if (output.extension == ".wpl")
+		   output.file << "<?wpl version=\"1.0\"?>\n"\
 			   "<smil>\n"\
 			   "\t<head>\n"\
 			   "\t\t<meta name=\"Generator\" content=\"tvplaylist -- 1.1\"/>\n"\
-			   "\t\t<title>" << outputName.filename().string() << "</title>\n"\
+			   "\t\t<title>" << output.name.filename().string() << "</title>\n"\
 			   "\t</head>\n"\
 			   "\t<body>\n"\
 			   "\t\t<seq>\n";
-		else if (outExt == ".smil")
-		   outputFile << "<?wpl version=\"1.0\"?>\n"\
+		else if (output.extension == ".smil")
+		   output.file << "<?wpl version=\"1.0\"?>\n"\
 			   "<smil>\n"\
 			   "\t<body>\n"\
 			   "\t\t<seq>\n";
-		else if (outExt == ".b4s")
-		   outputFile << "<?xml version=\"1.0\" standalone=\"yes\"?>\n"\
+		else if (output.extension == ".b4s")
+		   output.file << "<?xml version=\"1.0\" standalone=\"yes\"?>\n"\
 		   "<WindampXML>\n"\
 		   "\t<playlist>\n";
-		else if (isEqual(outExt.c_str(), {".asx", ".wax", ".wvx"}))
-		   outputFile << "<asx version=\"3.0\"?>\n"\
-			   "\t\t<title>" << outputName.filename().string() << "</title>\n";
-		else if (isEqual(outExt.c_str(), {".htm", ".html", ".xhtml"}))
-		   outputFile << "<html xmlns=\"http://www.w3.org/1999/xhtml\" lang=\"en\">\n"\
+		else if (isEqual(output.extension.c_str(), {".asx", ".wax", ".wvx"}))
+		   output.file << "<asx version=\"3.0\"?>\n"\
+			   "\t\t<title>" << output.name.filename().string() << "</title>\n";
+		else if (isEqual(output.extension.c_str(), {".htm", ".html", ".xhtml"}))
+		   output.file << "<html xmlns=\"http://www.w3.org/1999/xhtml\" lang=\"en\">\n"\
 		   "<head>\n"\
 		   "\t<meta http-equiv=\"Content-Type\" content=\"text/html\" />\n"\
 		   "\t<meta name=\"Generator\" content=\"tvplaylist -- 1.1\" />\n"\
 		   "\t<meta name=\"description\" content=\"Playlist\" />\n"\
-		   "\t<title>" << outputName.filename().string() << "</title>\n"\
+		   "\t<title>" << output.name.filename().string() << "</title>\n"\
 			"\t<style>\n"\
 			"\t\t.row_regular{  }\n"\
 			"\t\t.row_subtitle{  }\n"\
@@ -5726,9 +5849,9 @@ SIZE_NEEDED:		std::cout << "⚠️  Expecting operator '<' or '>' followed"\
 		   "</body>\n"\
 		   "\t<table>\n";
 		#if 0
-		else if (outExt == ".pdf") {
+		else if (output.extension == ".pdf") {
 			const var date { Date::now().string("%Y%m%d%H%M%S") };
-			outputFile << "%PDF-1.7\n"\
+			output.file << "%PDF-1.7\n"\
 			"1 0 obj\n"\
 			"<</Creator (tvplaylist v1.1)\n"\
 			" /Producer (Skia/PDF m98)\n"\
@@ -5782,7 +5905,7 @@ SIZE_NEEDED:		std::cout << "⚠️  Expecting operator '<' or '>' followed"\
 			var needAboslute { true };
 			const var isNetworkTransport { isNetworkTransportFile(fullPath) };
 			
-			if (isNetworkTransport or isEqual(outExt.c_str(), {".htm", ".html"}))
+			if (isNetworkTransport or isEqual(output.extension.c_str(), {".htm", ".html"}))
 			{
 				replace_all(fullPath, " ", "%20");
 				replace_all(fullPath, "=", "%3D");
@@ -5805,7 +5928,7 @@ SIZE_NEEDED:		std::cout << "⚠️  Expecting operator '<' or '>' followed"\
 				replace_all(fullPath, ">" ,"%3E");
 
 				if (not isNetworkTransport)
-					fullPath.insert(0, "file://", 0, 7);
+					fullPath.insert(0, "file://");
 				needAboslute = false;
 		   }
 
@@ -5816,7 +5939,7 @@ SIZE_NEEDED:		std::cout << "⚠️  Expecting operator '<' or '>' followed"\
 				var prefix { std::string() };
 				var suffix { std::string() };
 				var name { std::string() };
-				if (isEqual(outExt.c_str(), {".wpl", ".b4s", ".smil",
+				if (isEqual(output.extension.c_str(), {".wpl", ".b4s", ".smil",
 											".asx", ".wax", ".wvx"}))
 				{
 					for (var w { 0 }; w<ARRAYLEN(def::XML_CHARS_ALIAS); ++w)
@@ -5828,7 +5951,7 @@ SIZE_NEEDED:		std::cout << "⚠️  Expecting operator '<' or '>' followed"\
 						break;
 					}
 
-					if (not isEqual(outExt.c_str(), {".wpl", ".smil"}))
+					if (not isEqual(output.extension.c_str(), {".wpl", ".smil"}))
 					{
 						const var tmp { fs::path(fullPath).filename() };
 						name = tmp.string().substr(0,
@@ -5836,40 +5959,40 @@ SIZE_NEEDED:		std::cout << "⚠️  Expecting operator '<' or '>' followed"\
 					}
 				}
 			   
-				if (outExt == ".pls") {
+				if (output.extension == ".pls") {
 					const var indexString { std::to_string(playlistCount) };
 					prefix = "File" + indexString + '=';
 					suffix = "\nTitle" + indexString + '=';
 					suffix += title;
 				}
-				else if (outExt == ".xspf") {
+				else if (output.extension == ".xspf") {
 					prefix = "\t\t<track>\n\t\t\t<title>";
 					prefix += title;
 					prefix += "</title>\n"\
 						   "\t\t\t<location>file://";
 					suffix = "</location>\n\t\t</track>";
 				}
-				else if (outExt == ".wpl") {
+				else if (output.extension == ".wpl") {
 					prefix = "\t\t\t<media src=\"";
 					suffix = "\"/>";
 				}
-				else if (outExt == ".b4s") {
+				else if (output.extension == ".b4s") {
 					prefix = "\t\t<entry Playstring=\"file:";
 					suffix = "\">\n\t\t\t<Name>"
 						   + name
 						   + "</Name>\n\t\t</entry>";
 				}
-				else if (outExt == ".smil") {
+				else if (output.extension == ".smil") {
 					prefix = "\t\t\t<audio src=\"";
 					suffix = "\"/>";
 				}
-				else if (isEqual(outExt.c_str(), {".asx", ".wax", ".wvx"})) {
+				else if (isEqual(output.extension.c_str(), {".asx", ".wax", ".wvx"})) {
 					prefix = "\t<entry>\n\t\t<title>"
 						   + name
 						   + "</title>\t\t<ref href=\"";
 					suffix = "\"/>\n\t</entry>";
 				}
-				else if (outExt == ".xml") {
+				else if (output.extension == ".xml") {
 					const var key { std::to_string(1000 - playlistCount) };
 					prefix = "\t\t<key>" + key + "</key>\n"\
 					   "\t\t<dict>\n"\
@@ -5878,7 +6001,7 @@ SIZE_NEEDED:		std::cout << "⚠️  Expecting operator '<' or '>' followed"\
 					   "\t\t\t<key>Location</key><string>file://";
 					suffix = "</string>\n\t\t</dict>";
 				}
-				else if (isEqual(outExt.c_str(), {".htm", ".html", ".xhtml"})) {
+				else if (isEqual(output.extension.c_str(), {".htm", ".html", ".xhtml"})) {
 					var typeName { std::string() };
 					var classDef { std::pair<std::string, std::string>
 						{"column_numbering", "column_file"} };
@@ -5906,7 +6029,7 @@ SIZE_NEEDED:		std::cout << "⚠️  Expecting operator '<' or '>' followed"\
 						   "\t\t</tr>\n";
 				}
 				#if 0
-				else if (outExt == ".pdf") {
+				else if (output.extension == ".pdf") {
 					prefix = std::to_string(playlistCount + 10) + " 0 obj\n"\
 								"\t<<\t/FS /URL\n"\
 								"\t\t/F (";
@@ -5918,7 +6041,7 @@ SIZE_NEEDED:		std::cout << "⚠️  Expecting operator '<' or '>' followed"\
 				}
 				#endif
 
-				outputFile 	<< prefix << fullPath << suffix << '\n';
+				output.file 	<< prefix << fullPath << suffix << '\n';
 			}
 
 			#ifndef DEBUG
@@ -6113,35 +6236,35 @@ SIZE_NEEDED:		std::cout << "⚠️  Expecting operator '<' or '>' followed"\
 	if (dontWrite)
 		return RETURN_VALUE
 					   
-	if (outExt == ".pls")
-		outputFile << "\nNumberOfEntries="
+	if (output.extension == ".pls")
+		output.file << "\nNumberOfEntries="
 					<< playlistCount
 					<< "\nVersion=2\n";
-	else if (outExt == ".b4s")
-		outputFile << "\t</playlist>\n</WinampXML>\n";
-	else if (outExt == ".xspf")
-		outputFile << "\t</trackList>\n</playlist>\n";
-	else if (isEqual(outExt.c_str(), {".wpl", ".smil"}))
-		outputFile << "\t\t</seq>\n\t</body>\n</smil>\n";
-	else if (isEqual(outExt.c_str(), {".asx", ".wax", ".wvx"}))
-		outputFile << "</asx>\n";
-	else if (outExt == ".xml")
-		outputFile << "\t</dict>\n</dict>\n</plist>\n";
-	else if (isEqual(outExt.c_str(), {".htm", ".html", ".xhtml"}))
-		outputFile << "\t</table>\n</body>\n</html>\n";
+	else if (output.extension == ".b4s")
+		output.file << "\t</playlist>\n</WinampXML>\n";
+	else if (output.extension == ".xspf")
+		output.file << "\t</trackList>\n</playlist>\n";
+	else if (isEqual(output.extension.c_str(), {".wpl", ".smil"}))
+		output.file << "\t\t</seq>\n\t</body>\n</smil>\n";
+	else if (isEqual(output.extension.c_str(), {".asx", ".wax", ".wvx"}))
+		output.file << "</asx>\n";
+	else if (output.extension == ".xml")
+		output.file << "\t</dict>\n</dict>\n</plist>\n";
+	else if (isEqual(output.extension.c_str(), {".htm", ".html", ".xhtml"}))
+		output.file << "\t</table>\n</body>\n</html>\n";
 	#if 0
-	else if (outExt == ".pdf")
-		outputFile << "%%EOF\n";
+	else if (output.extension == ".pdf")
+		output.file << "%%EOF\n";
 	#endif
 		
-	outputFile.flush();
-	if (outputFile.is_open())
-		outputFile.close();
+	output.file.flush();
+	if (output.file.is_open())
+		output.file.close();
 		
 	if (playlistCount == 0)
-		fs::remove(outputName);
+		fs::remove(output.name);
 	else {
-		const var outputFullpath { fs::absolute(outputName).string() };
+		const var outputFullpath { fs::absolute(output.name).string() };
 		std::cout << outputFullpath
 					<< '\n';
 		
@@ -6165,6 +6288,7 @@ SIZE_NEEDED:		std::cout << "⚠️  Expecting operator '<' or '>' followed"\
 }
 #undef CString
 #undef ReadOnlyCString
+#undef property
 #undef let
 #undef var
 #undef func

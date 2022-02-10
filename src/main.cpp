@@ -618,7 +618,7 @@ func transformWhiteSpace(std::string s)
 
 func groupNumber(std::string number)
 {
-	var i { number.find_last_of('.') };
+	var i { (long long) number.find_last_of('.') };
 	if (i == std::string::npos) {
 		i = number.find_last_of('e');
 		if (i == std::string::npos)
@@ -639,7 +639,7 @@ func groupNumber(std::string number)
 
 func trim(const std::string& s)
 {
-	var start { (unsigned long) 0 }, end{s.size()};
+	var start { (unsigned long) 0 }, end{ s.size() };
 	for (var i { 0 }; i<end; ++i)
 		if (not std::isspace(s[i])) {
 			start=i;

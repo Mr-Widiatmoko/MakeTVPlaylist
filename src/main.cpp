@@ -4630,7 +4630,7 @@ func main(const int argc, CString const argv[]) -> int
 						if (keyVal not_eq "or" and keyVal not_eq "and") {
 							parseKeyValue(&keyVal, keyVal.starts_with("exclude-"));
 							
-							if (let EXCL {"exclude="};
+							if (let EXCL { "exclude=" };
 								keyVal.starts_with(EXCL))
 							{
 								var value { keyVal.substr(std::strlen(EXCL)) };

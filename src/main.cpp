@@ -4905,22 +4905,22 @@ void process(int argc, char *argv[], int *outc, char *outs[], unsigned long *max
 func main(const int argc, CString const argv[]) -> int
 {
 #endif
-	opt::valueOf[OPT_SIZEOPGT] 	= '\0';
-	opt::valueOf[OPT_SIZE] 		= '0';
-	opt::valueOf[OPT_EXCLSIZEOPGT]= '\0';
-	opt::valueOf[OPT_EXCLSIZE] 	= '0';
+	opt::valueOf[OPT_SIZEOPGT] 		= '\0';
+	opt::valueOf[OPT_SIZE] 			= '0';
+	opt::valueOf[OPT_EXCLSIZEOPGT]	= '\0';
+	opt::valueOf[OPT_EXCLSIZE] 		= '0';
 
-	opt::valueOf[OPT_EXECUTION]	= MODE_EXECUTION_ASYNC;
-	opt::valueOf[OPT_REGEXSYNTAX] = "ecma";
-	opt::valueOf[OPT_ARRANGEMENT] = MODE_ARRANGEMENT_DEFAULT;
+	opt::valueOf[OPT_EXECUTION]		= MODE_EXECUTION_ASYNC;
+	opt::valueOf[OPT_REGEXSYNTAX] 	= "ecma";
+	opt::valueOf[OPT_ARRANGEMENT] 	= MODE_ARRANGEMENT_DEFAULT;
 		
 	
-	opt::valueOf[OPT_LOADCONFIG] = CONFIG_PATH ;
+	opt::valueOf[OPT_LOADCONFIG] 	= CONFIG_PATH ;
 	
 	loadConfigInto(&in::args);
 	in::args.emplace_back(def::ARGS_SEPARATOR);
 	deduceArgsInto(argc, argv, ARGS_START_INDEX, &in::args);
-#undef ARGS_START_INDEX
+	#undef ARGS_START_INDEX
 
 	for (var i { 0 }; i<in::args.size(); ++i) {
 		if (func isMatch{[&i]

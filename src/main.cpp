@@ -3583,13 +3583,19 @@ func writeConfig(const ListString* const args,
 					 isOpt)
 				offset = 1;
 			if (isOpt) {
-				if ((offset == 2 and isEqual(s.c_str() + offset, OPT_WRITEDEFAULTS))
+				if ((offset == 2 and isEqual(s.c_str() + offset,
+											 {OPT_WRITEDEFAULTS, OPT_DEBUG}))
 					or (offset == 1 and (s[1] == 'W')))
 				{
 					if (const var next { i + 1 < args->size() ? (*args)[i + 1] : "" };
-						s == OPT_WRITEDEFAULTS
-						and not isEqual(next.c_str(), OPT_WRITEDEFAULTS_ARGS,
+						(s == OPT_WRITEDEFAULTS
+						 and not isEqual(next.c_str(), OPT_WRITEDEFAULTS_ARGS,
 										IgnoreCase::Left))
+						or
+						(s == OPT_DEBUG
+						 and not isEqual(next.c_str(), OPT_DEBUG_ARGS,
+										 IgnoreCase::Left))
+						)
 						;
 					else
 						i++;

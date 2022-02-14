@@ -3456,7 +3456,7 @@ func parseKeyValue(std::string* const s, const bool isExclude)
 	   }
    }
    else if (0 not_eq std::strlen(keyword)) {
-	   opt::valueOf[OPT_CASEINSENSITIVE] = value;
+		opt::valueOf[OPT_CASEINSENSITIVE] = value;
 		if (isEqual(value, "true", IgnoreCase::Left)) {
 			for (var& k : opt::listFindDir) k = tolower(k);
 			for (var& k : opt::listExclFindDir) k = tolower(k);

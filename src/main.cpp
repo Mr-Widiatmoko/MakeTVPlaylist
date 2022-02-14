@@ -5790,9 +5790,6 @@ DATE_NEEDED:	std::cout << "⚠️  Expecting date and/or time after \""
 								extensions->erase(std::move(ext));
 							else
 								extensions->insert(std::move(ext));
-						(opt == OPT_EXT
-							? opt::DEFAULT_EXT_REPLACED
-							: opt::EXCLUDE_EXT_REPLACED) = true;
 					}
 				}
 				else

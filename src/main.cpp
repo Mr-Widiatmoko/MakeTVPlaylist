@@ -3349,7 +3349,7 @@ func parseKeyValue(std::string* const s, const bool isExclude)
 	}
 	else if (isEqual(keyword, {OPT_DATE, OPT_EXCLDATE,
 		OPT_DCREATED, OPT_DCHANGED, OPT_DACCESSED, OPT_DMODIFIED,
-   OPT_DEXCLCREATED, OPT_DEXCLCHANGED, OPT_DEXCLMODIFIED, OPT_DEXCLACCESSED}))
+		OPT_DEXCLCREATED, OPT_DEXCLCHANGED, OPT_DEXCLMODIFIED, OPT_DEXCLACCESSED}))
    {
 	   const var havePrefix { value[0] == '<' or value[0] == '>'};
 	   if (const var opGt { value[0] };

@@ -4697,17 +4697,17 @@ private:
 func printOptionSummary(const int argc,
 						ReadOnlyCString argv[])
 {
-	[[maybe_unused]]
+	#ifndef DEBUG
 	const var condToShowArgsParsed {	not in::invalidArgs.empty()
 									or 	opt::valueOf[OPT_DEBUG] == "true"
 									or 	opt::valueOf[OPT_DEBUG] == "args" };
-	#ifndef DEBUG
+
 	if (	opt::valueOf[OPT_SHOWCONFIG].empty()
-		or 	opt::valueOf[OPT_VERBOSE] 	not_eq "all"
-		or 	opt::valueOf[OPT_VERBOSE] 	not_eq "info"
-		or 	opt::valueOf[OPT_BENCHMARK]	not_eq "true"
-		or 	opt::valueOf[OPT_LIST]		not_eq "true"
-		or 	not condToShowArgsParsed)
+		and opt::valueOf[OPT_VERBOSE] 	not_eq "all"
+		and opt::valueOf[OPT_VERBOSE] 	not_eq "info"
+		and opt::valueOf[OPT_BENCHMARK]	not_eq "true"
+		and opt::valueOf[OPT_LIST]		not_eq "true"
+		and not condToShowArgsParsed)
 		return true;
 	#endif
 		
@@ -4717,25 +4717,23 @@ func printOptionSummary(const int argc,
 	if (condToShowArgsParsed)
 	#endif
 	{
-		var formatSuffix { std::string() };
-		var formatPrefix { std::string() };
+		var format { std::pair<std::string, std::string>() };
+		
+		func tint{[&format](bool tinting) {
+			format.first = tinting ? "⚠️ \033[43m\033[1;30m" : "";
+			format.second = tinting ? "\033[0m" : "";
+		}};
 		
 		std::cout << LABEL("Original Arguments");
 		for (var i { 1 }; i<argc; ++i) {
 			#if defined(_WIN32) || defined(_WIN64)
 			#else
-			if (in::invalidArgs.find(argv[i]) not_eq in::invalidArgs.end()) {
-				formatPrefix = "⚠️ \033[43m\033[1;30m";
-				formatSuffix = "\033[0m";
-			} else {
-				formatSuffix = "";
-				formatPrefix = "";
-			}
+			tint(in::invalidArgs.find(argv[i]) not_eq in::invalidArgs.end());
 			#endif
 			std::cout << '"'
-						<< formatPrefix
+						<< format.first
 						<< argv[i]
-						<< formatSuffix
+						<< format.second
 						<< '"'
 						<< (i+1>=argc ? "" : ", ");
 		}
@@ -4747,18 +4745,12 @@ func printOptionSummary(const int argc,
 			
 			#if defined(_WIN32) || defined(_WIN64)
 			#else
-			if (in::invalidArgs.find(in::args[i]) not_eq in::invalidArgs.end()) {
-				formatPrefix = "⚠️ \033[43m\033[1;30m";
-				formatSuffix = "\033[0m";
-			} else {
-				formatSuffix = "";
-				formatPrefix = "";
-			}
+			tint(in::invalidArgs.find(in::args[i]) not_eq in::invalidArgs.end());
 			#endif
 			std::cout << '"'
-						<< formatPrefix
+						<< format.first
 						<< in::args[i]
-						<< formatSuffix
+						<< format.second
 						<< '"'
 						<< (i + 1 >= in::args.size() ? "" : ", ");
 		}

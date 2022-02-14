@@ -159,6 +159,8 @@ let UNINSTALL="\
         Uninstall tvplaylist from \"" INSTALL_PATH "\".\n\
 ";
 let OPT_UPDATE						{"update"};
+let OPT_UPDATE_ALTERNATIVE			= {	"upgrade",
+};
 let UPDATE="\
 --update\n\
 --upgrade\n\
@@ -178,7 +180,7 @@ let OPEN_WITH="\
 let LIST="\
 --list\n\
         Display list of options state, then exit.\n\
-        See also: --debug=args\n\
+        See also: --debug=args or --display-config\n\
 ";
 let SHOW="\
 --show-defaults\n\
@@ -194,8 +196,7 @@ let SHOW="\
 let WRITE="\
 -W, --write-defaults [new | reset | edit | add | remove]\n\
     --write-config [new | reset | edit | add | remove]\n\
-        Write anything you defined to \""\
-        CONFIG_PATH\
+        Write anything you defined to \"" CONFIG_PATH\
 "\" as new defaults (if no argument passed), instead executing it.\n\
         Argument \"new\" is used by default.\n\
         Example: --write-config\n\
@@ -213,9 +214,7 @@ let LOAD="\
         Load configuration from custom file.\n\
         Example:\n\
             --load-config tuesday_night.txt\n\
-        Default configuration file located in \""\
-			CONFIG_PATH\
-"\".\n\
+        Default configuration file located in \"" CONFIG_PATH "\".\n\
         If config file exist in default location, then it will be automatic loaded.\n\
         Content of configuration are list of options (with/out \"--\") separated by new line.\n\
         To write as defaults instead executing defined options, you can use option --write-config, either by specifying \"edit\", \"reset\", or \"add\" as parameter.\n\
@@ -531,7 +530,7 @@ typedef std::vector<short> 								ListShort;
 typedef std::vector<unsigned> 							ListUInt;
 typedef std::vector<std::pair<uintmax_t, uintmax_t>> 	ListPaitUIntMax;
 typedef std::vector<std::pair<float, std::string>> 		ListPairFloatString;
-struct Date;
+struct 	Date;
 typedef std::vector<std::pair<char, Date>> 				ListPairCharDate;
 typedef std::vector<std::pair<Date, Date>> 				ListPairDate;
 typedef unsigned long long 								MAXNUM;
@@ -624,6 +623,15 @@ func tolower(std::string s)
 				  );
 	return s;
 }
+
+func toupper(std::string s)
+{
+	std::transform(s.begin(), s.end(), s.begin(),
+				   [](unsigned char c){ return std::toupper(c); }
+				  );
+	return s;
+}
+
 
 func transformWhiteSpace(std::string s)
 {
@@ -2871,7 +2879,12 @@ namespace in {
 	ListPath 				regularDirs,
 							seasonDirs,
 							selectFiles,
-							listAdsDir;
+							listAdsDir,
+							inputDirs;
+	
+	var fileCountPerTurn 	{ (unsigned long) 1 };
+	var args				{ ListString() };
+	var invalidArgs			{ SetStringView() };
 }
 
 namespace def {
@@ -3570,25 +3583,41 @@ func writeConfig(const ListString* const args,
 					 isOpt)
 				offset = 1;
 			if (isOpt) {
-				if ((offset == 2 and isEqual(s.c_str() + offset,
-						{OPT_WRITEDEFAULTS, OPT_SHOWCONFIG,
-						OPT_INSTALL, OPT_UNINSTALL, OPT_UPDATE}))
+				if ((offset == 2 and isEqual(s.c_str() + offset, OPT_WRITEDEFAULTS))
 					or (offset == 1 and (s[1] == 'W')))
 				{
 					if (const var next { i + 1 < args->size() ? (*args)[i + 1] : "" };
-						OPT_WRITEDEFAULTS
+						s == OPT_WRITEDEFAULTS
 						and not isEqual(next.c_str(), OPT_WRITEDEFAULTS_ARGS,
 										IgnoreCase::Left))
 						;
 					else
 						i++;
 					continue;
+					
+				} else if (offset == 2
+						   and (isEqual(s.c_str() + offset, {
+										OPT_SHOWCONFIG, OPT_LIST,
+										OPT_INSTALL, OPT_UNINSTALL, OPT_UPDATE,
+										OPT_INSTALLMAN, OPT_UNINSTALLMAN })
+								or
+								isEqual(s.c_str() + offset,
+										OPT_SHOWCONFIG_ALTERNATIVE)
+								or
+								isEqual(s.c_str() + offset,
+										OPT_UPDATE_ALTERNATIVE)
+								))
+				{
+					continue;
 				}
+				
 				if (not buffer.empty())
 					lines->emplace_back(std::move(buffer));
+				
 				buffer.clear();
 			} else
 				buffer += ' ';
+			
 			if (removeOptPrefix)
 				buffer += s.c_str() + (isOpt ? offset : 0);
 			else
@@ -3686,7 +3715,7 @@ func writeConfig(const ListString* const args,
 	
 	var file { std::fstream(CONFIG_PATH, std::ios::out) };
 //	if (not file.good()) {
-//		std::cout << "⚠️  Cannot write \""
+//		std::cout << "⚠️  Cannot read/write \""
 //					<< CONFIG_PATH
 //					<< "\"\n";
 //		return;
@@ -3823,9 +3852,8 @@ func replace_all(std::string& s,
 	var count { (std::size_t) 0 };
 	for (var pos { (std::string::size_type) 9 };
 		 s.npos not_eq (pos = s.find(what.data(), pos, what.length()));
-		 pos += with.length(), ++count) {
+		 pos += with.length(), ++count)
 		s.replace(pos, what.length(), with.data(), with.length());
-	}
 }
  
 func installMan(bool install)
@@ -4136,6 +4164,743 @@ func loadPlaylistInto(const fs::path& path, ListPath* const outPaths)
 	//rdf		{"<dc:identifier>"}, {"</dc:identifier>"}
 }
 
+struct Output {
+	property std::ofstream	file;
+	property fs::path 		name;
+	property std::string	extension;
+	
+	Output(bool _isVerbose)
+	{
+		playlistCount = 0;
+		isVerbose = _isVerbose;
+	}
+	
+	property unsigned long  playlistCount;
+	
+
+	func filenameWithoutExtension() {
+		if (nameWithoutExt.empty())
+			nameWithoutExt = name.filename().string().substr(0,
+				name.filename().string().size() -
+				name.extension().string().size());
+		return nameWithoutExt;
+	}
+
+	enum class Section { None, Header, Content, Footer };
+	enum class Type { None, Regular, Subtitle, Advertise };
+	
+	func generate(Section section,
+				  const fs::path* const path = nullptr,
+				  ReadOnlyCString title = nullptr,
+				  Type type = Type::None)
+	{
+		struct Content {
+			property std::string 	fullPath,
+									prefix,
+									suffix;
+		} content;
+
+		if (section == Section::Content) {
+			if (not path)
+				return;
+			
+			playlistCount++;
+			
+			content.fullPath = path->string();
+			
+			var needAbsolute = true;
+			var isNetworkTransport = isNetworkTransportFile(path->string());
+			
+			if (isNetworkTransport or isEqual(extension.c_str(),
+											  {".htm", ".html", ".xhtml"}))
+			{
+				replace_all(content.fullPath, " ", "%20");
+				replace_all(content.fullPath, "=", "%3D");
+				replace_all(content.fullPath, "+", "%2B");
+				replace_all(content.fullPath, "-", "%2D");
+				replace_all(content.fullPath, "?", "%3F");
+				replace_all(content.fullPath, ";", "%3B");
+				//replace_all(content.fullPath, "%", "%25");
+				replace_all(content.fullPath, "@" ,"%4F");
+				replace_all(content.fullPath, "!" ,"%21");
+				replace_all(content.fullPath, "\"","%22");
+				replace_all(content.fullPath, "'" ,"%27");
+				replace_all(content.fullPath, "," ,"%2C");
+				//replace_all(content.fullPath, "/" ,"%2F");
+				replace_all(content.fullPath, "\\","%5C");
+				replace_all(content.fullPath, "$" ,"%24");
+				replace_all(content.fullPath, "&" ,"%26");
+				replace_all(content.fullPath, "#" ,"%23");
+				replace_all(content.fullPath, "<" ,"%3C");
+				replace_all(content.fullPath, ">" ,"%3E");
+
+				if (not isNetworkTransport)
+					content.fullPath.insert(0, "file://");
+				needAbsolute = false;
+			}
+			
+			if (needAbsolute)
+				content.fullPath = fs::absolute(*path).string();
+			
+			if (isEqual(extension.c_str(),
+						{".wpl", ".b4s", ".smil", ".asx", ".wax", ".wvx"}))
+			{
+				for (var w { 0 }; w<ARRAYLEN(def::XML_CHARS_ALIAS); ++w)
+					if (isContains(content.fullPath, def::XML_CHARS_NORMAL[w],
+								   IgnoreCase::Left) not_eq std::string::npos)
+					{
+						replace_all(content.fullPath, def::XML_CHARS_NORMAL[w],
+									def::XML_CHARS_ALIAS[w]);
+						break;
+					}
+
+				if (not isEqual(extension.c_str(), {".wpl", ".smil"}))
+				{
+					const var tmp { fs::path(content.fullPath).filename() };
+					name = tmp.string().substr(0,
+											   tmp.string().size() - tmp.extension().string().size());
+				}
+			}
+		}
+		
+
+		if (extension == ".pls") {
+			switch (section) {
+			case Section::Header:
+				file << "[playlist]\n";
+				break;
+			case Section::Content: {
+				const var indexString { std::to_string(playlistCount) };
+				content.prefix = "File" + indexString + '=';
+				content.suffix = "\nTitle" + indexString + '=';
+				content.suffix += title;
+				break; }
+			case Section::Footer:
+				file << "\nNumberOfEntries="
+						<< playlistCount
+						<< "\nVersion=2\n";
+				break;
+			default:
+				;
+			}
+		}
+		else if (extension == ".m3u") {
+			switch (section) {
+			case Section::Header:
+				file << "#EXTM3U\n";
+				break;
+			case Section::Footer:
+				break;
+			default:
+				;
+			}
+		}
+		else if (extension == ".xspf") {
+			switch (section) {
+			case Section::Header:
+				file << "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"\
+						"<playlist version=\"1\" xmlns=\"http://xspf.org/ns/0/\">\n"\
+						"\t<trackList>\n";
+				break;
+			case Section::Content: {
+				content.prefix = "\t\t<track>\n\t\t\t<title>";
+				content.prefix += title;
+				content.prefix += "</title>\n"\
+					   "\t\t\t<location>file://";
+				content.suffix = "</location>\n\t\t</track>";
+				break;
+			}
+			case Section::Footer:
+				file << "\t</trackList>\n</playlist>\n";
+				break;
+			default:
+				;
+			}
+		}
+		else if (extension == ".xml") {
+			switch (section) {
+			case Section::Header:
+				file << "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"\
+						"<!DOCTYPE plist PUBLIC \"-//Apple Computer//DTD PLIST 1.0//EN\" "\
+						"\"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">\n"\
+						"<plist version=\"1.0\">\n"\
+						"<dict>\n"\
+						"\t<key>Major Version</key><integer>1</integer>\n"\
+						"\t<key>Minor Version</key><integer>1</integer>\n"\
+						"\t<key>Date</key><date>" << Date::now().string("%FT%T") << "</date>\n"\
+						"\t<key>Application Version</key><string>1.1</string>\n"\
+						"\t<key>Tracks</key>\n"\
+						"\t<dict>";
+					break;
+			case Section::Content: {
+				const var key { std::to_string(1000 - playlistCount) };
+				content.prefix = "\t\t<key>" + key + "</key>\n"\
+				   "\t\t<dict>\n"\
+				   "\t\t\t<key>Track ID</key><integer>" + key + "</integer>\n"\
+				   "\t\t\t<key>Name</key><string>" + filenameWithoutExtension() + "</string>\n"\
+				   "\t\t\t<key>Location</key><string>file://";
+				content.suffix = "</string>\n\t\t</dict>";
+				break; }
+			case Section::Footer:
+				file << "\t</dict>\n</dict>\n</plist>\n";
+				break;
+			default:
+				;
+			}
+		}
+		else if (extension == ".wpl") {
+			switch (section) {
+			case Section::Header:
+				file << "<?wpl version=\"1.0\"?>\n"\
+					"<smil>\n"\
+					"\t<head>\n"\
+					"\t\t<meta name=\"Generator\" content=\"tvplaylist -- 1.1\"/>\n"\
+					"\t\t<title>" << name.filename().string() << "</title>\n"\
+					"\t</head>\n"\
+					"\t<body>\n"\
+					"\t\t<seq>\n";
+				break;
+			case Section::Content: {
+				content.prefix = "\t\t\t<media src=\"";
+				content.suffix = "\"/>";
+				break; }
+			case Section::Footer:
+				file << "\t\t</seq>\n\t</body>\n</smil>\n";
+				break;
+			default:
+				;
+			}
+		}
+		else if (extension == ".smil") {
+			switch (section) {
+			case Section::Header:
+				file << "<?wpl version=\"1.0\"?>\n"\
+						"<smil>\n"\
+						"\t<body>\n"\
+						"\t\t<seq>\n";
+				break;
+			case Section::Content: {
+				content.prefix = "\t\t\t<audio src=\"";
+				content.suffix = "\"/>";
+				break; }
+			case Section::Footer:
+				file << "\t\t</seq>\n\t</body>\n</smil>\n";
+				break;
+			default:
+				;
+			}
+		}
+		else if (extension == ".b4s") {
+			switch (section) {
+			case Section::Header:
+				file << "<?xml version=\"1.0\" standalone=\"yes\"?>\n"\
+						"<WindampXML>\n"\
+						"\t<playlist>\n";
+				break;
+			case Section::Content: {
+				content.prefix = "\t\t<entry Playstring=\"file:";
+				content.suffix = "\">\n\t\t\t<Name>"
+					   + filenameWithoutExtension()
+					   + "</Name>\n\t\t</entry>";
+				break; }
+			case Section::Footer:
+				file << "\t</playlist>\n</WinampXML>\n";
+				break;
+			default:
+				;
+			}
+		}
+		else if (isEqual(extension.c_str(), {".asx", ".wax", ".wvx"})) {
+			switch (section) {
+			case Section::Header:
+				file << "<asx version=\"3.0\"?>\n"\
+					"\t\t<title>" << name.filename().string() << "</title>\n";
+				break;
+			case Section::Content: {
+				content.prefix = "\t<entry>\n\t\t<title>"
+					   + filenameWithoutExtension()
+					   + "</title>\t\t<ref href=\"";
+				content.suffix = "\"/>\n\t</entry>";
+				break; }
+			case Section::Footer:
+				file << "</asx>\n";
+				break;
+			default:
+				;
+			}
+		}
+		else if (isEqual(extension.c_str(), {".htm", ".html", ".xhtml"})) {
+			switch (section) {
+			case Section::Header:
+				file << "<html xmlns=\"http://www.w3.org/1999/xhtml\" lang=\"en\">\n"\
+						"<head>\n"\
+						"\t<meta http-equiv=\"Content-Type\" content=\"text/html\" />\n"\
+						"\t<meta name=\"Generator\" content=\"tvplaylist -- 1.1\" />\n"\
+						"\t<meta name=\"description\" content=\"Playlist\" />\n"\
+						"\t<title>" << name.filename().string() << "</title>\n"\
+						"\t<style>\n"\
+						"\t\t.row_regular{  }\n"\
+						"\t\t.row_subtitle{  }\n"\
+						"\t\t.row_advertise{  }\n"\
+						"\t\t.column_numbering{ align=left; }\n"\
+						"\t\t.column_file{ width: 100%; }\n"\
+						"\t</style>\n"\
+						"</head>\n"\
+						"</body>\n"\
+						"\t<table>\n";
+				break;
+			case Section::Content: {
+				var typeName { std::string() };
+				var classDef { std::pair<std::string, std::string>
+					{"column_numbering", "column_file"} };
+				
+				switch (type) {
+					case Type::Regular:
+						typeName = "regular";
+						break;
+					case Type::Subtitle:
+						typeName = "subtitle";
+						break;
+					case Type::Advertise:
+						typeName = "advertise";
+						break;
+					default:
+						classDef.first = "align=\"right\"";
+						classDef.second = "width=\"100%\"";
+				}
+				
+				content.prefix = "\t\t<tr class=\"row_" + typeName + "\">\n"\
+					   "\t\t\t<td " + classDef.first + ">"
+					   + std::to_string(playlistCount) + ".</td>\n"\
+					   "\t\t\t<td " + classDef.second + "><a href=\"";
+				content.suffix = "\">" + name.filename().string() + "</a></td>\n"\
+					   "\t\t</tr>\n";
+				break; }
+			case Section::Footer:
+				file << "\t</table>\n</body>\n</html>";
+				break;
+			default:
+				;
+			}
+		}
+		else if (extension == ".sh") {
+			switch (section) {
+			case Section::Header:
+				file << "declare -a playlist=(\\\n";
+				break;
+			case Section::Content: {
+				content.prefix = "\t'";
+				content.suffix = "' \\\n";
+				break; }
+			case Section::Footer:
+				file << ")\n\n#for file in $playlist; do\n#\topen \"${file}\n#done\n";
+				break;
+			default:
+				;
+			}
+		}
+		else if (isEqual(extension.c_str(),
+						 {".c", "cpp", ".cxx", ".m", ".mpp", ".h", ".hpp", ".hxx"}))
+		{
+			if (section == Section::Footer)
+				file << "};\n";
+			else if (section == Section::Content) {
+				content.prefix = "\t\"";
+				content.suffix = "\",\n";
+			}
+			
+			if (isEqual(extension.c_str(), {".h", ".hpp"})) {
+				const var filename { toupper(filenameWithoutExtension()) + "_H" };
+				switch (section) {
+				case Section::Header:
+					file << "#ifndef "
+							<< filename
+							<< "\n#define "
+							<< filename
+							<< "\n\n";
+					break;
+				case Section::Footer:
+					file << "#undef "
+							<< filename
+							<< "\n";
+					break;
+				default:
+					;
+				}
+			}
+			
+			if (section == Section::Header)
+				file << "static const char* playlist[] = {\n";
+		}
+		else if (extension == ".rb") {
+			switch (section) {
+			case Section::Header:
+				file << "playlist = [\n";
+				break;
+			case Section::Content:
+				content.prefix = "\t\"";
+				content.suffix = "\",\n";
+				break;
+			case Section::Footer:
+				file << "]\n\n#for file in playlist do\n#\tputs file\n#end\n";
+				break;
+			default:
+				;
+			}
+		}
+		else if (extension == ".py") {
+			switch (section) {
+			case Section::Header:
+				file << "playlist = [\n";
+				break;
+			case Section::Content:
+				content.prefix = "\t'";
+				content.suffix = "',\n";
+				break;
+			case Section::Footer:
+				file << "\t]\n\n#for file in playlist:\n#\tprint(file)\n";
+				break;
+			default:
+				;
+			}
+		}
+		else if (extension == ".js") {
+			switch (section) {
+			case Section::Header:
+				file << "var playlist = [\n";
+				break;
+			case Section::Content:
+				content.prefix = "\t\"";
+				content.suffix = "\",\n";
+				break;
+			case Section::Footer:
+				file << "]\n";
+				break;
+			default:
+				;
+			}
+		}
+		else if (extension == ".json") {
+			switch (section) {
+			case Section::Header:
+				file << "{\n\t\"playlist\": [\n";
+				break;
+			case Section::Content:
+				content.prefix = "\t\t{\n\t\t\t\"file\": \"";
+				content.suffix = "\"\n\t\t},\n";
+				break;
+			case Section::Footer:
+				file << "\t]\n}";
+				break;
+			default:
+				;
+			}
+		}
+		else if (extension == ".swift") {
+			switch (section) {
+			case Section::Header:
+				file << "var playlist = [\n";
+				break;
+			case Section::Content:
+				content.prefix = "\t\"";
+				content.suffix = "\",\n";
+				break;
+			case Section::Footer:
+				file << "]\n\n#for file in playlist {\n#print(file)\n#}\n";
+				break;
+			default:
+				;
+			}
+		}
+		#if 0
+		else if (extension == ".pdf") {
+			const var date { Date::now().string("%Y%m%d%H%M%S") };
+			switch (section) {
+			case Section::Header:
+				file << "%PDF-1.7\n"\
+				"1 0 obj\n"\
+				"<</Creator (tvplaylist v1.1)\n"\
+				" /Producer (Skia/PDF m98)\n"\
+				" /CreationDate (D:" << date << "+00'00')\n"\
+				" /ModDate (D:" << date << "+00'00')>>\n"\
+				"endobj\n"\
+				"2 0 obj\n"\
+				"<</ca 1"\
+				" /BM /Normal>>\n"\
+				"endobj\n";
+				break;
+			case Section::Content: {
+				prefix = std::to_string(playlistCount + 10) + " 0 obj\n"\
+							"\t<<\t/FS /URL\n"\
+							"\t\t/F (";
+				replace_all(fullPath, "(" ,"\\(");
+				replace_all(fullPath, ")" ,"\\)");
+				suffix = ")\n"\
+						"\t>>\n"\
+						"endobj";
+				break; }
+			case Section::Footer:
+				file << "%%EOF\n";
+				break;
+			default:
+				;
+			}
+		}
+		#endif
+		
+		if (section == Section::Content) {
+			file << content.prefix << content.fullPath << content.suffix << '\n';
+			#ifndef DEBUG
+			if (isVerbose)
+			#endif
+				std::cout << content.fullPath
+							<< '\n';
+		}
+		else if (section == Section::Footer) {
+			file.flush();
+			if (file.is_open())
+				file.close();
+
+			if (playlistCount == 0)
+				fs::remove(name);
+			else {
+				const var outputFullpath { fs::absolute(name).string() };
+				std::cout << outputFullpath
+							<< '\n';
+
+				if (const var app { opt::valueOf[OPT_OPENWITH] };
+					opt::valueOf[OPT_OPEN] == "true" or not app.empty())
+				{
+					#if defined(_WIN32) || defined(_WIN64)
+					if (app.empty())
+						std::cout << "📢 Open in Windows is Under construction.\n";
+					else
+						std::system(std::string(
+												"\"" + app + "\" \"" + outputFullpath + "\"").c_str());
+					#else
+					std::system(std::string((not app.empty() ? "\"" + app + "\"" : "open")
+											+ " \""
+											+ outputFullpath
+											+ "\"").c_str());
+					#endif
+				}
+			}
+		}
+	}
+	
+private:
+	property std::string nameWithoutExt;
+	property bool			isVerbose;
+	
+};
+
+func printOptionSummary(const int argc,
+						ReadOnlyCString argv[])
+{
+	[[maybe_unused]]
+	const var condToShowArgsParsed {	not in::invalidArgs.empty()
+									or 	opt::valueOf[OPT_DEBUG] == "true"
+									or 	opt::valueOf[OPT_DEBUG] == "args" };
+	#ifndef DEBUG
+	if (	opt::valueOf[OPT_SHOWCONFIG].empty()
+		or 	opt::valueOf[OPT_VERBOSE] 	not_eq "all"
+		or 	opt::valueOf[OPT_VERBOSE] 	not_eq "info"
+		or 	opt::valueOf[OPT_BENCHMARK]	not_eq "true"
+		or 	opt::valueOf[OPT_LIST]		not_eq "true"
+		or 	not condToShowArgsParsed)
+		return true;
+	#endif
+		
+	let WIDTH { 20 };
+	#define LABEL(x)	x << std::setw(unsigned(WIDTH - std::strlen(x))) << ": "
+	#ifndef DEBUG
+	if (condToShowArgsParsed)
+	#endif
+	{
+		var formatSuffix { std::string() };
+		var formatPrefix { std::string() };
+		
+		std::cout << LABEL("Original Arguments");
+		for (var i { 1 }; i<argc; ++i) {
+			#if defined(_WIN32) || defined(_WIN64)
+			#else
+			if (in::invalidArgs.find(argv[i]) not_eq in::invalidArgs.end()) {
+				formatPrefix = "⚠️ \033[43m\033[1;30m";
+				formatSuffix = "\033[0m";
+			} else {
+				formatSuffix = "";
+				formatPrefix = "";
+			}
+			#endif
+			std::cout << '"'
+						<< formatPrefix
+						<< argv[i]
+						<< formatSuffix
+						<< '"'
+						<< (i+1>=argc ? "" : ", ");
+		}
+		std::cout << "\n\n"
+					<< LABEL("Deduced Arguments");
+		for (var i { 0 }; i<in::args.size(); ++i) {
+			if (in::args[i] == def::ARGS_SEPARATOR)
+				continue;
+			
+			#if defined(_WIN32) || defined(_WIN64)
+			#else
+			if (in::invalidArgs.find(in::args[i]) not_eq in::invalidArgs.end()) {
+				formatPrefix = "⚠️ \033[43m\033[1;30m";
+				formatSuffix = "\033[0m";
+			} else {
+				formatSuffix = "";
+				formatPrefix = "";
+			}
+			#endif
+			std::cout << '"'
+						<< formatPrefix
+						<< in::args[i]
+						<< formatSuffix
+						<< '"'
+						<< (i + 1 >= in::args.size() ? "" : ", ");
+		}
+		std::cout << '\n';
+		
+		if (not in::invalidArgs.empty())
+			return false;
+	}
+		
+		
+	#define PRINT_OPT(x)	(x.empty() ? "false" : x)
+
+	std::cout
+		<< LABEL(OPT_ARRANGEMENT) << opt::valueOf[OPT_ARRANGEMENT] << '\n'
+		<< LABEL(OPT_EXECUTION) << opt::valueOf[OPT_EXECUTION] << '\n'
+		<< LABEL(OPT_VERBOSE) << PRINT_OPT(opt::valueOf[OPT_VERBOSE]) << '\n'
+		<< LABEL(OPT_BENCHMARK) << PRINT_OPT(opt::valueOf[OPT_BENCHMARK]) << '\n'
+		<< LABEL(OPT_OVERWRITE) << PRINT_OPT(opt::valueOf[OPT_OVERWRITE]) << '\n'
+		<< LABEL(OPT_NOOUTPUTFILE) << PRINT_OPT(opt::valueOf[OPT_NOOUTPUTFILE]) << '\n'
+		<< LABEL(OPT_OUTFILENAME) << opt::valueOf[OPT_OUTFILENAME] << '\n'
+		<< LABEL(OPT_CURRENTDIR) << fs::current_path().string() << '\n'
+		<< LABEL(OPT_OUTDIR) << opt::valueOf[OPT_OUTDIR] << '\n'
+		<< LABEL(OPT_EXCLHIDDEN) << PRINT_OPT(opt::valueOf[OPT_EXCLHIDDEN]) << '\n'
+		<< LABEL(OPT_SKIPSUBTITLE) << PRINT_OPT(opt::valueOf[OPT_SKIPSUBTITLE]) << '\n';
+
+	for (var& opt : { OPT_EXT, OPT_EXCLEXT }) {
+		std::cout << LABEL(opt) << opt::valueOf[opt];
+		if (var i { 0 };
+			opt::valueOf[opt].empty())
+			for (var& ext : opt == OPT_EXT ? opt::DEFAULT_EXT : opt::EXCLUDE_EXT)
+				std::cout << ext
+							<< (++i < (opt == OPT_EXT
+									   ? opt::DEFAULT_EXT.size()
+									   : opt::EXCLUDE_EXT.size()
+									   ) - 1 ? ", " : "");
+		std::cout << '\n';
+	}
+	std::cout << LABEL("case-insensitive") << PRINT_OPT(opt::valueOf[OPT_CASEINSENSITIVE]) << '\n';
+
+	#undef PRINT_OPT
+		
+	for (var& S : {OPT_FIND, OPT_EXCLFIND}) {
+		std::cout << LABEL(S);
+		for (var i { 0 }; i<(S == OPT_FIND ? opt::listFind : opt::listExclFind).size(); ++i)
+			std::cout << (S == OPT_FIND ? opt::listFind : opt::listExclFind)[i]
+						<< (i < (S == OPT_FIND ? opt::listFind
+								 : opt::listExclFind).size() - 1 ? ", " : "");
+		std::cout << '\n';
+	}
+
+	for (var& S : {OPT_REGEX, OPT_EXCLREGEX}) {
+		std::cout << LABEL(S);
+		for (var i { 0 }; i<(S == OPT_REGEX ? opt::listRegex : opt::listExclRegex).size(); ++i)
+			std::cout << (S == OPT_REGEX ? opt::listRegex : opt::listExclRegex)[i].mark_count()
+						<< " expression"
+						<< (i < (S == OPT_REGEX ? opt::listRegex
+								 : opt::listExclRegex).size() - 1 ? ", " : "");
+		std::cout << '\n';
+	}
+		
+	std::cout << LABEL(OPT_REGEXSYNTAX) << opt::valueOf[OPT_REGEXSYNTAX] << '\n';
+
+	for (var& S : {OPT_SIZE, OPT_EXCLSIZE}) {
+		std::cout << LABEL(S);
+		if (opt::valueOf[OPT_SIZEOPGT][0] not_eq '\0' or opt::valueOf[OPT_EXCLSIZEOPGT][0] not_eq '\0')
+			std::cout << ((S == OPT_SIZE ? opt::listSize : opt::listExclSize).empty()
+					or opt::valueOf[S == OPT_SIZE ? OPT_SIZEOPGT
+							  : OPT_EXCLSIZEOPGT][0] not_eq '\0'
+					? (opt::valueOf[S == OPT_SIZE ? OPT_SIZEOPGT
+							 : OPT_EXCLSIZEOPGT][0] == '<' ? "< " : "> ")
+					+ opt::valueOf[S] : "");
+		for (var i { 0 }; i<(S == OPT_SIZE ? opt::listSize : opt::listExclSize).size(); ++i)
+			std::cout << (S == OPT_SIZE ? opt::listSize : opt::listExclSize)[i].first
+						<< ".."
+						<< (S == OPT_SIZE ? opt::listSize : opt::listExclSize)[i].second
+						<< (i < (S == OPT_SIZE ? opt::listSize
+								 : opt::listExclSize).size() - 1 ? ", " : "");
+		std::cout << '\n';
+	}
+		
+	{
+		const char * const* st[8] = { &OPT_DCREATED, &OPT_DCHANGED, &OPT_DACCESSED, &OPT_DMODIFIED,
+			&OPT_DEXCLCREATED, &OPT_DEXCLCHANGED, &OPT_DEXCLACCESSED, &OPT_DEXCLMODIFIED };
+		
+		const ListPairCharDate* const ot[8] = {
+			&opt::listDCreated, &opt::listDAccessed, &opt::listDModified, &opt::listDChanged,
+			&opt::listDExclCreated, &opt::listDExclAccessed, &opt::listDExclModified, &opt::listDExclChanged };
+
+		
+		const ListPairDate* const rt[8] = {
+			&opt::listDCreatedR, &opt::listDAccessedR, &opt::listDModifiedR, &opt::listDChangedR,
+			&opt::listDExclCreatedR, &opt::listDExclAccessedR, &opt::listDExclModifiedR, &opt::listDExclChangedR };
+		
+		for (var i { 0 }; i<8; ++i) {
+			std::cout << LABEL(*st[i]);
+			for (var k { 0 }; k<ot[i]->size(); ++k)
+				std::cout << '\"'
+							<< ot[i]->at(k).first
+							<< ' '
+							<< ot[i]->at(k).second.string()
+							<< "\", ";
+			
+			for (var k { 0 }; k<rt[i]->size(); ++k)
+				std::cout << '\"'
+							<< rt[i]->at(k).first.string()
+							<< "\" .. \""
+							<< rt[i]->at(k).second.string()
+							<< "\", ";
+			std::cout << '\n';
+		}
+	}
+		
+	{
+		std::cout << LABEL("Inputs");
+		for (var i { 0 }; i<in::inputDirs.size() + in::selectFiles.size(); ++i) {
+			if (i < in::inputDirs.size())
+				std::cout << in::inputDirs[i];
+			else
+				std::cout << in::selectFiles[i - in::inputDirs.size()];
+			
+			std::cout  << (i < (in::inputDirs.size() + in::selectFiles.size()) - 1 ? ", " : "");
+		}
+		std::cout << '\n';
+	}
+		
+	std::cout << LABEL(OPT_ADSCOUNT) << opt::valueOf[OPT_ADSCOUNT] << '\n';
+	{
+		std::cout << LABEL(OPT_ADSDIR);
+		var i { -1 };
+		for (i++; var& d : in::listAdsDir)
+			std::cout << d.string()
+						<< (i < in::listAdsDir.size() - 1 ? ", " : "");
+		std::cout << '\n';
+	}
+		
+	std::cout << LABEL(OPT_OPENWITH) << opt::valueOf[OPT_OPENWITH] << '\n';
+		
+	#undef LABEL
+	
+	return true;
+}
+
 #if MAKE_LIB
 #define RETURN_VALUE	;
 #define ARGS_START_INDEX	0
@@ -4157,33 +4922,29 @@ func main(const int argc, CString const argv[]) -> int
 	opt::valueOf[OPT_REGEXSYNTAX] = "ecma";
 	opt::valueOf[OPT_ARRANGEMENT] = MODE_ARRANGEMENT_DEFAULT;
 		
-	var args { ListString() };
 	
 	opt::valueOf[OPT_LOADCONFIG] = CONFIG_PATH ;
 	
-	loadConfigInto(&args);
-	args.emplace_back(def::ARGS_SEPARATOR);
-	deduceArgsInto(argc, argv, ARGS_START_INDEX, &args);
+	loadConfigInto(&in::args);
+	in::args.emplace_back(def::ARGS_SEPARATOR);
+	deduceArgsInto(argc, argv, ARGS_START_INDEX, &in::args);
 #undef ARGS_START_INDEX
-	var fileCountPerTurn { (unsigned long) 1 };
-	var invalidArgs { SetStringView() };
-	var bufferInputDirs { ListPath() };
 
-	for (var i { 0 }; i<args.size(); ++i) {
-		if (func isMatch{[&args, &i]
-				(ReadOnlyCString with,
-				 const char mnemonic,
-				 bool writeBoolean=false,
-				 const std::initializer_list<const CString>& others = {})
+	for (var i { 0 }; i<in::args.size(); ++i) {
+		if (func isMatch{[&i]
+						(ReadOnlyCString with,
+						 const char mnemonic,
+						 bool writeBoolean=false,
+						 const std::initializer_list<const CString>& others = {})
 		{
 			var result { false };
 			const var isWithStartWithDoubleStrip {
 				std::strlen(with) > 2 and with[0] == '-' and with[1] == '-' };
-			if (args[i].length() > 3
-				and args[i][0] == '-'
-				and args[i][1] == '-')
+			if (in::args[i].length() > 3
+				and in::args[i][0] == '-'
+				and in::args[i][1] == '-')
 			{
-				result = isEqual(args[i], with, IgnoreCase::Left,
+				result = isEqual(in::args[i], with, IgnoreCase::Left,
 								 isWithStartWithDoubleStrip ? 0 : 2);
 				
 				if (not result)
@@ -4191,1015 +4952,1015 @@ func main(const int argc, CString const argv[]) -> int
 						if (const var isOtherStartWithDoubleStrip {
 							std::strlen(other) > 2 and
 							other[0] == '-' and other[1] == '-' };
-							isEqual(args[i], other, IgnoreCase::Left,
+							isEqual(in::args[i], other, IgnoreCase::Left,
 									isOtherStartWithDoubleStrip ? 0 : 2))
 						{
-							args[i] = with;
+							in::args[i] = with;
 							if (not isOtherStartWithDoubleStrip)
-								args[i].insert(0, "--");
+								in::args[i].insert(0, "--");
 							result = true;
 							break;
 						}
 			} else if (mnemonic not_eq '\0'
-					   and args[i].length() == 2
-					   and args[i][0] == '-')
-				result = args[i][1] == mnemonic;
+					   and in::args[i].length() == 2
+					   and in::args[i][0] == '-')
+				result = in::args[i][1] == mnemonic;
 
 			if (result) {
-				if (args[i].length() == 2) { // convert mnemonic to full
-					args[i] = with;
+				if (in::args[i].length() == 2) { // convert mnemonic to full
+					in::args[i] = with;
 					if (not isWithStartWithDoubleStrip)
-						args[i].insert(0, "--");
+						in::args[i].insert(0, "--");
 				}
 				if (writeBoolean)
 					opt::valueOf[with] = "true";
 			}
 			return result;
-		} };
-			args[i] == def::ARGS_SEPARATOR)
+		}};
+			in::args[i] == def::ARGS_SEPARATOR)
+			continue;
+		else if (isMatch(OPT_UPDATE, '\0', false, OPT_UPDATE_ALTERNATIVE)) {
+			#if defined(MAKE_LIB)
+			continue;
+			#endif
+			
+			const var path { fs::path(INSTALL_FULLPATH) };
+			#define REPO_URI "https://github.com/Mr-Widiatmoko/MakeTVPlaylist.git"
+			#if defined(_WIN32) || defined(_WIN64)
+			// TODO: Windows
+			std::cout << "📢 Under construction.\n";
+			#define CACHE_PATH "%userprofile%\\AppData\\Local"
+			if (0 not_eq std::system("git.exe --version")
+				or (0 not_eq std::system("cmake.exe --version"))) {
+				std::cout << "⚠️  \"GIT\" and \"CMAKE\" required!.\n";
 				continue;
-			else if (isMatch(OPT_UPDATE, '\0', false, {"upgrade"})) {
-				#if defined(MAKE_LIB)
-				continue;
-				#endif
-				
-				const var path { fs::path(INSTALL_FULLPATH) };
-				#define REPO_URI "https://github.com/Mr-Widiatmoko/MakeTVPlaylist.git"
-				#if defined(_WIN32) || defined(_WIN64)
-				// TODO: Windows
-				std::cout << "📢 Under construction.\n";
-				#define CACHE_PATH "%userprofile%\\AppData\\Local"
-				if (0 not_eq std::system("git.exe --version")
-					or (0 not_eq std::system("cmake.exe --version"))) {
-					std::cout << "⚠️  \"GIT\" and \"CMAKE\" required!.\n";
-					continue;
-				}
-				fs::current_path(fs::path(CACHE_PATH));
-				var dir { fs::path("tvplaylist") };
-				if (not fs::exists(dir))
-					std::system(
-					"git.exe clone --depth 1 " REPO_URI " " CACHE_PATH  "\\tvplaylist");
-				fs::current_path(dir);
-				std::system("git pull");
-				dir = "Build";
-				if (not fs::exists(dir))
-					fs::create_directory(dir);
-				fs::current_path(dir);
-				
-				if (0 == std::system("cmake.exe --version") {
-					std::system("cmake " CACHE_PATH "\\tvplaylist");
-					std::system("make");
-					std::system("copy tvplaylist.exe " INSTALL_PATH);
-					std::system("make clean");
-				}
-				#undef CACHE_PATH
-				#else
-				if (not fs::exists(INSTALL_PATH "/git")
-					or not fs::exists(INSTALL_PATH "/c++")
-						or not fs::exists(INSTALL_PATH "/cmake"))
-				{
-					std::cout << "⚠️  \"GIT\" or \"CMAKE\" required!."
-								<< "\nTo install:"
-								<< "\n\t\"brew install git\""
-								<< "\n\t\"brew install cmake\"\n";
-					continue;
-				}
-				
-				fs::current_path(fs::path("~"));
-				var dir { fs::path(".tvplaylist") };
-				if (not fs::exists(dir))
-					std::system("git clone --depth 1 " REPO_URI " ~/.tvplaylist");
-				fs::current_path(dir);
-				std::system("git pull");
-				dir = "Build";
-				if (not fs::exists(dir))
-					fs::create_directory(dir);
-				fs::current_path(dir);
-				
-				if (fs::exists(INSTALL_PATH "/cmake")) {
-					std::system("cmake ~/.tvplaylist");
-					std::system("make");
-					std::system("make install");
-					std::system("make clean");
-				} else if (fs::exists(INSTALL_PATH "/c++")) {
-					if (fs::exists(path))
-						fs::remove(path);
-					std::system("c++ -std=c++2b ~/.tvplaylist/src/main.cpp " INSTALL_FULLPATH);
-				}
-				#endif
-				#undef REPO_URI
-				std::cout << (fs::exists(path) ? "✅  Updated" :
-							  "⚠️  For some reason, update fail!")
-							<< ".\n";
-				return RETURN_VALUE
 			}
-			else if (isMatch(OPT_INSTALL, '\0')) {
-				#if defined(MAKE_LIB)
-				continue;
-				#endif
-					
-				const var path { fs::path(INSTALL_FULLPATH) };
-				
-				if (not isEqual(argv[0], path)) {
-					#if defined(_WIN32) || defined(_WIN64)
-					if (fs::exists(path))
-						fs::remove(path);
-					var cmd { std::string("copy \"") };
-					#else
-					var cmd { std::string("cp -f \"") };
-					installMan(true);
-					#endif
-					cmd += argv[0];
-					cmd += "\" ";
-					cmd += path;
-					std::system(cmd.c_str());
-					std::cout << (fs::exists(path) ? "✅  Installed" :
-								  "⚠️  For some reason, install fail!")
-								<< ".\n";
-				}
-				return RETURN_VALUE
+			fs::current_path(fs::path(CACHE_PATH));
+			var dir { fs::path("tvplaylist") };
+			if (not fs::exists(dir))
+				std::system(
+				"git.exe clone --depth 1 " REPO_URI " " CACHE_PATH  "\\tvplaylist");
+			fs::current_path(dir);
+			std::system("git pull");
+			dir = "Build";
+			if (not fs::exists(dir))
+				fs::create_directory(dir);
+			fs::current_path(dir);
+			
+			if (0 == std::system("cmake.exe --version") {
+				std::system("cmake " CACHE_PATH "\\tvplaylist");
+				std::system("make");
+				std::system("copy tvplaylist.exe " INSTALL_PATH);
+				std::system("make clean");
 			}
-			else if (isMatch(OPT_UNINSTALL, '\0')) {
-				#if defined(MAKE_LIB)
+			#undef CACHE_PATH
+			#else
+			if (not fs::exists(INSTALL_PATH "/git")
+				or not fs::exists(INSTALL_PATH "/c++")
+					or not fs::exists(INSTALL_PATH "/cmake"))
+			{
+				std::cout << "⚠️  \"GIT\" or \"CMAKE\" required!."
+							<< "\nTo install:"
+							<< "\n\t\"brew install git\""
+							<< "\n\t\"brew install cmake\"\n";
 				continue;
-				#endif
-					
-				const var path { fs::path(INSTALL_FULLPATH) };
+			}
+			
+			fs::current_path(fs::path("~"));
+			var dir { fs::path(".tvplaylist") };
+			if (not fs::exists(dir))
+				std::system("git clone --depth 1 " REPO_URI " ~/.tvplaylist");
+			fs::current_path(dir);
+			std::system("git pull");
+			dir = "Build";
+			if (not fs::exists(dir))
+				fs::create_directory(dir);
+			fs::current_path(dir);
+			
+			if (fs::exists(INSTALL_PATH "/cmake")) {
+				std::system("cmake ~/.tvplaylist");
+				std::system("make");
+				std::system("make install");
+				std::system("make clean");
+			} else if (fs::exists(INSTALL_PATH "/c++")) {
 				if (fs::exists(path))
+					fs::remove(path);
+				std::system("c++ -std=c++2b ~/.tvplaylist/src/main.cpp " INSTALL_FULLPATH);
+			}
+			#endif
+			#undef REPO_URI
+			std::cout << (fs::exists(path) ? "✅  Updated" :
+						  "⚠️  For some reason, update fail!")
+						<< ".\n";
+			return RETURN_VALUE
+		}
+		else if (isMatch(OPT_INSTALL, '\0')) {
+			#if defined(MAKE_LIB)
+			continue;
+			#endif
+				
+			const var path { fs::path(INSTALL_FULLPATH) };
+			
+			if (not isEqual(argv[0], path)) {
 				#if defined(_WIN32) || defined(_WIN64)
-					std::system("del " INSTALL_FULLPATH);
+				if (fs::exists(path))
+					fs::remove(path);
+				var cmd { std::string("copy \"") };
 				#else
-					std::system("rm -f " INSTALL_FULLPATH);
-					installMan(false);
-				#endif
-				std::cout << (not fs::exists(path) ? "✅  Uninstalled" :
-							  "⚠️  For some reason, uninstall fail!")
-							<< ".\n";
-				return RETURN_VALUE
-			}
-			else if (isMatch(OPT_UNINSTALLMAN, '\0')) {
-				installMan(false);
-				return RETURN_VALUE
-			}
-			else if (isMatch(OPT_INSTALLMAN, '\0')) {
+				var cmd { std::string("cp -f \"") };
 				installMan(true);
+				#endif
+				cmd += argv[0];
+				cmd += "\" ";
+				cmd += path;
+				std::system(cmd.c_str());
+				std::cout << (fs::exists(path) ? "✅  Installed" :
+							  "⚠️  For some reason, install fail!")
+							<< ".\n";
+			}
+			return RETURN_VALUE
+		}
+		else if (isMatch(OPT_UNINSTALL, '\0')) {
+			#if defined(MAKE_LIB)
+			continue;
+			#endif
+				
+			const var path { fs::path(INSTALL_FULLPATH) };
+			if (fs::exists(path))
+			#if defined(_WIN32) || defined(_WIN64)
+				std::system("del " INSTALL_FULLPATH);
+			#else
+				std::system("rm -f " INSTALL_FULLPATH);
+				installMan(false);
+			#endif
+			std::cout << (not fs::exists(path) ? "✅  Uninstalled" :
+						  "⚠️  For some reason, uninstall fail!")
+						<< ".\n";
+			return RETURN_VALUE
+		}
+		else if (isMatch(OPT_UNINSTALLMAN, '\0')) {
+			installMan(false);
+			return RETURN_VALUE
+		}
+		else if (isMatch(OPT_INSTALLMAN, '\0')) {
+			installMan(true);
+			return RETURN_VALUE
+		}
+		else if (isMatch(OPT_HELP, 'h') or isMatch(OPT_VERSION, 'v'))
+		{
+			printHelp(i + 1 < in::args.size()
+					  ? (in::args[i + 1][0] == '-' and in::args[i + 1][1] == '-'
+						 ? tolower(in::args[++i].substr(2)).c_str()
+						 : tolower(in::args[++i]).c_str())
+					  : in::args[i].substr(2).c_str());
+			
+			if (i + 1 == in::args.size())
 				return RETURN_VALUE
-			}
-			else if (isMatch(OPT_HELP, 'h') or isMatch(OPT_VERSION, 'v')) // MARK: Option Matching
+		}
+		else if (isMatch(OPT_CURRENTDIR, '\0')) {
+			if (i + 1 < in::args.size()) {
+				i++;
+				try {
+					fs::current_path(in::args[i]);
+				} catch (fs::filesystem_error& e) {
+					std::cout << "⚠️  No such directory: \""
+								<< in::args[i]
+								<< "\"\n";
+					--i;
+				}
+			} else
+				std::cout << "⚠️  Expecting directory. Please see --help "
+							<< in::args[i].substr(2)
+							<< '\n';
+		}
+		else if (isMatch(OPT_LIST, 	'\0', true));
+		else if (isMatch(OPT_DEBUG, 'B', true)) {
+			if (i + 1 < in::args.size() and
+				isEqual(in::args[i + 1].c_str(), OPT_DEBUG_ARGS))
 			{
-				printHelp(i + 1 < args.size()
-						  ? (args[i + 1][0] == '-' and args[i + 1][1] == '-'
-							 ? tolower(args[++i].substr(2)).c_str()
-							 : tolower(args[++i]).c_str())
-						  : args[i].substr(2).c_str());
-				
-				if (i + 1 == args.size())
-					return RETURN_VALUE
-			}
-			else if (isMatch(OPT_CURRENTDIR, '\0')) {
-				if (i + 1 < args.size()) {
-					i++;
-					try {
-						fs::current_path(args[i]);
-					} catch (fs::filesystem_error& e) {
-						std::cout << "⚠️  No such directory: \""
-									<< args[i]
-									<< "\"\n";
-						--i;
-					}
-				} else
-					std::cout << "⚠️  Expecting directory. Please see --help "
-								<< args[i].substr(2)
-								<< '\n';
-			}
-			else if (isMatch(OPT_LIST, '\0', true));
-			else if (isMatch(OPT_DEBUG, 		'B', true)) {
-				if (i + 1 < args.size() and
-					isEqual(args[i + 1].c_str(), OPT_DEBUG_ARGS))
+				i++;
+				opt::valueOf[OPT_DEBUG] = in::args[i];
+				if (in::args[i] == "id3")
 				{
-					i++;
-					opt::valueOf[OPT_DEBUG] = args[i];
-					if (args[i] == "id3")
-					{
-						if (i + 1 == args.size())
-							std::cout << "Usage: --debug=id3 [key[=]value ...] file [file ...]\n";
-						var keyVals { MapString() };
-						var files { ListPath() };
-						while (++i < args.size()) {
-							if (const var path { fs::path(args[i]) };
-								fs::exists(path)
-								and isEqual(path.extension().string().c_str(),
-											".mp3", IgnoreCase::Left))
-								files.emplace_back(std::move(path));
-							else {
-								if (const var pos { args[i].find('=') };
-									pos not_eq std::string::npos)
-									keyVals.emplace(std::make_pair(
-													args[i].substr(0, pos),
-													args[i].substr(pos + 1)));
-								else {
-									keyVals.emplace(std::make_pair(args[i], args[i + 1]));
-									i++;
-								}
-							}
-						}
-						
-						for (var& file : files) {
-							var mp3 { ID3(file.string().c_str()) };
-							for (var& keyVal : keyVals)
-								mp3.set(keyVal.first, keyVal.second);
-							
-							if (not keyVals.empty())
-								mp3.write();
-							std::cout << "File "
-										<< file.filename()
-										<< ":\n"
-							<< mp3.string() << '\n';
-						}
-						
-						return RETURN_VALUE
-					}
-					if (args[i] == "date") {
-						if (i + 1 == args.size()) {
-							std::cout << "Usage: --debug=date 'date or/and time' ['output format']\n"
-										<< HELP_DATE_REST
-										<< '\n';
-						}
+					if (i + 1 == in::args.size())
+						std::cout << "Usage: --debug=id3 [key[=]value ...] file [file ...]\n";
+					var keyVals { MapString() };
+					var files { ListPath() };
+					while (++i < in::args.size()) {
+						if (const var path { fs::path(in::args[i]) };
+							fs::exists(path)
+							and isEqual(path.extension().string().c_str(),
+										".mp3", IgnoreCase::Left))
+							files.emplace_back(std::move(path));
 						else {
-							i++;
-							const var input { args[i] };
-							var date { Date(input) };
-							
-							std::cout << '\"'
-										<< input
-										<< '\"'
-										<< "  -> \""
-							
-										<< date.string(i + 1 < args.size()
-													 ? args[++i].c_str()
-													 : nullptr)
-										<< "\" "
-										<< (date.isValid() ? "✅" : "❌")
-										<< '\n';
-						}
-						
-						return RETURN_VALUE
-					}
-				}
-			}
-			else if (isMatch(OPT_OPEN, '\0', true));
-			else if (isMatch(OPT_OPENWITH, '\0')) {
-				if (i + 1 < args.size()) {
-					i++;
-					opt::valueOf[OPT_OPENWITH] = trim(args[i]);
-				} else
-					std::cout << "⚠️  Expecting application. Please see --help "
-								<< args[i].substr(2)
-								<< '\n';
-			}
-			else if (isMatch(OPT_SHOWCONFIG, '\0', true, OPT_SHOWCONFIG_ALTERNATIVE));
-			else if (isMatch(OPT_WRITEDEFAULTS, 'W', true, OPT_WRITEDEFAULTS_ALTERNATIVE)) {
-				if (i + 1 < args.size()) {
-					if (isEqual(args[i + 1], "reset", IgnoreCase::Left)) {
-						fs::remove(CONFIG_PATH);
-						opt::valueOf[OPT_WRITEDEFAULTS].clear();
-						i++;
-					}
-					else if (isEqual(args[i + 1].c_str(),
-									 OPT_WRITEDEFAULTS_ARGS, IgnoreCase::Left)) {
-						i++;
-						opt::valueOf[OPT_WRITEDEFAULTS] = args[i];
-					}
-				} else opt::valueOf[OPT_WRITEDEFAULTS] = "new";
-			}
-			else if (isMatch(OPT_LOADCONFIG, 'L')) {
-				if (i + 1 < args.size() and fs::exists(args[i + 1])) {
-					i++;
-					opt::valueOf[OPT_LOADCONFIG] = args[i];
-					loadConfigInto(&args);
-					continue;
-				}
-				
-				std::cout << "⚠️  Expecting config file path. Please see --help "
-							<< args[i].substr(2)
-							<< '\n';
-			}
-			else if (isMatch(OPT_ADSDIR, 'D')) {
-				if (i + 1 < args.size() and fs::exists(args[i + 1])) {
-					i++;
-					in::listAdsDir.emplace_back(fs::path(args[i]));
-					continue;
-				}
-				
-				std::cout << "⚠️  Expecting directory path. Please see --help "
-							<< args[i].substr(2)
-							<< '\n';
-			}
-			else if (isMatch(OPT_ADSCOUNT, 'C')) {
-				if (var range { std::pair<int, int>() };
-					i + 3 < args.size()
-					and (args[i + 2] == ".." or args[i + 2] == "-")
-					and isInt(args[i + 1], &(range.first))
-					and isInt(args[i + 3], &(range.second)))
-				{
-					if (range.first < range.second) {
-						opt::valueOf[OPT_ADSCOUNT] = range.first + '-' + range.second;
-						i += 3;
-						continue;
-					}
-					std::cout << "⚠️  "
-								<< args[i]
-								<< " value range is up side down!. "
-								<< range.first
-								<< " greater than "
-								<< range.second
-								<< '\n';
-				}
-				else if (func push{[&args, &i] (unsigned long pos, unsigned long offset) {
-					const var lower { args[i + 1].substr(0, pos) };
-					const var upper { args[i + 1].substr(pos + offset) };
-					   
-					int count[2] { 0, 0 };
-					if (isInt(lower, &count[0]) and isInt(upper, &count[1])
-						and count[0] < count[1]) {
-						opt::valueOf[OPT_ADSCOUNT] = lower + '-' + upper;
-						i++;
-						return true;
-					}
-					return false;
-				}};
-					i + 1 < args.size())
-				{
-					if (var pos { args[i + 1].find('-') };
-							pos not_eq std::string::npos
-						and pos not_eq 0 and pos not_eq args[i + 1].size() - 1)
-					{
-						if (push(pos, 1))
-							continue;
-					}
-					else if (pos = args[i + 1].find("..");
-							 pos not_eq std::string::npos)
-					{
-						if (push(pos, 2))
-							continue;
-					}
-					else if (var value { 0 };
-						isInt(args[i + 1], &value)) {
-						i++;
-						opt::valueOf[OPT_ADSCOUNT] = std::to_string(value);
-						continue;
-					}
-				}
-				std::cout << "⚠️  Expecting number of advertise. Please see --help "
-							<< args[i].substr(2)
-							<< '\n';
-			}
-			else if (isMatch(OPT_NOOUTPUTFILE, 	'F', true)) {
-				if (i + 1 < args.size())
-				{
-					i++;
-					if (isEqual(args[i + 1].c_str(), {"true", "yes"},
-								IgnoreCase::Left))
-						opt::valueOf[OPT_NOOUTPUTFILE] = "true";
-					else if (isEqual(args[i + 1].c_str(), {"false", "no"},
-									 IgnoreCase::Left))
-						opt::valueOf[OPT_NOOUTPUTFILE] = "false";
-					else
-						i--;
-				}
-			}
-			else if (isMatch(OPT_ARRANGEMENT, 'w')) {
-				if (i + 1 < args.size()
-					   and (args[i + 1].starts_with(MODE_ARRANGEMENT_DEFAULT)
-						 or args[i + 1] == MODE_ARRANGEMENT_UNORDERED
-						 or args[i + 1] == MODE_ARRANGEMENT_PERTITLE
-						 or args[i + 1] == MODE_ARRANGEMENT_ASCENDING
-						 or args[i + 1] == MODE_ARRANGEMENT_SHUFFLE
-						 or args[i + 1] == MODE_ARRANGEMENT_SHUFFLE_PERTITLE
-						 or args[i + 1].starts_with(MODE_ARRANGEMENT_SHUFFLE_DEFAULT)
-						 or args[i + 1] == MODE_ARRANGEMENT_DESCENDING
-						 or args[i + 1] == MODE_ARRANGEMENT_DESCENDING_PERTITLE
-						 or args[i + 1].starts_with(MODE_ARRANGEMENT_DESCENDING_DEFAULT)))
-				{
-					i++;
-					var value { args[i] };
-					if (args[i].starts_with(MODE_ARRANGEMENT_DEFAULT)
-						or args[i].starts_with(MODE_ARRANGEMENT_DEFAULT)
-						or args[i].starts_with(MODE_ARRANGEMENT_DESCENDING_DEFAULT))
-					{
-						const var pos { args[i].find('=') };
-						value = args[i].substr(0, pos - 1);
-						const var count_s { args[i].substr(pos + 1) };
-						if (var count { 0 }; isInt(count_s, &count) and count > 1)
-							fileCountPerTurn = count;
-					}
-					
-					opt::valueOf[OPT_ARRANGEMENT] = value;
-				} else
-					std::cout << "⚠️  Expecting arrangement type. Please see --help "
-								<< args[i].substr(2)
-								<< "\n";
-			}
-			else if (isMatch(OPT_CASEINSENSITIVE, 'N', true, OPT_CASEINSENSITIVE_ALTERNATIVE))
-			{
-				if (i + 1 < args.size() and isEqual(args[i + 1].c_str(),
-													TRUE_FALSE,
-													IgnoreCase::Left))
-					opt::valueOf[OPT_CASEINSENSITIVE] = args[++i];
-				
-				if (opt::valueOf[OPT_CASEINSENSITIVE] == "true") {
-					for (var& k : opt::listFindDir) k = tolower(k);
-					for (var& k : opt::listExclFindDir) k = tolower(k);
-					for (var& k : opt::listFind) k = tolower(k);
-					for (var& k : opt::listExclFind) k = tolower(k);
-				}
-			}
-			else if (isMatch(OPT_SEARCH, 'q')) {
-				if (i + 1 < args.size()) {
-					opt::valueOf[OPT_NOOUTPUTFILE] = "true";
-					opt::valueOf[OPT_VERBOSE] = "true";
-					opt::valueOf[OPT_ARRANGEMENT] = MODE_ARRANGEMENT_ASCENDING;
-					opt::valueOf[OPT_CASEINSENSITIVE] = "true";
-					
-					i++;
-					
-					var index { -1 };
-					var last { 0 };
-					func push{[&]() {
-						var keyVal { args[i].substr(last, index) };
-						if (keyVal not_eq "or" and keyVal not_eq "and") {
-							parseKeyValue(&keyVal, keyVal.starts_with("exclude-"));
-							
-							if (let EXCL { "exclude=" };
-								keyVal.starts_with(EXCL))
-							{
-								var value { keyVal.substr(std::strlen(EXCL)) };
-								if (value.find('=') not_eq std::string::npos)
-									parseKeyValue(&value, true);
-								if (not value.empty())
-									opt::listExclFind.emplace_back(value);
-							} else if (not keyVal.empty())
-								opt::listFind.emplace_back(keyVal);
-						}
-					}};
-					while (++index < args[i].size()) {
-						if (std::isspace(args[i][index])) {
-							if (last not_eq -1 and index - last > 0) {
-								push();
-								last = -1;
+							if (const var pos { in::args[i].find('=') };
+								pos not_eq std::string::npos)
+								keyVals.emplace(std::make_pair(
+												in::args[i].substr(0, pos),
+												in::args[i].substr(pos + 1)));
+							else {
+								keyVals.emplace(std::make_pair(in::args[i], in::args[i + 1]));
+								i++;
 							}
-							continue;
 						}
-						if (last == -1)
-							last = index;
 					}
-					if (last not_eq -1)
-						push();
-				} else
-					std::cout << "⚠️  Expecting search keyword!\n";
+					
+					for (var& file : files) {
+						var mp3 { ID3(file.string().c_str()) };
+						for (var& keyVal : keyVals)
+							mp3.set(keyVal.first, keyVal.second);
+						
+						if (not keyVals.empty())
+							mp3.write();
+						std::cout << "File "
+									<< file.filename()
+									<< ":\n"
+						<< mp3.string() << '\n';
+					}
+					
+					return RETURN_VALUE
+				}
+				if (in::args[i] == "date") {
+					if (i + 1 == in::args.size())
+						std::cout << "Usage: --debug=date 'date or/and time' ['output format']\n"
+									<< HELP_DATE_REST
+									<< '\n';
+					else {
+						i++;
+						const var input { in::args[i] };
+						var date { Date(input) };
+						
+						std::cout << '\"'
+									<< input
+									<< '\"'
+									<< "  -> \""
+						
+									<< date.string(i + 1 < in::args.size()
+												 ? in::args[++i].c_str()
+												 : nullptr)
+									<< "\" "
+									<< (date.isValid() ? "✅" : "❌")
+									<< '\n';
+					}
+					
+					return RETURN_VALUE
+				}
 			}
-			else if (isMatch(OPT_FIND, 			'i')
-					 or isMatch(OPT_EXCLFIND, 	'I')) {
-				if (i + 1 < args.size())
-				{
-					const var opt { args[i].substr(2) };
-					const var isExclude { opt == OPT_EXCLFIND };
+		}
+		else if (isMatch(OPT_OPEN, '\0', true));
+		else if (isMatch(OPT_OPENWITH, '\0')) {
+			if (i + 1 < in::args.size()) {
+				i++;
+				opt::valueOf[OPT_OPENWITH] = trim(in::args[i]);
+			} else
+				std::cout << "⚠️  Expecting application. Please see --help "
+							<< in::args[i].substr(2)
+							<< '\n';
+		}
+		else if (isMatch(OPT_SHOWCONFIG, '\0', true, OPT_SHOWCONFIG_ALTERNATIVE));
+		else if (isMatch(OPT_WRITEDEFAULTS, 'W', true, OPT_WRITEDEFAULTS_ALTERNATIVE)) {
+			if (i + 1 < in::args.size()) {
+				if (isEqual(in::args[i + 1], "reset", IgnoreCase::Left)) {
+					fs::remove(CONFIG_PATH);
+					opt::valueOf[OPT_WRITEDEFAULTS].clear();
 					i++;
-					var index { -1 };
-					var last { 0 };
-					var buff { std::string() };
-					var lastIndex{ 0 };
-					func push{[&](){
-						var keyVal { args[i].substr(last, index) };
-						if (keyVal.empty())
-							return;
+				}
+				else if (isEqual(in::args[i + 1].c_str(),
+								 OPT_WRITEDEFAULTS_ARGS, IgnoreCase::Left)) {
+					i++;
+					opt::valueOf[OPT_WRITEDEFAULTS] = in::args[i];
+				}
+			} else opt::valueOf[OPT_WRITEDEFAULTS] = "new";
+		}
+		else if (isMatch(OPT_LOADCONFIG, 'L')) {
+			if (i + 1 < in::args.size() and fs::exists(in::args[i + 1])) {
+				i++;
+				opt::valueOf[OPT_LOADCONFIG] = in::args[i];
+				loadConfigInto(&in::args);
+				continue;
+			}
+			
+			std::cout << "⚠️  Expecting config file path. Please see --help "
+						<< in::args[i].substr(2)
+						<< '\n';
+		}
+		else if (isMatch(OPT_ADSDIR, 'D')) {
+			if (i + 1 < in::args.size() and fs::exists(in::args[i + 1])) {
+				i++;
+				in::listAdsDir.emplace_back(fs::path(in::args[i]));
+				continue;
+			}
+			
+			std::cout << "⚠️  Expecting directory path. Please see --help "
+						<< in::args[i].substr(2)
+						<< '\n';
+		}
+		else if (isMatch(OPT_ADSCOUNT, 'C')) {
+			if (var range { std::pair<int, int>() };
+				i + 3 < in::args.size()
+				and (in::args[i + 2] == ".." or in::args[i + 2] == "-")
+				and isInt(in::args[i + 1], &(range.first))
+				and isInt(in::args[i + 3], &(range.second)))
+			{
+				if (range.first < range.second) {
+					opt::valueOf[OPT_ADSCOUNT] = range.first + '-' + range.second;
+					i += 3;
+					continue;
+				}
+				std::cout << "⚠️  "
+							<< in::args[i]
+							<< " value range is up side down!. "
+							<< range.first
+							<< " greater than "
+							<< range.second
+							<< '\n';
+			}
+			else if (func push{[&i] (unsigned long pos, unsigned long offset) {
+				const var lower { in::args[i + 1].substr(0, pos) };
+				const var upper { in::args[i + 1].substr(pos + offset) };
+				   
+				int count[2] { 0, 0 };
+				if (isInt(lower, &count[0]) and isInt(upper, &count[1])
+					and count[0] < count[1]) {
+					opt::valueOf[OPT_ADSCOUNT] = lower + '-' + upper;
+					i++;
+					return true;
+				}
+				return false;
+			}};
+				i + 1 < in::args.size())
+			{
+				if (var pos { in::args[i + 1].find('-') };
+						pos not_eq std::string::npos
+					and pos not_eq 0 and pos not_eq in::args[i + 1].size() - 1)
+				{
+					if (push(pos, 1))
+						continue;
+				}
+				else if (pos = in::args[i + 1].find("..");
+						 pos not_eq std::string::npos)
+				{
+					if (push(pos, 2))
+						continue;
+				}
+				else if (var value { 0 };
+					isInt(in::args[i + 1], &value)) {
+					i++;
+					opt::valueOf[OPT_ADSCOUNT] = std::to_string(value);
+					continue;
+				}
+			}
+			std::cout << "⚠️  Expecting number of advertise. Please see --help "
+						<< in::args[i].substr(2)
+						<< '\n';
+		}
+		else if (isMatch(OPT_NOOUTPUTFILE, 	'F', true)) {
+			if (i + 1 < in::args.size())
+			{
+				i++;
+				if (isEqual(in::args[i + 1].c_str(), {"true", "yes"},
+							IgnoreCase::Left))
+					opt::valueOf[OPT_NOOUTPUTFILE] = "true";
+				else if (isEqual(in::args[i + 1].c_str(), {"false", "no"},
+								 IgnoreCase::Left))
+					opt::valueOf[OPT_NOOUTPUTFILE] = "false";
+				else
+					i--;
+			}
+		}
+		else if (isMatch(OPT_ARRANGEMENT, 'w')) {
+			if (i + 1 < in::args.size()
+				   and (in::args[i + 1].starts_with(MODE_ARRANGEMENT_DEFAULT)
+					 or in::args[i + 1] == MODE_ARRANGEMENT_UNORDERED
+					 or in::args[i + 1] == MODE_ARRANGEMENT_PERTITLE
+					 or in::args[i + 1] == MODE_ARRANGEMENT_ASCENDING
+					 or in::args[i + 1] == MODE_ARRANGEMENT_SHUFFLE
+					 or in::args[i + 1] == MODE_ARRANGEMENT_SHUFFLE_PERTITLE
+					 or in::args[i + 1].starts_with(MODE_ARRANGEMENT_SHUFFLE_DEFAULT)
+					 or in::args[i + 1] == MODE_ARRANGEMENT_DESCENDING
+					 or in::args[i + 1] == MODE_ARRANGEMENT_DESCENDING_PERTITLE
+					 or in::args[i + 1].starts_with(MODE_ARRANGEMENT_DESCENDING_DEFAULT)))
+			{
+				i++;
+				var value { in::args[i] };
+				if (in::args[i].starts_with(MODE_ARRANGEMENT_DEFAULT)
+					or in::args[i].starts_with(MODE_ARRANGEMENT_DEFAULT)
+					or in::args[i].starts_with(MODE_ARRANGEMENT_DESCENDING_DEFAULT))
+				{
+					const var pos { in::args[i].find('=') };
+					value = in::args[i].substr(0, pos - 1);
+					const var count_s { in::args[i].substr(pos + 1) };
+					if (var count { 0 }; isInt(count_s, &count) and count > 1)
+						in::fileCountPerTurn = count;
+				}
+				
+				opt::valueOf[OPT_ARRANGEMENT] = value;
+			} else
+				std::cout << "⚠️  Expecting arrangement type. Please see --help "
+							<< in::args[i].substr(2)
+							<< "\n";
+		}
+		else if (isMatch(OPT_CASEINSENSITIVE, 'N', true, OPT_CASEINSENSITIVE_ALTERNATIVE))
+		{
+			if (i + 1 < in::args.size() and isEqual(in::args[i + 1].c_str(),
+												TRUE_FALSE,
+												IgnoreCase::Left))
+				opt::valueOf[OPT_CASEINSENSITIVE] = in::args[++i];
+			
+			if (opt::valueOf[OPT_CASEINSENSITIVE] == "true") {
+				for (var& k : opt::listFindDir) k = tolower(k);
+				for (var& k : opt::listExclFindDir) k = tolower(k);
+				for (var& k : opt::listFind) k = tolower(k);
+				for (var& k : opt::listExclFind) k = tolower(k);
+			}
+		}
+		else if (isMatch(OPT_SEARCH, 'q')) {
+			if (i + 1 < in::args.size()) {
+				opt::valueOf[OPT_NOOUTPUTFILE] = "true";
+				opt::valueOf[OPT_VERBOSE] = "true";
+				opt::valueOf[OPT_ARRANGEMENT] = MODE_ARRANGEMENT_ASCENDING;
+				opt::valueOf[OPT_CASEINSENSITIVE] = "true";
+				
+				i++;
+				
+				var index { -1 };
+				var last { 0 };
+				func push{[&]() {
+					var keyVal { in::args[i].substr(last, index) };
+					if (keyVal not_eq "or" and keyVal not_eq "and") {
+						parseKeyValue(&keyVal, keyVal.starts_with("exclude-"));
 						
-						const var isTrue { parseKeyValue(&keyVal,
-											keyVal.starts_with("exclude-")) };
-						
-						if (let EXCL {"exclude="};
+						if (let EXCL { "exclude=" };
 							keyVal.starts_with(EXCL))
 						{
 							var value { keyVal.substr(std::strlen(EXCL)) };
 							if (value.find('=') not_eq std::string::npos)
 								parseKeyValue(&value, true);
-							if (not value.empty()) {
-								(isExclude ? opt::listExclFind : opt::listFind)
-									.emplace_back(value);
-								opt::valueOf[opt] = "1";
-							}
-						}
-						else if (not isTrue
-							and (lastIndex == 0 or last - lastIndex == 1))
-						{
-							if (not buff.empty())
-								buff.append(" ");
-							buff.append(keyVal);
-							lastIndex = index;
-						}
-					}};
-					while (++index < args[i].size()) {
-						if (std::isspace(args[i][index])) {
-							if (last not_eq -1 and index - last > 0) {
-								push();
-								last = -1;
-							}
-							continue;
-						}
-						if (last == -1)
-							last = index;
+							if (not value.empty())
+								opt::listExclFind.emplace_back(value);
+						} else if (not keyVal.empty())
+							opt::listFind.emplace_back(keyVal);
 					}
-					if (last not_eq -1)
-						push();
-					
-					if (not buff.empty()) {
-						(isExclude ? opt::listExclFind : opt::listFind).emplace_back(buff);
-						opt::valueOf[opt] = "1";
-					}
-				} else
-					std::cout << "⚠️  Expecting keyword after \""
-								<< args[i]
-								<< "\" option. Please see --help "
-								<< args[i].substr(2)
-								<< '\n';
-			}
-			else if (isMatch(OPT_REGEXSYNTAX, 	'X')) {
-				if (var found { false }; i + 1 < args.size()) {
-					for (var& s : OPT_REGEXSYNTAX_ARGS)
-						if (isEqual(args[i + 1].c_str(), s, IgnoreCase::Left)) {
-							opt::valueOf[OPT_REGEXSYNTAX] = s;
-							i++;
-							found = true;
-							break;
-						}
-					if (found)
-						continue;
-				}
-				std::cout << "⚠️  Expecting regular expression syntax after \""
-							<< args[i]
-							<< "\" option. Please see --help "
-							<< args[i].substr(2)
-							<< '\n';
-			}
-			else if (	isMatch(OPT_REGEX, 		'r')
-					 or isMatch(OPT_EXCLREGEX, 	'R')) {
-				if (var found { false }; i + 1 < args.size())
-				{
-					if (const var pos { args[i + 1].find('=') };
-						pos not_eq std::string::npos)
-					{
-						if (args[i + 1].substr(0, pos) == "type") {
-							const var value { args[i + 1].substr(pos + 1) };
-							for (var& keyword : OPT_REGEXSYNTAX_ARGS)
-								if (keyword == value) {
-									opt::valueOf[OPT_REGEXSYNTAX] = keyword;
-									i++;
-									found = true;
-									break;
-								}
-						}
-					}
-					
-					if (not found) {
-						func getRegexSyntaxType{[](const std::string& s)
-							-> std::regex_constants::syntax_option_type {
-							if (s == "basic") return std::regex_constants::syntax_option_type::basic;
-							if (s == "extended") return std::regex_constants::syntax_option_type::extended;
-							if (s == "awk") return std::regex_constants::syntax_option_type::awk;
-							if (s == "grep") return std::regex_constants::syntax_option_type::grep;
-							if (s == "egrep") return std::regex_constants::syntax_option_type::egrep;
-							else return std::regex_constants::syntax_option_type::ECMAScript;
-						}};
-						const var opt { args[i].substr(2) };
-						(opt == OPT_REGEX ? opt::listRegex : opt::listExclRegex)
-							.emplace_back(std::regex(args[i + 1],
-										getRegexSyntaxType(opt::valueOf[OPT_REGEXSYNTAX])));
-						opt::valueOf[opt] = "1";
-						i++;
-					}
-				} else
-					std::cout << "⚠️  Expecting regular expression after \""
-								<< args[i]
-								<< "\" option. Please see --help "
-								<< args[i].substr(2)
-								<< '\n';
-			}
-			else if (	isMatch(OPT_DATE, 			'z')
-					 or isMatch(OPT_EXCLDATE, 		'Z')
-					 or isMatch(OPT_DCREATED, 	't')
-					 or isMatch(OPT_DCHANGED, 	'g')
-					 or isMatch(OPT_DACCESSED, 	'a')
-					 or isMatch(OPT_DMODIFIED, 	'm')
-					 or isMatch(OPT_DEXCLCREATED, 	'T')
-					 or isMatch(OPT_DEXCLCHANGED, 	'G')
-					 or isMatch(OPT_DEXCLACCESSED, 	'A')
-					 or isMatch(OPT_DEXCLMODIFIED, 	'M')
-					 )
-			{
-				const var opt { args[i].substr(2) };
-				func as_single{[&](const char opGt) -> bool {
-					const var date { Date(args[i + 1]) };
-					if (date.isValid()) {
-						if (opt == OPT_DATE) {
-							opt::listDCreated.emplace_back(std::make_pair(opGt, date));
-							opt::listDChanged.emplace_back(std::make_pair(opGt, date));
-							opt::listDModified.emplace_back(std::make_pair(opGt, date));
-							opt::listDAccessed.emplace_back(std::make_pair(opGt, date));
-							opt::valueOf[OPT_DCREATED]  = "1";
-							opt::valueOf[OPT_DMODIFIED] = "1";
-							opt::valueOf[OPT_DACCESSED] = "1";
-							opt::valueOf[OPT_DCHANGED]  = "1";
-						} else if (opt == OPT_EXCLDATE) {
-							opt::listDExclCreated.emplace_back(std::make_pair(opGt, date));
-							opt::listDExclChanged.emplace_back(std::make_pair(opGt, date));
-							opt::listDExclModified.emplace_back(std::make_pair(opGt, date));
-							opt::listDExclAccessed.emplace_back(std::make_pair(opGt, date));
-							opt::valueOf[OPT_DEXCLCREATED]  = "1";
-							opt::valueOf[OPT_DEXCLMODIFIED] = "1";
-							opt::valueOf[OPT_DEXCLACCESSED] = "1";
-							opt::valueOf[OPT_DEXCLCHANGED]  = "1";
-						} else {
-						(opt == OPT_DCREATED ? opt::listDCreated
-						 : opt == OPT_DCHANGED ? opt::listDChanged
-						 : opt == OPT_DMODIFIED ? opt::listDModified
-						 : opt == OPT_DACCESSED ? opt::listDAccessed
-						 : opt == OPT_DEXCLCREATED ? opt::listDExclCreated
-						 : opt == OPT_DEXCLCHANGED ? opt::listDExclChanged
-						 : opt == OPT_DEXCLMODIFIED ? opt::listDExclModified
-						 : opt::listDExclAccessed
-						 ).emplace_back(std::make_pair(opGt, date));
-
-							opt::valueOf[opt] = "1";
-						}
-						i++;
-						return true;
-					}
-					return false;
 				}};
-				if (i + 1 < args.size()
-					and (args[i + 1][0] == '<'
-							or args[i + 1][0] == '>'
-							or args[i + 1][0] == '='))
-				{
-					if (args[i + 1] == "<" or args[i + 1] == ">"
-						or args[i + 1] == "=")
-					{
-						if (i + 2 < args.size())
-							i++;
-						else
-							goto DATE_NEEDED;
-					}
-
-					if (as_single(args[i + 1][0]))
-						continue;
-				}
-				else
-				{
-					func push{[&](const Date& lower, const Date& upper) {
-						if (lower > upper) {
-							std::cout << "⚠️  Date range up side down!, "
-										<< lower.string()
-										<< " greater than "
-										<< upper.string()
-										<< '\n';
-							return false;
+				while (++index < in::args[i].size()) {
+					if (std::isspace(in::args[i][index])) {
+						if (last not_eq -1 and index - last > 0) {
+							push();
+							last = -1;
 						}
-						if (opt == OPT_DATE) {
-							opt::listDCreatedR.emplace_back(std::make_pair(lower, upper));
-							opt::listDChangedR.emplace_back(std::make_pair(lower, upper));
-							opt::listDModifiedR.emplace_back(std::make_pair(lower, upper));
-							opt::listDAccessedR.emplace_back(std::make_pair(lower, upper));
-							opt::valueOf[OPT_DCREATED]  = "1";
-							opt::valueOf[OPT_DMODIFIED] = "1";
-							opt::valueOf[OPT_DACCESSED] = "1";
-							opt::valueOf[OPT_DCHANGED]  = "1";
-						} else if (opt == OPT_EXCLDATE) {
-							opt::listDExclCreatedR.emplace_back(std::make_pair(lower, upper));
-							opt::listDExclChangedR.emplace_back(std::make_pair(lower, upper));
-							opt::listDExclModifiedR.emplace_back(std::make_pair(lower, upper));
-							opt::listDExclAccessedR.emplace_back(std::make_pair(lower, upper));
-							opt::valueOf[OPT_DEXCLCREATED]  = "1";
-							opt::valueOf[OPT_DEXCLMODIFIED] = "1";
-							opt::valueOf[OPT_DEXCLACCESSED] = "1";
-							opt::valueOf[OPT_DEXCLCHANGED]  = "1";
-						} else {
-						(opt == OPT_DCREATED ? opt::listDCreatedR
-						 : opt == OPT_DCHANGED ? opt::listDChangedR
-						 : opt == OPT_DMODIFIED ? opt::listDModifiedR
-						 : opt == OPT_DACCESSED ? opt::listDAccessedR
-						 : opt == OPT_DEXCLCREATED ? opt::listDExclCreatedR
-						 : opt == OPT_DEXCLCHANGED ? opt::listDExclChangedR
-						 : opt == OPT_DEXCLMODIFIED ? opt::listDExclModifiedR
-						 : opt::listDExclAccessedR
-						 ).emplace_back(std::make_pair(lower, upper));
+						continue;
+					}
+					if (last == -1)
+						last = index;
+				}
+				if (last not_eq -1)
+					push();
+			} else
+				std::cout << "⚠️  Expecting search keyword!\n";
+		}
+		else if (	isMatch(OPT_FIND, 		'i')
+				 or isMatch(OPT_EXCLFIND, 	'I')) {
+			if (i + 1 < in::args.size())
+			{
+				const var opt { in::args[i].substr(2) };
+				const var isExclude { opt == OPT_EXCLFIND };
+				i++;
+				var index { -1 };
+				var last { 0 };
+				var buff { std::string() };
+				var lastIndex{ 0 };
+				func push{[&](){
+					var keyVal { in::args[i].substr(last, index) };
+					if (keyVal.empty())
+						return;
+					
+					const var isTrue { parseKeyValue(&keyVal,
+										keyVal.starts_with("exclude-")) };
+					
+					if (let EXCL {"exclude="};
+						keyVal.starts_with(EXCL))
+					{
+						var value { keyVal.substr(std::strlen(EXCL)) };
+						if (value.find('=') not_eq std::string::npos)
+							parseKeyValue(&value, true);
+						if (not value.empty()) {
+							(isExclude ? opt::listExclFind : opt::listFind)
+								.emplace_back(value);
 							opt::valueOf[opt] = "1";
 						}
-						return true;
+					}
+					else if (not isTrue
+						and (lastIndex == 0 or last - lastIndex == 1))
+					{
+						if (not buff.empty())
+							buff.append(" ");
+						buff.append(keyVal);
+						lastIndex = index;
+					}
+				}};
+				while (++index < in::args[i].size()) {
+					if (std::isspace(in::args[i][index])) {
+						if (last not_eq -1 and index - last > 0) {
+							push();
+							last = -1;
+						}
+						continue;
+					}
+					if (last == -1)
+						last = index;
+				}
+				if (last not_eq -1)
+					push();
+				
+				if (not buff.empty()) {
+					(isExclude ? opt::listExclFind : opt::listFind).emplace_back(buff);
+					opt::valueOf[opt] = "1";
+				}
+			} else
+				std::cout << "⚠️  Expecting keyword after \""
+							<< in::args[i]
+							<< "\" option. Please see --help "
+							<< in::args[i].substr(2)
+							<< '\n';
+		}
+		else if (isMatch(OPT_REGEXSYNTAX, 	'X')) {
+			if (var found { false }; i + 1 < in::args.size()) {
+				for (var& s : OPT_REGEXSYNTAX_ARGS)
+					if (isEqual(in::args[i + 1].c_str(), s, IgnoreCase::Left)) {
+						opt::valueOf[OPT_REGEXSYNTAX] = s;
+						i++;
+						found = true;
+						break;
+					}
+				if (found)
+					continue;
+			}
+			std::cout << "⚠️  Expecting regular expression syntax after \""
+						<< in::args[i]
+						<< "\" option. Please see --help "
+						<< in::args[i].substr(2)
+						<< '\n';
+		}
+		else if (	isMatch(OPT_REGEX, 		'r')
+				 or isMatch(OPT_EXCLREGEX, 	'R')) {
+			if (var found { false }; i + 1 < in::args.size())
+			{
+				if (const var pos { in::args[i + 1].find('=') };
+					pos not_eq std::string::npos)
+				{
+					if (in::args[i + 1].substr(0, pos) == "type") {
+						const var value { in::args[i + 1].substr(pos + 1) };
+						for (var& keyword : OPT_REGEXSYNTAX_ARGS)
+							if (keyword == value) {
+								opt::valueOf[OPT_REGEXSYNTAX] = keyword;
+								i++;
+								found = true;
+								break;
+							}
+					}
+				}
+				
+				if (not found) {
+					func getRegexSyntaxType{[](const std::string& s)
+						-> std::regex_constants::syntax_option_type {
+						if (s == "basic") 	return std::regex_constants::syntax_option_type::basic;
+						if (s == "extended")return std::regex_constants::syntax_option_type::extended;
+						if (s == "awk") 	return std::regex_constants::syntax_option_type::awk;
+						if (s == "grep") 	return std::regex_constants::syntax_option_type::grep;
+						if (s == "egrep") 	return std::regex_constants::syntax_option_type::egrep;
+						else return std::regex_constants::syntax_option_type::ECMAScript;
 					}};
-					if (i + 3 < args.size() and
-						(args[i + 2] == "-" or args[i + 2] == "..")) {
-						if (const var lower { Date(args[i + 1]) }; lower.isValid())
-							if (const var upper { Date(args[i + 3]) }; upper.isValid())
+					const var opt { in::args[i].substr(2) };
+					(opt == OPT_REGEX ? opt::listRegex : opt::listExclRegex)
+						.emplace_back(std::regex(in::args[i + 1],
+									getRegexSyntaxType(opt::valueOf[OPT_REGEXSYNTAX])));
+					opt::valueOf[opt] = "1";
+					i++;
+				}
+			} else
+				std::cout << "⚠️  Expecting regular expression after \""
+							<< in::args[i]
+							<< "\" option. Please see --help "
+							<< in::args[i].substr(2)
+							<< '\n';
+		}
+		else if (	isMatch(OPT_DATE, 			'z')
+				 or isMatch(OPT_EXCLDATE, 		'Z')
+				 or isMatch(OPT_DCREATED, 	't')
+				 or isMatch(OPT_DCHANGED, 	'g')
+				 or isMatch(OPT_DACCESSED, 	'a')
+				 or isMatch(OPT_DMODIFIED, 	'm')
+				 or isMatch(OPT_DEXCLCREATED, 	'T')
+				 or isMatch(OPT_DEXCLCHANGED, 	'G')
+				 or isMatch(OPT_DEXCLACCESSED, 	'A')
+				 or isMatch(OPT_DEXCLMODIFIED, 	'M')
+				 )
+		{
+			const var opt { in::args[i].substr(2) };
+			func as_single{[&](const char opGt) -> bool {
+				const var date { Date(in::args[i + 1]) };
+				if (date.isValid()) {
+					if (opt == OPT_DATE) {
+						opt::listDCreated.emplace_back(std::make_pair(opGt, date));
+						opt::listDChanged.emplace_back(std::make_pair(opGt, date));
+						opt::listDModified.emplace_back(std::make_pair(opGt, date));
+						opt::listDAccessed.emplace_back(std::make_pair(opGt, date));
+						opt::valueOf[OPT_DCREATED]  = "1";
+						opt::valueOf[OPT_DMODIFIED] = "1";
+						opt::valueOf[OPT_DACCESSED] = "1";
+						opt::valueOf[OPT_DCHANGED]  = "1";
+					} else if (opt == OPT_EXCLDATE) {
+						opt::listDExclCreated.emplace_back(std::make_pair(opGt, date));
+						opt::listDExclChanged.emplace_back(std::make_pair(opGt, date));
+						opt::listDExclModified.emplace_back(std::make_pair(opGt, date));
+						opt::listDExclAccessed.emplace_back(std::make_pair(opGt, date));
+						opt::valueOf[OPT_DEXCLCREATED]  = "1";
+						opt::valueOf[OPT_DEXCLMODIFIED] = "1";
+						opt::valueOf[OPT_DEXCLACCESSED] = "1";
+						opt::valueOf[OPT_DEXCLCHANGED]  = "1";
+					} else {
+					(opt == OPT_DCREATED ? opt::listDCreated
+					 : opt == OPT_DCHANGED ? opt::listDChanged
+					 : opt == OPT_DMODIFIED ? opt::listDModified
+					 : opt == OPT_DACCESSED ? opt::listDAccessed
+					 : opt == OPT_DEXCLCREATED ? opt::listDExclCreated
+					 : opt == OPT_DEXCLCHANGED ? opt::listDExclChanged
+					 : opt == OPT_DEXCLMODIFIED ? opt::listDExclModified
+					 : opt::listDExclAccessed
+					 ).emplace_back(std::make_pair(opGt, date));
+
+						opt::valueOf[opt] = "1";
+					}
+					i++;
+					return true;
+				}
+				return false;
+			}};
+			if (i + 1 < in::args.size()
+				and (	in::args[i + 1][0] == '<'
+					or 	in::args[i + 1][0] == '>'
+					or 	in::args[i + 1][0] == '='))
+			{
+				if (in::args[i + 1] == "<" or in::args[i + 1] == ">"
+					or in::args[i + 1] == "=")
+				{
+					if (i + 2 < in::args.size())
+						i++;
+					else
+						goto DATE_NEEDED;
+				}
+
+				if (as_single(in::args[i + 1][0]))
+					continue;
+			}
+			else
+			{
+				func push{[&](const Date& lower, const Date& upper) {
+					if (lower > upper) {
+						std::cout << "⚠️  Date range up side down!, "
+									<< lower.string()
+									<< " greater than "
+									<< upper.string()
+									<< '\n';
+						return false;
+					}
+					if (opt == OPT_DATE) {
+						opt::listDCreatedR.emplace_back(std::make_pair(lower, upper));
+						opt::listDChangedR.emplace_back(std::make_pair(lower, upper));
+						opt::listDModifiedR.emplace_back(std::make_pair(lower, upper));
+						opt::listDAccessedR.emplace_back(std::make_pair(lower, upper));
+						opt::valueOf[OPT_DCREATED]  = "1";
+						opt::valueOf[OPT_DMODIFIED] = "1";
+						opt::valueOf[OPT_DACCESSED] = "1";
+						opt::valueOf[OPT_DCHANGED]  = "1";
+					} else if (opt == OPT_EXCLDATE) {
+						opt::listDExclCreatedR.emplace_back(std::make_pair(lower, upper));
+						opt::listDExclChangedR.emplace_back(std::make_pair(lower, upper));
+						opt::listDExclModifiedR.emplace_back(std::make_pair(lower, upper));
+						opt::listDExclAccessedR.emplace_back(std::make_pair(lower, upper));
+						opt::valueOf[OPT_DEXCLCREATED]  = "1";
+						opt::valueOf[OPT_DEXCLMODIFIED] = "1";
+						opt::valueOf[OPT_DEXCLACCESSED] = "1";
+						opt::valueOf[OPT_DEXCLCHANGED]  = "1";
+					} else {
+					(opt == OPT_DCREATED ? opt::listDCreatedR
+					 : opt == OPT_DCHANGED ? opt::listDChangedR
+					 : opt == OPT_DMODIFIED ? opt::listDModifiedR
+					 : opt == OPT_DACCESSED ? opt::listDAccessedR
+					 : opt == OPT_DEXCLCREATED ? opt::listDExclCreatedR
+					 : opt == OPT_DEXCLCHANGED ? opt::listDExclChangedR
+					 : opt == OPT_DEXCLMODIFIED ? opt::listDExclModifiedR
+					 : opt::listDExclAccessedR
+					 ).emplace_back(std::make_pair(lower, upper));
+						opt::valueOf[opt] = "1";
+					}
+					return true;
+				}};
+				if (i + 3 < in::args.size() and
+					(in::args[i + 2] == "-" or in::args[i + 2] == "..")) {
+					if (const var lower { Date(in::args[i + 1]) }; lower.isValid())
+						if (const var upper { Date(in::args[i + 3]) }; upper.isValid())
+							if (push(lower, upper)) {
+								i += 3;
+								continue;
+							}
+				} else if (i + 1 < in::args.size()) {
+					var pos { in::args[i + 1].find("..") };
+					var next { 2 };
+					if (pos == std::string::npos) {
+						next = 1;
+						var strip { (unsigned) 0 };
+						pos = 0;
+						for (var m { 0 }; m < in::args[i + 1].size(); ++m)
+							if (in::args[i + 1][m] == '-') {
+								strip++;
+								pos = m;
+							}
+						if (strip not_eq 1)
+							pos = std::string::npos;
+					}
+						
+					if (pos not_eq std::string::npos) {
+						if (const var lower { Date(in::args[i + 1].substr(0, pos)) };
+							lower.isValid())
+							if (const var upper { Date(in::args[i + 1].substr(pos + next)) };
+								upper.isValid())
+							{
 								if (push(lower, upper)) {
-									i += 3;
+									i++;
 									continue;
 								}
-					} else if (i + 1 < args.size()) {
-						var pos { args[i + 1].find("..") };
-						var next { 2 };
-						if (pos == std::string::npos) {
-							next = 1;
-							var strip { (unsigned) 0 };
-							pos = 0;
-							for (var m { 0 }; m < args[i + 1].size(); ++m)
-								if (args[i + 1][m] == '-') {
-									strip++;
-									pos = m;
-								}
-							if (strip not_eq 1)
-								pos = std::string::npos;
-						}
-							
-						if (pos not_eq std::string::npos) {
-							if (const var lower { Date(args[i + 1].substr(0, pos)) };
-								lower.isValid())
-								if (const var upper { Date(args[i + 1].substr(pos + next)) };
-									upper.isValid())
-								{
-									if (push(lower, upper)) {
-										i++;
-										continue;
-									}
-								}
-						}
-						
-						if (as_single('=')) {
-							continue;
-						}
-						
+							}
 					}
-				}
-DATE_NEEDED:	std::cout << "⚠️  Expecting date and/or time after \""
-							<< args[i]
-							<< "\" option. Please see --help "
-							<< args[i].substr(2)
-							<< '\n';
-			}
-			else if (isMatch(OPT_OVERWRITE, 	'O', true)) {
-				if (i + 1 < args.size() and isEqual(args[i + 1].c_str(),
-													TRUE_FALSE, IgnoreCase::Left))
-					opt::valueOf[OPT_OVERWRITE] = args[++i];
-			}
-			else if (isMatch(OPT_BENCHMARK, 	'b', true)) {
-				if (i + 1 < args.size() and isEqual(args[i + 1].c_str(),
-													TRUE_FALSE, IgnoreCase::Left))
-					opt::valueOf[OPT_OVERWRITE] = args[++i];
-			}
-			else if (isMatch(OPT_SKIPSUBTITLE, 	'x', true)) {
-				if (i + 1 < args.size() and isEqual(args[i + 1].c_str(),
-													TRUE_FALSE, IgnoreCase::Left))
-					opt::valueOf[OPT_OVERWRITE] = args[++i];
-			}
-			else if (isMatch(OPT_EXCLHIDDEN, 	'n', true)) {
-				if (i + 1 < args.size() and isEqual(args[i + 1].c_str(),
-													TRUE_FALSE, IgnoreCase::Left))
-					opt::valueOf[OPT_OVERWRITE] = args[++i];
-			}
-			else if (isMatch(OPT_VERBOSE, 		'V', true)) {
-				if (i + 1 < args.size() and (args[i + 1] == "all" or args[i + 1] == "info"))
-				{
-					i++;
-					opt::valueOf[OPT_VERBOSE] = args[i];
-				}
-			}
-			else if (isMatch(OPT_EXECUTION, 	'c')) {
-				if (i + 1 < args.size()) {
-					i++;
-					if (args[i] == MODE_EXECUTION_ASYNC or args[i] == MODE_EXECUTION_THREAD)
-						opt::valueOf[OPT_EXECUTION] = args[i];
-					else
-						opt::valueOf[OPT_EXECUTION] = "Linear";
-				} else
-					std::cout << "⚠️  Expecting 'thread', 'async', or 'none' after \""
-								<< args[i]
-								<< "\" option. Please see --help "
-								<< args[i].substr(2)
-								<< '\n';
-			}
-			else if (	isMatch(OPT_EXT,		'e')
-					 or isMatch(OPT_EXCLEXT, 	'E')) {
-				if (i + 1 < args.size()) {
-					const var opt { args[i].substr(2) == OPT_EXT ? OPT_EXT : OPT_EXCLEXT };
-					i++;
-					if (args[i].size() == 2 and args[i][1] == '=' and i + 1 < args.size())
-					{
-						enum class OP { Add, Sub };
-						
-						const var op { args[i][0] == '+' ? OP::Add : OP::Sub };
-						
-						i++;
-						
-						var newList { ListString() };
-						parseExtCommaDelimited(args[i], &newList);
-						
-						if (not opt::valueOf[opt].empty()) {
-							if (op == OP::Sub) {
-								var list { ListString() };
-								parseExtCommaDelimited(opt::valueOf[opt], &list);
-								opt::valueOf[opt].clear();
-								
-								for (var& ext : newList) {
-									const var iterator { std::find(list.begin(), list.end(), ext) };
-									if (iterator not_eq list.end())
-										list.erase(iterator);
-								}
-								
-								for (var& ext : list) {
-									if (not opt::valueOf[opt].empty())
-										opt::valueOf[opt] += ",";
-									opt::valueOf[opt] += std::move(ext);
-								}
-							} else
-								for (var& ext : newList)
-									opt::valueOf[opt] += std::move(ext);
-							
-						} else {
-							var extensions { opt == OPT_EXT ? &opt::DEFAULT_EXT
-															: &opt::EXCLUDE_EXT };
-							for (var& ext : newList)
-								if (op == OP::Sub)
-									extensions->erase(std::move(ext));
-								else
-									extensions->insert(std::move(ext));
-							(opt == OPT_EXT
-								? opt::DEFAULT_EXT_REPLACED
-								: opt::EXCLUDE_EXT_REPLACED) = true;
-						}
-					}
-					else
-						opt::valueOf[opt] = args[i] == "*.*" ? "*" : args[i];
 					
-				} else
-					std::cout << "Expecting extension after \""
-								<< args[i]
-								<< "\" option (eg: \"mp4, mkv\"). Please see --help "
-								<< args[i].substr(2)
-								<< '\n';
-			}
-			else if (isMatch(OPT_OUTFILENAME, 	'f', false, {"fix-filename"})) {
-				if (i + 1 < args.size()) {
-					i++;
-					opt::valueOf[OPT_OUTFILENAME] = args[i];
-					if (var parent { fs::path(args[i]).parent_path().string() };
-						not parent.empty())
-					{
-						opt::valueOf[OPT_OUTFILENAME] = fs::path(args[i]).filename().string();
-						parent += fs::path::preferred_separator;
-						args.insert(args.begin() + 1 + i, std::move(parent));
-						
-						parent = "--";
-						parent += OPT_OUTDIR;
-						args.insert(args.begin() + 1 + i, std::move(parent));
+					if (as_single('=')) {
+						continue;
 					}
-				} else
-					std::cout << "⚠️  Expecting file name after \""
-								<< args[i]
-								<< "\" option (eg: \"my_playlist.m3u8\"). Please see --help "
-								<< args[i].substr(2)
-								<< '\n';
+					
+				}
 			}
-			else if (isMatch(OPT_OUTDIR, 		'd')) {
-				if (i + 1 < args.size()) {
+DATE_NEEDED:	std::cout << "⚠️  Expecting date and/or time after \""
+						<< in::args[i]
+						<< "\" option. Please see --help "
+						<< in::args[i].substr(2)
+						<< '\n';
+		}
+		else if (isMatch(OPT_OVERWRITE, 	'O', true)) {
+			if (i + 1 < in::args.size() and isEqual(in::args[i + 1].c_str(),
+												TRUE_FALSE, IgnoreCase::Left))
+				opt::valueOf[OPT_OVERWRITE] = in::args[++i];
+		}
+		else if (isMatch(OPT_BENCHMARK, 	'b', true)) {
+			if (i + 1 < in::args.size() and isEqual(in::args[i + 1].c_str(),
+												TRUE_FALSE, IgnoreCase::Left))
+				opt::valueOf[OPT_OVERWRITE] = in::args[++i];
+		}
+		else if (isMatch(OPT_SKIPSUBTITLE, 	'x', true)) {
+			if (i + 1 < in::args.size() and isEqual(in::args[i + 1].c_str(),
+												TRUE_FALSE, IgnoreCase::Left))
+				opt::valueOf[OPT_OVERWRITE] = in::args[++i];
+		}
+		else if (isMatch(OPT_EXCLHIDDEN, 	'n', true)) {
+			if (i + 1 < in::args.size() and isEqual(in::args[i + 1].c_str(),
+												TRUE_FALSE, IgnoreCase::Left))
+				opt::valueOf[OPT_OVERWRITE] = in::args[++i];
+		}
+		else if (isMatch(OPT_VERBOSE, 		'V', true)) {
+			if (i + 1 < in::args.size()
+				and (in::args[i + 1] == "all" or in::args[i + 1] == "info"))
+			{
+				i++;
+				opt::valueOf[OPT_VERBOSE] = in::args[i];
+			}
+		}
+		else if (isMatch(OPT_EXECUTION, 	'c')) {
+			if (i + 1 < in::args.size()) {
+				i++;
+				if (in::args[i] == MODE_EXECUTION_ASYNC or in::args[i] == MODE_EXECUTION_THREAD)
+					opt::valueOf[OPT_EXECUTION] = in::args[i];
+				else
+					opt::valueOf[OPT_EXECUTION] = "Linear";
+			} else
+				std::cout << "⚠️  Expecting 'thread', 'async', or 'none' after \""
+							<< in::args[i]
+							<< "\" option. Please see --help "
+							<< in::args[i].substr(2)
+							<< '\n';
+		}
+		else if (	isMatch(OPT_EXT,		'e')
+				 or isMatch(OPT_EXCLEXT, 	'E')) {
+			if (i + 1 < in::args.size()) {
+				const var opt { in::args[i].substr(2) == OPT_EXT ? OPT_EXT : OPT_EXCLEXT };
+				i++;
+				if (in::args[i].size() == 2 and in::args[i][1] == '=' and i + 1 < in::args.size())
+				{
+					enum class OP { Add, Sub };
+					
+					const var op { in::args[i][0] == '+' ? OP::Add : OP::Sub };
+					
 					i++;
-					const var dir { fs::path(args[i]) };
-					if (not fs::exists(dir))
-						fs::create_directories(dir);
-					opt::valueOf[OPT_OUTDIR] = fs::absolute(dir);
-					if (const var tmp { args[i] };
-						tmp[tmp.size() - 1] not_eq fs::path::preferred_separator)
-						opt::valueOf[OPT_OUTDIR] += fs::path::preferred_separator;
-				} else
-					std::cout << "⚠️  Expecting directory after \""
-								<< args[i]
-								<< "\" option (eg: \"Downloads/\"). Please see --help "
-								<< args[i].substr(2)
-								<< '\n';
-			}
-			else if (	isMatch(OPT_SIZE, 		's')
-					 or isMatch(OPT_EXCLSIZE, 	'S')) {
-				if (bool isExclude{ args[i].substr(2) == OPT_EXCLSIZE };
-					i + 1 < args.size()) {
-					if (args[i + 1][0] == '<' or args[i + 1][0] == '>')
-					{
-						i++;
-						const var opGT { args[i][0] };
-						
-						var value{ (uintmax_t) 0 };
-						
-						if (args[i].size() > 1) {
-							value = getBytes(args[i].substr(1));
-							if (value <= 0)
-								goto SIZE_NEEDED;
-						}
-						
-						if (value <= 0 and i + 1 < args.size()) {
-							value = getBytes(args[i + 1]);
+					
+					var newList { ListString() };
+					parseExtCommaDelimited(in::args[i], &newList);
+					
+					if (not opt::valueOf[opt].empty()) {
+						if (op == OP::Sub) {
+							var list { ListString() };
+							parseExtCommaDelimited(opt::valueOf[opt], &list);
+							opt::valueOf[opt].clear();
 							
-							if (value <= 0)
-								goto SIZE_NEEDED;
-							else
-								i++;
-						}
+							for (var& ext : newList) {
+								const var iterator { std::find(list.begin(), list.end(), ext) };
+								if (iterator not_eq list.end())
+									list.erase(iterator);
+							}
+							
+							for (var& ext : list) {
+								if (not opt::valueOf[opt].empty())
+									opt::valueOf[opt] += ",";
+								opt::valueOf[opt] += std::move(ext);
+							}
+						} else
+							for (var& ext : newList)
+								opt::valueOf[opt] += std::move(ext);
 						
-						opt::valueOf[isExclude ? OPT_EXCLSIZEOPGT : OPT_SIZEOPGT] = opGT;
-						opt::valueOf[isExclude ? OPT_EXCLSIZE : OPT_SIZE] = std::to_string(std::move(value));
-						(isExclude ? opt::listExclSize : opt::listSize).clear();
 					} else {
-						var range { getRange(args[i + 1], std::move("-")) };
-						if (not range)
-							range = getRange(args[i + 1], std::move(".."));
-						
-						const var s_first { std::string(isExclude ? OPT_EXCLSIZE : OPT_SIZE) };
-						var first { std::string("0") };
-						var second { std::string("0") };
-						
-						if (range)
-						{
-							first = std::to_string(range->first);
-							second = std::to_string(range->second);
-							
-							i++;
-							
-							if (second == "0") {
-								var value { (uintmax_t) 0 };
-								if (i + 1 < args.size())
-									value = getBytes(args[i + 1]);
-								
-								if (value > 0) {
-									second = std::to_string(value);
-									i++;
-								} else
-									goto SIZE_NEEDED;
-							}
-						} else {
-							if (i + 3 < args.size()) {
-								first = std::to_string(getBytes(args[i + 1]));
-								second = std::to_string(getBytes(args[i + 3]));
-							} else if (i + 2 < args.size()) {
-								first = std::to_string(getBytes(args[i + 1]));
-								second = std::to_string(getBytes(args[i + 2]));
-							}
-							
-							if (first not_eq "0" and second not_eq "0")
-								i+=3;
-							else if (first not_eq "0" and second == "0") {
-								if (args[i + 2].size() > 1
-									and args[i + 2][0] == '-'
-									and std::isdigit(args[i + 2][1]))
-								{
-									second = std::to_string(getBytes(args[i + 2].substr(1)));
-								} else if (args[i + 2].size() > 2
-										   and args[i + 2][0] == '.'
-										   and args[i + 2][1] == '.'
-										   and std::isdigit(args[i + 2][2]))
-								{
-									second = std::to_string(getBytes(args[i + 2].substr(2)));
-								} else
-									goto SIZE_NEEDED;
-								i+=2;
-							} else
-								goto SIZE_NEEDED;
-						}
-						
-						opt::valueOf[isExclude ? OPT_EXCLSIZEOPGT : OPT_SIZEOPGT] = '\0';
-						opt::valueOf[s_first] = first;
-
-						if (std::stoul(second) < std::stoul(first)) {
-							std::cout << "⚠️  Range is up side down! \""
-										<< groupNumber(first)
-										<< " bytes greater than "
-										<< groupNumber(second)
-										<< " bytes\"\n";
-							opt::valueOf[s_first] = "0";
-						} else if (first not_eq "0" and second not_eq "0")
-							(isExclude ? opt::listExclSize : opt::listSize).emplace_back(std::make_pair(
-										   std::stoul(first),
-										   std::stoul(second)));
+						var extensions { opt == OPT_EXT ? &opt::DEFAULT_EXT
+														: &opt::EXCLUDE_EXT };
+						for (var& ext : newList)
+							if (op == OP::Sub)
+								extensions->erase(std::move(ext));
+							else
+								extensions->insert(std::move(ext));
+						(opt == OPT_EXT
+							? opt::DEFAULT_EXT_REPLACED
+							: opt::EXCLUDE_EXT_REPLACED) = true;
 					}
 				}
 				else
-SIZE_NEEDED:		std::cout << "⚠️  Expecting operator '<' or '>' followed"\
-								"by size in KB, MB, or GB.\nOr use value in"\
-								"range using form 'from-to' OR 'from..to'"\
-								"Please see --help "
-								<< OPT_SIZE
-								<< '\n';
+					opt::valueOf[opt] = in::args[i] == "*.*" ? "*" : in::args[i];
+				
+			} else
+				std::cout << "Expecting extension after \""
+							<< in::args[i]
+							<< "\" option (eg: \"mp4, mkv\"). Please see --help "
+							<< in::args[i].substr(2)
+							<< '\n';
 		}
-		else if (isNetworkTransportFile(args[i]))
-			insertInto(&in::selectFiles, fs::path(args[i]));
-		else if (fs::is_directory(args[i]))
-			insertInto(&bufferInputDirs, fs::path(args[i]));
-		else if (const var path { fs::path(args[i]) };
+		else if (isMatch(OPT_OUTFILENAME, 	'f', false, {"fix-filename"})) {
+			if (i + 1 < in::args.size()) {
+				i++;
+				opt::valueOf[OPT_OUTFILENAME] = in::args[i];
+				if (var parent { fs::path(in::args[i]).parent_path().string() };
+					not parent.empty())
+				{
+					opt::valueOf[OPT_OUTFILENAME] = fs::path(in::args[i]).filename().string();
+					parent += fs::path::preferred_separator;
+					in::args.insert(in::args.begin() + 1 + i, std::move(parent));
+					
+					parent = "--";
+					parent += OPT_OUTDIR;
+					in::args.insert(in::args.begin() + 1 + i, std::move(parent));
+				}
+			} else
+				std::cout << "⚠️  Expecting file name after \""
+							<< in::args[i]
+							<< "\" option (eg: \"my_playlist.m3u8\"). Please see --help "
+							<< in::args[i].substr(2)
+							<< '\n';
+		}
+		else if (isMatch(OPT_OUTDIR, 		'd')) {
+			if (i + 1 < in::args.size()) {
+				i++;
+				const var dir { fs::path(in::args[i]) };
+				if (not fs::exists(dir))
+					fs::create_directories(dir);
+				opt::valueOf[OPT_OUTDIR] = fs::absolute(dir);
+				if (const var tmp { in::args[i] };
+					tmp[tmp.size() - 1] not_eq fs::path::preferred_separator)
+					opt::valueOf[OPT_OUTDIR] += fs::path::preferred_separator;
+			} else
+				std::cout << "⚠️  Expecting directory after \""
+							<< in::args[i]
+							<< "\" option (eg: \"Downloads/\"). Please see --help "
+							<< in::args[i].substr(2)
+							<< '\n';
+		}
+		else if (	isMatch(OPT_SIZE, 		's')
+				 or isMatch(OPT_EXCLSIZE, 	'S')) {
+			if (bool isExclude{ in::args[i].substr(2) == OPT_EXCLSIZE };
+				i + 1 < in::args.size()) {
+				if (in::args[i + 1][0] == '<' or in::args[i + 1][0] == '>')
+				{
+					i++;
+					const var opGT { in::args[i][0] };
+					
+					var value{ (uintmax_t) 0 };
+					
+					if (in::args[i].size() > 1) {
+						value = getBytes(in::args[i].substr(1));
+						if (value <= 0)
+							goto SIZE_NEEDED;
+					}
+					
+					if (value <= 0 and i + 1 < in::args.size()) {
+						value = getBytes(in::args[i + 1]);
+						
+						if (value <= 0)
+							goto SIZE_NEEDED;
+						else
+							i++;
+					}
+					
+					opt::valueOf[isExclude ? OPT_EXCLSIZEOPGT : OPT_SIZEOPGT] = opGT;
+					opt::valueOf[isExclude ? OPT_EXCLSIZE : OPT_SIZE] = std::to_string(std::move(value));
+					(isExclude ? opt::listExclSize : opt::listSize).clear();
+				} else {
+					var range { getRange(in::args[i + 1], std::move("-")) };
+					if (not range)
+						range = getRange(in::args[i + 1], std::move(".."));
+					
+					const var s_first { std::string(isExclude ? OPT_EXCLSIZE : OPT_SIZE) };
+					var first { std::string("0") };
+					var second { std::string("0") };
+					
+					if (range)
+					{
+						first = std::to_string(range->first);
+						second = std::to_string(range->second);
+						
+						i++;
+						
+						if (second == "0") {
+							var value { (uintmax_t) 0 };
+							if (i + 1 < in::args.size())
+								value = getBytes(in::args[i + 1]);
+							
+							if (value > 0) {
+								second = std::to_string(value);
+								i++;
+							} else
+								goto SIZE_NEEDED;
+						}
+					} else {
+						if (i + 3 < in::args.size()) {
+							first = std::to_string(getBytes(in::args[i + 1]));
+							second = std::to_string(getBytes(in::args[i + 3]));
+						} else if (i + 2 < in::args.size()) {
+							first = std::to_string(getBytes(in::args[i + 1]));
+							second = std::to_string(getBytes(in::args[i + 2]));
+						}
+						
+						if (first not_eq "0" and second not_eq "0")
+							i+=3;
+						else if (first not_eq "0" and second == "0") {
+							if (in::args[i + 2].size() > 1
+								and in::args[i + 2][0] == '-'
+								and std::isdigit(in::args[i + 2][1]))
+							{
+								second = std::to_string(getBytes(in::args[i + 2].substr(1)));
+							} else if (in::args[i + 2].size() > 2
+									   and in::args[i + 2][0] == '.'
+									   and in::args[i + 2][1] == '.'
+									   and std::isdigit(in::args[i + 2][2]))
+							{
+								second = std::to_string(getBytes(in::args[i + 2].substr(2)));
+							} else
+								goto SIZE_NEEDED;
+							i+=2;
+						} else
+							goto SIZE_NEEDED;
+					}
+					
+					opt::valueOf[isExclude ? OPT_EXCLSIZEOPGT : OPT_SIZEOPGT] = '\0';
+					opt::valueOf[s_first] = first;
+
+					if (std::stoul(second) < std::stoul(first)) {
+						std::cout << "⚠️  Range is up side down! \""
+									<< groupNumber(first)
+									<< " bytes greater than "
+									<< groupNumber(second)
+									<< " bytes\"\n";
+						opt::valueOf[s_first] = "0";
+					} else if (first not_eq "0" and second not_eq "0")
+						(isExclude ? opt::listExclSize : opt::listSize).emplace_back(std::make_pair(
+									   std::stoul(first),
+									   std::stoul(second)));
+				}
+			}
+			else
+SIZE_NEEDED:	std::cout << "⚠️  Expecting operator '<' or '>' followed"\
+							"by size in KB, MB, or GB.\nOr use value in"\
+							"range using form 'from-to' OR 'from..to'"\
+							"Please see --help "
+							<< OPT_SIZE
+							<< '\n';
+		}
+		else if (isNetworkTransportFile(in::args[i]))
+			insertInto(&in::selectFiles, fs::path(in::args[i]));
+		else if (fs::is_directory(in::args[i]))
+			insertInto(&in::inputDirs, fs::path(in::args[i]));
+		else if (const var path { fs::path(in::args[i]) };
 				 fs::is_regular_file(path)
 				 and isValid(path) and isValidFile(path))
 		{
@@ -5213,17 +5974,17 @@ SIZE_NEEDED:		std::cout << "⚠️  Expecting operator '<' or '>' followed"\
 						insertInto(&in::selectFiles, f);
 		}
 		else
-			invalidArgs.emplace(args[i]);
+			in::invalidArgs.emplace(in::args[i]);
 	}
 	// MARK: End option matching
 	
-	if (not invalidArgs.empty()) {
-		std::string_view invalid_args[invalidArgs.size()];
-		std::move(invalidArgs.begin(), invalidArgs.end(), invalid_args);
+	if (not in::invalidArgs.empty()) {
+		std::string_view invalid_args[in::invalidArgs.size()];
+		std::move(in::invalidArgs.begin(), in::invalidArgs.end(), invalid_args);
 		std::cout << "⚠️  What "
-					<< (invalidArgs.size() > 1 ? "are these" : "is this")
+					<< (in::invalidArgs.size() > 1 ? "are these" : "is this")
 					<< ":\n";
-		for (var i { 0 }; i<invalidArgs.size(); ++i) {
+		for (var i { 0 }; i<in::invalidArgs.size(); ++i) {
 			const var item { &invalid_args[i] };
 			var others { std::string() };
 			if (item->size() > 4)
@@ -5271,13 +6032,13 @@ SIZE_NEEDED:		std::cout << "⚠️  Expecting operator '<' or '>' followed"\
 					<< " --help ['keyword']\"\n\n";
 	}
 	
-	if (bufferInputDirs.empty() and in::selectFiles.empty())
-		insertInto(&bufferInputDirs, fs::current_path());
+	if (in::inputDirs.empty() and in::selectFiles.empty())
+		insertInto(&in::inputDirs, fs::current_path());
 	
 	/// Saving state for original inputDirs
-	const var inputDirsCount { bufferInputDirs.size() };
-	fs::path inputDirs[inputDirsCount + 1];
-	std::copy(bufferInputDirs.begin(), bufferInputDirs.end(), inputDirs);
+	var bufferInputDirs { ListPath() };
+	std::copy(in::inputDirs.begin(), in::inputDirs.end(),
+			  std::back_inserter(bufferInputDirs));
 
 	/// Expand InputDir if only one dir.
 	while (bufferInputDirs.size() == 1) {
@@ -5294,9 +6055,9 @@ SIZE_NEEDED:		std::cout << "⚠️  Expecting operator '<' or '>' followed"\
 			insertInto(&bufferInputDirs, child.path());
 	}
 
-	if (const var dirOut { inputDirsCount == 1
+	if (const var dirOut { in::inputDirs.size() == 1
 			? transformWhiteSpace(fs::path(opt::valueOf[OPT_OUTDIR]).filename().string())
-			: std::to_string(inputDirsCount)};
+			: std::to_string(in::inputDirs.size())};
 		opt::valueOf[OPT_OUTFILENAME].empty())
 	{
 		#ifdef LIBCPP_FORMAT
@@ -5310,228 +6071,35 @@ SIZE_NEEDED:		std::cout << "⚠️  Expecting operator '<' or '>' followed"\
 		opt::valueOf[OPT_OUTFILENAME] =
 				opt::valueOf[OPT_NOOUTPUTFILE] == "true" ? "" :
 				"playlist_from_"
-				+ (inputDirsCount == 0
+				+ (in::inputDirs.size() == 0
 				   ? groupNumber(std::to_string(in::selectFiles.size())) + "_file"
 				   : dirOut + "_dir")
 		
-				+ (inputDirsCount > 1 or in::selectFiles.size() > 1 ? "s" : "")
+				+ (in::inputDirs.size() > 1 or in::selectFiles.size() > 1 ? "s" : "")
 				+ ".m3u8";
 		#endif
 	}
 	
-	#ifndef DEBUG
-	if (const var condToShowArgsParsed { not invalidArgs.empty()
-											or opt::valueOf[OPT_DEBUG] == "true"
-											or opt::valueOf[OPT_DEBUG] == "args" };
-		not opt::valueOf[OPT_SHOWCONFIG].empty()
-		or opt::valueOf[OPT_VERBOSE] 	== "all"
-		or opt::valueOf[OPT_VERBOSE] 	== "info"
-		or opt::valueOf[OPT_BENCHMARK]	== "true"
-		or opt::valueOf[OPT_LIST]		== "true"
-		or condToShowArgsParsed)
-	#endif
-	{ // MARK: Options Summary
-		let WIDTH { 20 };
-		#define LABEL(x)	x << std::setw(unsigned(WIDTH - std::strlen(x))) << ": "
-		#ifndef DEBUG
-		if (condToShowArgsParsed)
-		#endif
-		{
-			var formatSuffix { std::string() };
-			var formatPrefix { std::string() };
-			
-			std::cout << LABEL("Original Arguments");
-			for (var i { 1 }; i<argc; ++i) {
-				#if defined(_WIN32) || defined(_WIN64)
-				#else
-				if (invalidArgs.find(argv[i]) not_eq invalidArgs.end()) {
-					formatPrefix = "⚠️ \033[43m\033[1;30m";
-					formatSuffix = "\033[0m";
-				} else {
-					formatSuffix = "";
-					formatPrefix = "";
-				}
-				#endif
-				std::cout << '"'
-							<< formatPrefix
-							<< argv[i]
-							<< formatSuffix
-							<< '"'
-							<< (i+1>=argc ? "" : ", ");
-			}
-			std::cout << "\n\n"
-						<< LABEL("Deduced Arguments");
-			for (var i { 0 }; i<args.size(); ++i) {
-				if (args[i] == def::ARGS_SEPARATOR)
-					continue;
-				
-				#if defined(_WIN32) || defined(_WIN64)
-				#else
-				if (invalidArgs.find(args[i]) not_eq invalidArgs.end()) {
-					formatPrefix = "⚠️ \033[43m\033[1;30m";
-					formatSuffix = "\033[0m";
-				} else {
-					formatSuffix = "";
-					formatPrefix = "";
-				}
-				#endif
-				std::cout << '"'
-							<< formatPrefix
-							<< args[i]
-							<< formatSuffix
-							<< '"'
-							<< (i+1>=args.size() ? "" : ", ");
-			}
-			std::cout << '\n';
-			
-			if (not invalidArgs.empty())
-				return RETURN_VALUE
-		}
-	#define PRINT_OPT(x)	(x.empty() ? "false" : x)
 	
-	std::cout
-		<< LABEL(OPT_ARRANGEMENT) << opt::valueOf[OPT_ARRANGEMENT] << '\n'
-		<< LABEL(OPT_EXECUTION) << opt::valueOf[OPT_EXECUTION] << '\n'
-		<< LABEL(OPT_VERBOSE) << PRINT_OPT(opt::valueOf[OPT_VERBOSE]) << '\n'
-		<< LABEL(OPT_BENCHMARK) << PRINT_OPT(opt::valueOf[OPT_BENCHMARK]) << '\n'
-		<< LABEL(OPT_OVERWRITE) << PRINT_OPT(opt::valueOf[OPT_OVERWRITE]) << '\n'
-		<< LABEL(OPT_NOOUTPUTFILE) << PRINT_OPT(opt::valueOf[OPT_NOOUTPUTFILE]) << '\n'
-		<< LABEL(OPT_OUTFILENAME) << opt::valueOf[OPT_OUTFILENAME] << '\n'
-		<< LABEL(OPT_CURRENTDIR) << fs::current_path().string() << '\n'
-		<< LABEL(OPT_OUTDIR) << opt::valueOf[OPT_OUTDIR] << '\n'
-		<< LABEL(OPT_EXCLHIDDEN) << PRINT_OPT(opt::valueOf[OPT_EXCLHIDDEN]) << '\n'
-		<< LABEL(OPT_SKIPSUBTITLE) << PRINT_OPT(opt::valueOf[OPT_SKIPSUBTITLE]) << '\n';
-
-	for (var& opt : { OPT_EXT, OPT_EXCLEXT }) {
-		std::cout << LABEL(opt) << opt::valueOf[opt];
-		if (var i { 0 };
-			opt::valueOf[opt].empty())
-			for (var& ext : opt == OPT_EXT ? opt::DEFAULT_EXT : opt::EXCLUDE_EXT)
-				std::cout << ext
-							<< (++i < (opt == OPT_EXT
-									   ? opt::DEFAULT_EXT.size()
-									   : opt::EXCLUDE_EXT.size()
-									   ) - 1 ? ", " : "");
-		std::cout << '\n';
-	}
-	std::cout << LABEL("case-insensitive") << PRINT_OPT(opt::valueOf[OPT_CASEINSENSITIVE]) << '\n';
-	
-	#undef PRINT_OPT
-			
-	for (var& S : {OPT_FIND, OPT_EXCLFIND}) {
-		std::cout << LABEL(S);
-		for (var i { 0 }; i<(S == OPT_FIND ? opt::listFind : opt::listExclFind).size(); ++i)
-			std::cout << (S == OPT_FIND ? opt::listFind : opt::listExclFind)[i]
-						<< (i < (S == OPT_FIND ? opt::listFind
-								 : opt::listExclFind).size() - 1 ? ", " : "");
-		std::cout << '\n';
-	}
-
-	for (var& S : {OPT_REGEX, OPT_EXCLREGEX}) {
-		std::cout << LABEL(S);
-		for (var i { 0 }; i<(S == OPT_REGEX ? opt::listRegex : opt::listExclRegex).size(); ++i)
-			std::cout << (S == OPT_REGEX ? opt::listRegex : opt::listExclRegex)[i].mark_count()
-						<< " expression"
-						<< (i < (S == OPT_REGEX ? opt::listRegex
-								 : opt::listExclRegex).size() - 1 ? ", " : "");
-		std::cout << '\n';
-	}
-			
-	std::cout << LABEL(OPT_REGEXSYNTAX) << opt::valueOf[OPT_REGEXSYNTAX] << '\n';
-
-	for (var& S : {OPT_SIZE, OPT_EXCLSIZE}) {
-		std::cout << LABEL(S);
-		if (opt::valueOf[OPT_SIZEOPGT][0] not_eq '\0' or opt::valueOf[OPT_EXCLSIZEOPGT][0] not_eq '\0')
-			std::cout << ((S == OPT_SIZE ? opt::listSize : opt::listExclSize).empty()
-					or opt::valueOf[S == OPT_SIZE ? OPT_SIZEOPGT
-							  : OPT_EXCLSIZEOPGT][0] not_eq '\0'
-					? (opt::valueOf[S == OPT_SIZE ? OPT_SIZEOPGT
-							 : OPT_EXCLSIZEOPGT][0] == '<' ? "< " : "> ")
-					+ opt::valueOf[S] : "");
-		for (var i { 0 }; i<(S == OPT_SIZE ? opt::listSize : opt::listExclSize).size(); ++i)
-			std::cout << (S == OPT_SIZE ? opt::listSize : opt::listExclSize)[i].first
-						<< ".."
-						<< (S == OPT_SIZE ? opt::listSize : opt::listExclSize)[i].second
-						<< (i < (S == OPT_SIZE ? opt::listSize
-								 : opt::listExclSize).size() - 1 ? ", " : "");
-		std::cout << '\n';
-	}
-			
-	{
-		const char * const* st[8] = { &OPT_DCREATED, &OPT_DCHANGED, &OPT_DACCESSED, &OPT_DMODIFIED,
-			&OPT_DEXCLCREATED, &OPT_DEXCLCHANGED, &OPT_DEXCLACCESSED, &OPT_DEXCLMODIFIED };
-		
-		const ListPairCharDate* const ot[8] = {
-			&opt::listDCreated, &opt::listDAccessed, &opt::listDModified, &opt::listDChanged,
-			&opt::listDExclCreated, &opt::listDExclAccessed, &opt::listDExclModified, &opt::listDExclChanged };
-
-		
-		const ListPairDate* const rt[8] = {
-			&opt::listDCreatedR, &opt::listDAccessedR, &opt::listDModifiedR, &opt::listDChangedR,
-			&opt::listDExclCreatedR, &opt::listDExclAccessedR, &opt::listDExclModifiedR, &opt::listDExclChangedR };
-		
-		for (var i { 0 }; i<8; ++i) {
-			std::cout << LABEL(*st[i]);
-			for (var k { 0 }; k<ot[i]->size(); ++k)
-				std::cout << '\"'
-							<< ot[i]->at(k).first
-							<< ' '
-							<< ot[i]->at(k).second.string()
-							<< "\", ";
-			
-			for (var k { 0 }; k<rt[i]->size(); ++k)
-				std::cout << '\"'
-							<< rt[i]->at(k).first.string()
-							<< "\" .. \""
-							<< rt[i]->at(k).second.string()
-							<< "\", ";
-			std::cout << '\n';
-		}
-	}
-			
-	{
-		std::cout << LABEL("Inputs");
-		for (var i { 0 }; i<inputDirsCount + in::selectFiles.size(); ++i) {
-			if (i < inputDirsCount)
-				std::cout << inputDirs[i];
-			else
-				std::cout << in::selectFiles[i - inputDirsCount];
-			
-			std::cout  << (i < (inputDirsCount + in::selectFiles.size()) - 1 ? ", " : "");
-		}
-		std::cout << '\n';
-	}
-			
-	std::cout << LABEL(OPT_ADSCOUNT) << opt::valueOf[OPT_ADSCOUNT] << '\n';
-	{
-		std::cout << LABEL(OPT_ADSDIR);
-		var i { -1 };
-		for (i++; var& d : in::listAdsDir)
-			std::cout << d.string()
-						<< (i < in::listAdsDir.size() - 1 ? ", " : "");
-		std::cout << '\n';
-	}
-	std::cout << LABEL(OPT_OPENWITH) << opt::valueOf[OPT_OPENWITH] << '\n';
-	#undef LABEL
-	} // END Info
-					   
-	if (not invalidArgs.empty())
+	if (	not	printOptionSummary(argc, argv)
+		or 	not in::invalidArgs.empty())
 		return RETURN_VALUE
+					   
 					   
 	if (const var mode { opt::valueOf[OPT_WRITEDEFAULTS] };
 		not mode.empty())
-		writeConfig(&args,
+		writeConfig(&in::args,
 					  mode == "edit" 	? WriteConfigMode::Edit
 					: mode == "add" 	? WriteConfigMode::Add
 					: mode == "remove" 	? WriteConfigMode::Remove
-					: WriteConfigMode::New);
+					: 					  WriteConfigMode::New);
 
 	if (not opt::valueOf[OPT_SHOWCONFIG].empty()) {
-		func displayFile{[](ReadOnlyCString path) {
+		func printFile{[](ReadOnlyCString path) {
 			if (not fs::exists(fs::path(path)))
 				return;
 			
-			std::cout << "\nContent of file \""
+			std::cout << "\nContents of file \""
 						<< path
 						<< "\":\n";
 			var file { std::ifstream(path) };
@@ -5542,10 +6110,10 @@ SIZE_NEEDED:		std::cout << "⚠️  Expecting operator '<' or '>' followed"\
 			file.close();
 		}};
 			
-		displayFile(CONFIG_PATH);
+		printFile(CONFIG_PATH);
 		var otherFile { opt::valueOf[OPT_LOADCONFIG].c_str() };
 		if (not isEqual(CONFIG_PATH, otherFile))
-			displayFile(otherFile);
+			printFile(otherFile);
 	}
 					   
     if (		opt::valueOf[OPT_LIST] == "true"
@@ -5582,10 +6150,11 @@ SIZE_NEEDED:		std::cout << "⚠️  Expecting operator '<' or '>' followed"\
 		const var list { std::move(in::listAdsDir) };
 		
 		for (var& child : list)
-			if (opt::valueOf[OPT_EXECUTION] == MODE_EXECUTION_THREAD)
+			if (const var mode { opt::valueOf[OPT_EXECUTION] };
+				mode == MODE_EXECUTION_THREAD)
 				threads.emplace_back([&, child]() {
 					listDirRecursivelyInto(child, &in::listAdsDir, false); });
-			else if (opt::valueOf[OPT_EXECUTION] == MODE_EXECUTION_ASYNC)
+			else if (mode == MODE_EXECUTION_ASYNC)
 				asyncs.emplace_back(std::async(std::launch::async, [&, child]() {
 					listDirRecursivelyInto(child, &in::listAdsDir, false); }));
 			else
@@ -5593,8 +6162,9 @@ SIZE_NEEDED:		std::cout << "⚠️  Expecting operator '<' or '>' followed"\
 	}
 	
 	for (const var isByPass { opt::valueOf[OPT_ARRANGEMENT] == MODE_ARRANGEMENT_ASCENDING };
-		 var& child : bufferInputDirs)
-		if (opt::valueOf[OPT_EXECUTION] == MODE_EXECUTION_THREAD) {
+		var& child : bufferInputDirs)
+		if (const var mode { opt::valueOf[OPT_EXECUTION] };
+			mode == MODE_EXECUTION_THREAD) {
 			if (isByPass)
 				threads.emplace_back([&, child]() {
 					listDirRecursivelyInto(child, &in::regularDirs, false);
@@ -5602,7 +6172,7 @@ SIZE_NEEDED:		std::cout << "⚠️  Expecting operator '<' or '>' followed"\
 			else
 				threads.emplace_back(checkForSeasonDir, child);
 		}
-		else if (opt::valueOf[OPT_EXECUTION] == MODE_EXECUTION_ASYNC)
+		else if (mode == MODE_EXECUTION_ASYNC)
 			if (isByPass)
 				asyncs.emplace_back(std::async(std::launch::async, [&, child]() {
 					listDirRecursivelyInto(child, &in::regularDirs, false);
@@ -5618,11 +6188,12 @@ SIZE_NEEDED:		std::cout << "⚠️  Expecting operator '<' or '>' followed"\
 				checkForSeasonDir(child);
 		}
 
-	if (opt::valueOf[OPT_EXECUTION] == MODE_EXECUTION_THREAD) {
+	if (const var mode { opt::valueOf[OPT_EXECUTION] };
+		mode == MODE_EXECUTION_THREAD) {
 		for (var& t : threads)
 			t.join();
 		threads.clear();
-	} else if (opt::valueOf[OPT_EXECUTION] == MODE_EXECUTION_ASYNC) {
+	} else if (mode == MODE_EXECUTION_ASYNC) {
 		for (var& a : asyncs)
 			a.wait();
 		asyncs.clear();
@@ -5631,18 +6202,10 @@ SIZE_NEEDED:		std::cout << "⚠️  Expecting operator '<' or '>' followed"\
 	
 	const var maxDirSize { std::max(in::regularDirs.size(), in::seasonDirs.size()) };
 
-	const var BY_PASS {
-			   opt::valueOf[OPT_ARRANGEMENT] == MODE_ARRANGEMENT_PERTITLE
-			or opt::valueOf[OPT_ARRANGEMENT] == MODE_ARRANGEMENT_SHUFFLE_PERTITLE
-			or opt::valueOf[OPT_ARRANGEMENT] == MODE_ARRANGEMENT_ASCENDING
-			or opt::valueOf[OPT_ARRANGEMENT] == MODE_ARRANGEMENT_SHUFFLE
-			or opt::valueOf[OPT_ARRANGEMENT] == MODE_ARRANGEMENT_DESCENDING
-			or opt::valueOf[OPT_ARRANGEMENT] == MODE_ARRANGEMENT_DESCENDING_PERTITLE
-		};
-					   
-	if (	opt::valueOf[OPT_ARRANGEMENT] == MODE_ARRANGEMENT_DEFAULT
-		or 	opt::valueOf[OPT_ARRANGEMENT] == MODE_ARRANGEMENT_SHUFFLE_DEFAULT
-		or 	opt::valueOf[OPT_ARRANGEMENT] == MODE_ARRANGEMENT_DESCENDING_DEFAULT)
+	if (const var mode { opt::valueOf[OPT_ARRANGEMENT] };
+			mode == MODE_ARRANGEMENT_DEFAULT
+		or 	mode == MODE_ARRANGEMENT_SHUFFLE_DEFAULT
+		or 	mode == MODE_ARRANGEMENT_DESCENDING_DEFAULT)
 	{
 		std::sort(in::regularDirs.begin(), in::regularDirs.end());
 		std::sort(in::seasonDirs.begin(), in::seasonDirs.end());
@@ -5654,7 +6217,7 @@ SIZE_NEEDED:		std::cout << "⚠️  Expecting operator '<' or '>' followed"\
 	if (opt::valueOf[OPT_BENCHMARK] == "true" or opt::valueOf[OPT_DEBUG] == "true")
 	#endif
 	{
-		if (inputDirsCount > 0)
+		if (in::inputDirs.size() > 0)
 			timeLapse(start, groupNumber(
 						std::to_string(in::regularDirs.size() + in::seasonDirs.size()))
 					  + " valid input dirs"
@@ -5751,11 +6314,12 @@ SIZE_NEEDED:		std::cout << "⚠️  Expecting operator '<' or '>' followed"\
 				if (const var dir { x == 1 ? in::regularDirs[i] : (x == 2 ? in::seasonDirs[i]
 															  : in::listAdsDir[i]) };
 					not dir.empty() and isDirNameValid(dir)) {
-					if (opt::valueOf[OPT_EXECUTION] == MODE_EXECUTION_THREAD)
+					if (const var mode { opt::valueOf[OPT_EXECUTION] };
+						mode == MODE_EXECUTION_THREAD)
 						threads.emplace_back([&, dir]() {
 							filterChildFiles(dir, x == 2);
 						});
-					else if (opt::valueOf[OPT_EXECUTION] == MODE_EXECUTION_ASYNC)
+					else if (mode == MODE_EXECUTION_ASYNC)
 						asyncs.emplace_back(std::async(std::launch::async, [&, dir]() {
 							filterChildFiles(dir, x == 2);
 						}));
@@ -5763,22 +6327,21 @@ SIZE_NEEDED:		std::cout << "⚠️  Expecting operator '<' or '>' followed"\
 						filterChildFiles(dir, x == 2);
 				}
 					   
-	if (opt::valueOf[OPT_EXECUTION] == MODE_EXECUTION_THREAD)
+	if (const var mode { opt::valueOf[OPT_EXECUTION] };
+		mode == MODE_EXECUTION_THREAD)
 		for (var& t : threads)
 			t.join();
-	else if (opt::valueOf[OPT_EXECUTION] == MODE_EXECUTION_ASYNC)
+	else if (mode == MODE_EXECUTION_ASYNC)
 		for (var& a : asyncs)
 			a.wait();
 
-	struct Output {
-		property std::ofstream	file;
-		property fs::path 		name;
-		property std::string	extension;
-	} output;
+	var output { Output(	opt::valueOf[OPT_VERBOSE]	== "all"
+						or 	opt::valueOf[OPT_VERBOSE]	== "true"
+						or 	opt::valueOf[OPT_DEBUG] 	== "true") };
 
 	
-	const var dontWrite { opt::valueOf[OPT_NOOUTPUTFILE] == "true" };
-	if (not dontWrite) {
+	const var isDontWrite { opt::valueOf[OPT_NOOUTPUTFILE] == "true" };
+	if (not isDontWrite) {
 		output.name = opt::valueOf[OPT_OUTDIR] + opt::valueOf[OPT_OUTFILENAME];
 			
 		if (fs::exists(output.name) and opt::valueOf[OPT_OVERWRITE] == "true")
@@ -5794,107 +6357,29 @@ SIZE_NEEDED:		std::cout << "⚠️  Expecting operator '<' or '>' followed"\
 //						<< "\"\n";
 //			return RETURN_VALUE
 //		}
-	}
-				  
-	if (not dontWrite) {
-		if (output.extension == ".pls")
-		   output.file << "[playlist]\n";
-		else if (output.extension == ".m3u")
-		   output.file << "#EXTM3U\n";
-		else if (output.extension == ".xspf")
-		   output.file << "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"\
-		   "<playlist version=\"1\" xmlns=\"http://xspf.org/ns/0/\">\n"\
-		   "\t<trackList>\n";
-		else if (output.extension == ".xml")
-		   output.file << "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"\
-		   "<!DOCTYPE plist PUBLIC \"-//Apple Computer//DTD PLIST 1.0//EN\" "\
-		   "\"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">\n"\
-		   "<plist version=\"1.0\">\n"\
-		   "<dict>\n"\
-		   "\t<key>Major Version</key><integer>1</integer>\n"\
-		   "\t<key>Minor Version</key><integer>1</integer>\n"\
-		   "\t<key>Date</key><date>" << Date::now().string("%FT%T") << "</date>\n"\
-		   "\t<key>Application Version</key><string>1.1</string>\n"\
-		   "\t<key>Tracks</key>\n"\
-		   "\t<dict>"
-		   ;
-		else if (output.extension == ".wpl")
-		   output.file << "<?wpl version=\"1.0\"?>\n"\
-			   "<smil>\n"\
-			   "\t<head>\n"\
-			   "\t\t<meta name=\"Generator\" content=\"tvplaylist -- 1.1\"/>\n"\
-			   "\t\t<title>" << output.name.filename().string() << "</title>\n"\
-			   "\t</head>\n"\
-			   "\t<body>\n"\
-			   "\t\t<seq>\n";
-		else if (output.extension == ".smil")
-		   output.file << "<?wpl version=\"1.0\"?>\n"\
-			   "<smil>\n"\
-			   "\t<body>\n"\
-			   "\t\t<seq>\n";
-		else if (output.extension == ".b4s")
-		   output.file << "<?xml version=\"1.0\" standalone=\"yes\"?>\n"\
-		   "<WindampXML>\n"\
-		   "\t<playlist>\n";
-		else if (isEqual(output.extension.c_str(), {".asx", ".wax", ".wvx"}))
-		   output.file << "<asx version=\"3.0\"?>\n"\
-			   "\t\t<title>" << output.name.filename().string() << "</title>\n";
-		else if (isEqual(output.extension.c_str(), {".htm", ".html", ".xhtml"}))
-		   output.file << "<html xmlns=\"http://www.w3.org/1999/xhtml\" lang=\"en\">\n"\
-		   "<head>\n"\
-		   "\t<meta http-equiv=\"Content-Type\" content=\"text/html\" />\n"\
-		   "\t<meta name=\"Generator\" content=\"tvplaylist -- 1.1\" />\n"\
-		   "\t<meta name=\"description\" content=\"Playlist\" />\n"\
-		   "\t<title>" << output.name.filename().string() << "</title>\n"\
-			"\t<style>\n"\
-			"\t\t.row_regular{  }\n"\
-			"\t\t.row_subtitle{  }\n"\
-			"\t\t.row_advertise{  }\n"\
-			"\t\t.column_numbering{ align=left; }\n"\
-			"\t\t.column_file{ width: 100%; }\n"\
-			"\t</style>\n"\
-		   "</head>\n"\
-		   "</body>\n"\
-		   "\t<table>\n";
-		#if 0
-		else if (output.extension == ".pdf") {
-			const var date { Date::now().string("%Y%m%d%H%M%S") };
-			output.file << "%PDF-1.7\n"\
-			"1 0 obj\n"\
-			"<</Creator (tvplaylist v1.1)\n"\
-			" /Producer (Skia/PDF m98)\n"\
-			" /CreationDate (D:" << date << "+00'00')\n"\
-			" /ModDate (D:" << date << "+00'00')>>\n"\
-			"endobj\n"\
-			"2 0 obj\n"\
-			"<</ca 1"\
-			" /BM /Normal>>\n"\
-			"endobj\n";
-		}
-		#endif
+			
+		output.generate(Output::Section::Header);
 	}
 
-	var playlistCount { (unsigned long) 0 };
+	
 	std::random_device rd;  //Will be used to obtain a seed for the random number engine
 	std::mt19937 mersenneTwisterEngine(rd()); //Standard mersenne_twister_engine seeded with rd()
 	std::uniform_int_distribution<> distrib;
 	std::uniform_int_distribution<> distribCount;
 	unsigned long adsCount[2] {0, 0};
 
-	#ifndef DEBUG
-	const var isVerbose { 	opt::valueOf[OPT_VERBOSE]	== "all"
-						or 	opt::valueOf[OPT_VERBOSE]	== "true"
-						or 	opt::valueOf[OPT_DEBUG] 	== "true" };
-	#endif
+
 	func putIntoPlaylist{ [&](const fs::path& file)
 	{
-		enum class Type { None, Regular, Subtitle, Advertise };
-		
-		func putIt{ [&](const fs::path& file, ReadOnlyCString title = nullptr,
-						Type type = Type::None)
+		func putIt{ [&](const fs::path& file,
+						ReadOnlyCString title = nullptr,
+						Output::Type type = Output::Type::None)
 		{
-			playlistCount++;
-			if (dontWrite) {
+			if (not isDontWrite)
+				output.generate(Output::Section::Content, &file, title, type);
+			
+			else {
+				output.playlistCount++;
 				#if MAKE_LIB
 				if (outc)
 					*outc += 1;
@@ -5904,159 +6389,10 @@ SIZE_NEEDED:		std::cout << "⚠️  Expecting operator '<' or '>' followed"\
 						*maxLength = sz;
 				}
 				if (outs)
-					std::strcpy(outs[playlistCount - 1],
+					std::strcpy(outs[output.playlistCount - 1],
 								fs::absolute(file).string().c_str());
 				#endif
 			}
-		   
-			var fullPath { file.string() };
-			var needAboslute { true };
-			const var isNetworkTransport { isNetworkTransportFile(fullPath) };
-			
-			if (isNetworkTransport or isEqual(output.extension.c_str(), {".htm", ".html"}))
-			{
-				replace_all(fullPath, " ", "%20");
-				replace_all(fullPath, "=", "%3D");
-				replace_all(fullPath, "+", "%2B");
-				replace_all(fullPath, "-", "%2D");
-				replace_all(fullPath, "?", "%3F");
-				replace_all(fullPath, ";", "%3B");
-				//replace_all(fullPath, "%", "%25");
-				replace_all(fullPath, "@" ,"%4F");
-				replace_all(fullPath, "!" ,"%21");
-				replace_all(fullPath, "\"","%22");
-				replace_all(fullPath, "'" ,"%27");
-				replace_all(fullPath, "," ,"%2C");
-				//replace_all(fullPath, "/" ,"%2F");
-				replace_all(fullPath, "\\","%5C");
-				replace_all(fullPath, "$" ,"%24");
-				replace_all(fullPath, "&" ,"%26");
-				replace_all(fullPath, "#" ,"%23");
-				replace_all(fullPath, "<" ,"%3C");
-				replace_all(fullPath, ">" ,"%3E");
-
-				if (not isNetworkTransport)
-					fullPath.insert(0, "file://");
-				needAboslute = false;
-		   }
-
-			if (needAboslute)
-				fullPath = fs::absolute(file).string();
-
-			if (not dontWrite) {
-				var prefix { std::string() };
-				var suffix { std::string() };
-				var name { std::string() };
-				if (isEqual(output.extension.c_str(), {".wpl", ".b4s", ".smil",
-											".asx", ".wax", ".wvx"}))
-				{
-					for (var w { 0 }; w<ARRAYLEN(def::XML_CHARS_ALIAS); ++w)
-					if (isContains(fullPath, def::XML_CHARS_NORMAL[w],
-						   IgnoreCase::Left) not_eq std::string::npos)
-					{
-						replace_all(fullPath, def::XML_CHARS_NORMAL[w],
-									def::XML_CHARS_ALIAS[w]);
-						break;
-					}
-
-					if (not isEqual(output.extension.c_str(), {".wpl", ".smil"}))
-					{
-						const var tmp { fs::path(fullPath).filename() };
-						name = tmp.string().substr(0,
-							tmp.string().size() - tmp.extension().string().size());
-					}
-				}
-			   
-				if (output.extension == ".pls") {
-					const var indexString { std::to_string(playlistCount) };
-					prefix = "File" + indexString + '=';
-					suffix = "\nTitle" + indexString + '=';
-					suffix += title;
-				}
-				else if (output.extension == ".xspf") {
-					prefix = "\t\t<track>\n\t\t\t<title>";
-					prefix += title;
-					prefix += "</title>\n"\
-						   "\t\t\t<location>file://";
-					suffix = "</location>\n\t\t</track>";
-				}
-				else if (output.extension == ".wpl") {
-					prefix = "\t\t\t<media src=\"";
-					suffix = "\"/>";
-				}
-				else if (output.extension == ".b4s") {
-					prefix = "\t\t<entry Playstring=\"file:";
-					suffix = "\">\n\t\t\t<Name>"
-						   + name
-						   + "</Name>\n\t\t</entry>";
-				}
-				else if (output.extension == ".smil") {
-					prefix = "\t\t\t<audio src=\"";
-					suffix = "\"/>";
-				}
-				else if (isEqual(output.extension.c_str(), {".asx", ".wax", ".wvx"})) {
-					prefix = "\t<entry>\n\t\t<title>"
-						   + name
-						   + "</title>\t\t<ref href=\"";
-					suffix = "\"/>\n\t</entry>";
-				}
-				else if (output.extension == ".xml") {
-					const var key { std::to_string(1000 - playlistCount) };
-					prefix = "\t\t<key>" + key + "</key>\n"\
-					   "\t\t<dict>\n"\
-					   "\t\t\t<key>Track ID</key><integer>" + key + "</integer>\n"\
-					   "\t\t\t<key>Name</key><string>" + name + "</string>\n"\
-					   "\t\t\t<key>Location</key><string>file://";
-					suffix = "</string>\n\t\t</dict>";
-				}
-				else if (isEqual(output.extension.c_str(), {".htm", ".html", ".xhtml"})) {
-					var typeName { std::string() };
-					var classDef { std::pair<std::string, std::string>
-						{"column_numbering", "column_file"} };
-					
-					switch (type) {
-						case Type::Regular:
-							typeName = "regular";
-							break;
-						case Type::Subtitle:
-							typeName = "subtitle";
-							break;
-						case Type::Advertise:
-							typeName = "advertise";
-							break;
-						default:
-							classDef.first = "align=\"right\"";
-							classDef.second = "width=\"100%\"";
-					}
-					
-					prefix = "\t\t<tr class=\"row_" + typeName + "\">\n"\
-						   "\t\t\t<td " + classDef.first + ">"
-						   + std::to_string(playlistCount) + ".</td>\n"\
-						   "\t\t\t<td " + classDef.second + "><a href=\"";
-					suffix = "\">" + file.filename().string() + "</a></td>\n"\
-						   "\t\t</tr>\n";
-				}
-				#if 0
-				else if (output.extension == ".pdf") {
-					prefix = std::to_string(playlistCount + 10) + " 0 obj\n"\
-								"\t<<\t/FS /URL\n"\
-								"\t\t/F (";
-					replace_all(fullPath, "(" ,"\\(");
-					replace_all(fullPath, ")" ,"\\)");
-					suffix = ")\n"\
-							"\t>>\n"\
-							"endobj";
-				}
-				#endif
-
-				output.file 	<< prefix << fullPath << suffix << '\n';
-			}
-
-			#ifndef DEBUG
-			if (isVerbose)
-			#endif
-				std::cout << fullPath
-							<< '\n';
 		}};
 		
 		#if defined(_WIN32) || defined(_WIN64)
@@ -6067,24 +6403,29 @@ SIZE_NEEDED:		std::cout << "⚠️  Expecting operator '<' or '>' followed"\
 		#define OS_NAME	"Linux"
 		#endif
 
-		putIt(file, OS_NAME " Path", Type::Regular);
+		putIt(file,
+			  OS_NAME " Path",
+			  Output::Type::Regular);
 		   
 
 		if (opt::valueOf[OPT_SKIPSUBTITLE] not_eq "true") {
 			var subtitleFiles { ListPath() };
 			findSubtitleFileInto(file, &subtitleFiles);
 			for (var& sf : subtitleFiles)
-				putIt(std::move(sf), "Subtitle Path on " OS_NAME, Type::Subtitle);
+				putIt(std::move(sf),
+					  "Subtitle Path on " OS_NAME,
+					  Output::Type::Subtitle);
 		}
 		   
 		if (not in::listAdsDir.empty())
 		   for (var i { 0 }; i<(adsCount[1] == 0
 							  ? adsCount[0]
 							  : distribCount(mersenneTwisterEngine));
-			   ++i, ++playlistCount)
+			   ++i, ++output.playlistCount)
 			   putIt(fs::absolute(
 						   in::listAdsDir[distrib(mersenneTwisterEngine)]).string(),
-						   "Ads path on " OS_NAME, Type::Advertise);
+					 "Ads path on " OS_NAME,
+					 Output::Type::Advertise);
 		#undef OS_NAME
 	}};
 					   
@@ -6133,52 +6474,11 @@ SIZE_NEEDED:		std::cout << "⚠️  Expecting operator '<' or '>' followed"\
 		}
 	}
 					   
-	if (BY_PASS)
-	{
-		std::move(in::seasonDirs.begin(), in::seasonDirs.end(),
-					  std::back_inserter(in::regularDirs));
-		in::seasonDirs.clear();
-		
-		std::sort(in::regularDirs.begin(), in::regularDirs.end());
-			
-		for (var& dir : in::regularDirs) {
-			if (dir.empty())
-				continue;
-			if (const var found { records[dir] }; found) {
-				if (opt::valueOf[OPT_ARRANGEMENT] == MODE_ARRANGEMENT_PERTITLE)
-					std::sort(found->begin(), found->end(), ascending);
-				else if (opt::valueOf[OPT_ARRANGEMENT] == MODE_ARRANGEMENT_DESCENDING_PERTITLE)
-					std::sort(found->begin(), found->end(), descending);
-					
-				for (var& f : *found)
-				{
-					if (opt::valueOf[OPT_ARRANGEMENT] == MODE_ARRANGEMENT_ASCENDING
-						or opt::valueOf[OPT_ARRANGEMENT] == MODE_ARRANGEMENT_DESCENDING
-						or opt::valueOf[OPT_ARRANGEMENT] == MODE_ARRANGEMENT_SHUFFLE)
-						in::selectFiles.emplace_back(std::move(f));
-					else
-						putIntoPlaylist(std::move(f));
-				}
-			}
-		}
-	
-		if (opt::valueOf[OPT_ARRANGEMENT] == MODE_ARRANGEMENT_PERTITLE)
-			sortFiles(&in::selectFiles);
-			
-		else if (opt::valueOf[OPT_ARRANGEMENT] == MODE_ARRANGEMENT_SHUFFLE)
-			std::shuffle(in::selectFiles.begin(), in::selectFiles.end(), mersenneTwisterEngine);
-			
-		else if (	opt::valueOf[OPT_ARRANGEMENT] == MODE_ARRANGEMENT_DESCENDING
-				 or opt::valueOf[OPT_ARRANGEMENT] == MODE_ARRANGEMENT_DESCENDING_PERTITLE)
-			std::sort(in::selectFiles.begin(), in::selectFiles.end(), descending);
-			
-		else
-			std::sort(in::selectFiles.begin(), in::selectFiles.end(), ascending);
-			
-		for (var& f : in::selectFiles)
-			putIntoPlaylist(std::move(f));
-	}
-	else
+	if (const var mode { opt::valueOf[OPT_ARRANGEMENT] };
+			mode == MODE_ARRANGEMENT_DEFAULT
+		 or mode == MODE_ARRANGEMENT_UNORDERED
+		 or mode == MODE_ARRANGEMENT_SHUFFLE_DEFAULT
+		 or mode == MODE_ARRANGEMENT_DESCENDING_DEFAULT)
 	{
 		var indexFile { (unsigned long) 0 };
 
@@ -6197,7 +6497,7 @@ SIZE_NEEDED:		std::cout << "⚠️  Expecting operator '<' or '>' followed"\
 						continue;
 
 					else if (const var found { records[dir] }; found) {
-						if (opt::valueOf[OPT_ARRANGEMENT] == MODE_ARRANGEMENT_SHUFFLE_PERTITLE)
+						if (mode == MODE_ARRANGEMENT_SHUFFLE_PERTITLE)
 						{
 							std::shuffle(found->begin(), found->end(),
 										 mersenneTwisterEngine);
@@ -6207,14 +6507,14 @@ SIZE_NEEDED:		std::cout << "⚠️  Expecting operator '<' or '>' followed"\
 						}
 						
 						if (indexFile == 0) {
-							if (opt::valueOf[OPT_ARRANGEMENT] == MODE_ARRANGEMENT_SHUFFLE_DEFAULT)
+							if (mode == MODE_ARRANGEMENT_SHUFFLE_DEFAULT)
 								std::shuffle(found->begin(), found->end(), mersenneTwisterEngine);
 							
-							else if (opt::valueOf[OPT_ARRANGEMENT] == MODE_ARRANGEMENT_DESCENDING_DEFAULT)
+							else if (mode == MODE_ARRANGEMENT_DESCENDING_DEFAULT)
 								std::sort(found->begin(), found->end(), descending);
 						}
 							
-						for (var c { 0 }; c < fileCountPerTurn; ++c)
+						for (var c { 0 }; c < in::fileCountPerTurn; ++c)
 							if (indexFile + c < found->size()) {
 								finish = false;
 
@@ -6223,76 +6523,74 @@ SIZE_NEEDED:		std::cout << "⚠️  Expecting operator '<' or '>' followed"\
 					}
 				} ///end pass loop
 			
-			if (opt::valueOf[OPT_ARRANGEMENT] == MODE_ARRANGEMENT_SHUFFLE_PERTITLE)
+			if (mode == MODE_ARRANGEMENT_SHUFFLE_PERTITLE)
 				break;
 			
 			if (indexFile < in::selectFiles.size())
 				putIntoPlaylist(std::move(in::selectFiles[indexFile]));
 			
-			indexFile += fileCountPerTurn;
+			indexFile += in::fileCountPerTurn;
 			
 			if (finish and indexFile >= in::selectFiles.size())
 				break;
 		}
 	}
+	else {
+		std::move(in::seasonDirs.begin(), in::seasonDirs.end(),
+					   std::back_inserter(in::regularDirs));
+		in::seasonDirs.clear();
+
+		std::sort(in::regularDirs.begin(), in::regularDirs.end());
+
+		for (var& dir : in::regularDirs) {
+			if (dir.empty())
+				continue;
+			if (const var found { records[dir] }; found) {
+				if (mode == MODE_ARRANGEMENT_PERTITLE)
+					std::sort(found->begin(), found->end(), ascending);
+				else if (mode == MODE_ARRANGEMENT_DESCENDING_PERTITLE)
+					std::sort(found->begin(), found->end(), descending);
+
+				for (var& f : *found)
+				{
+					if (	mode == MODE_ARRANGEMENT_ASCENDING
+						or 	mode == MODE_ARRANGEMENT_DESCENDING
+						or 	mode == MODE_ARRANGEMENT_SHUFFLE)
+						in::selectFiles.emplace_back(std::move(f));
+					else
+						putIntoPlaylist(std::move(f));
+				}
+			}
+		}
+
+		if (mode == MODE_ARRANGEMENT_PERTITLE)
+			sortFiles(&in::selectFiles);
+
+		else if (mode == MODE_ARRANGEMENT_SHUFFLE)
+			std::shuffle(in::selectFiles.begin(), in::selectFiles.end(), mersenneTwisterEngine);
+
+		else if (	mode == MODE_ARRANGEMENT_DESCENDING
+				 or mode == MODE_ARRANGEMENT_DESCENDING_PERTITLE)
+			std::sort(in::selectFiles.begin(), in::selectFiles.end(), descending);
+
+		else
+			std::sort(in::selectFiles.begin(), in::selectFiles.end(), ascending);
+
+		for (var& f : in::selectFiles)
+			putIntoPlaylist(std::move(f));
+	 }
 	
 	#ifndef DEBUG
 	if (opt::valueOf[OPT_BENCHMARK] == "true" or opt::valueOf[OPT_DEBUG] == "true")
 	#endif
-		timeLapse(start, groupNumber(std::to_string(playlistCount)) + " valid files took ");
+		timeLapse(start,
+				  groupNumber(std::to_string(output.playlistCount))
+						+ " valid files took ");
 					   
-	if (dontWrite)
+	if (isDontWrite)
 		return RETURN_VALUE
 					   
-	if (output.extension == ".pls")
-		output.file << "\nNumberOfEntries="
-					<< playlistCount
-					<< "\nVersion=2\n";
-	else if (output.extension == ".b4s")
-		output.file << "\t</playlist>\n</WinampXML>\n";
-	else if (output.extension == ".xspf")
-		output.file << "\t</trackList>\n</playlist>\n";
-	else if (isEqual(output.extension.c_str(), {".wpl", ".smil"}))
-		output.file << "\t\t</seq>\n\t</body>\n</smil>\n";
-	else if (isEqual(output.extension.c_str(), {".asx", ".wax", ".wvx"}))
-		output.file << "</asx>\n";
-	else if (output.extension == ".xml")
-		output.file << "\t</dict>\n</dict>\n</plist>\n";
-	else if (isEqual(output.extension.c_str(), {".htm", ".html", ".xhtml"}))
-		output.file << "\t</table>\n</body>\n</html>\n";
-	#if 0
-	else if (output.extension == ".pdf")
-		output.file << "%%EOF\n";
-	#endif
-		
-	output.file.flush();
-	if (output.file.is_open())
-		output.file.close();
-		
-	if (playlistCount == 0)
-		fs::remove(output.name);
-	else {
-		const var outputFullpath { fs::absolute(output.name).string() };
-		std::cout << outputFullpath
-					<< '\n';
-		
-		if (const var app { opt::valueOf[OPT_OPENWITH] };
-			opt::valueOf[OPT_OPEN] == "true" or not app.empty())
-		{
-			#if defined(_WIN32) || defined(_WIN64)
-			if (app.empty())
-				std::cout << "📢 Open in Windows is Under construction.\n";
-			else
-				std::system(std::string(
-							"\"" + app + "\" \"" + outputFullpath + "\"").c_str());
-			#else
-			std::system(std::string((not app.empty() ? "\"" + app + "\"" : "open")
-						+ " \""
-						+ outputFullpath
-						+ "\"").c_str());
-			#endif
-		}
-	}
+	output.generate(Output::Section::Footer);
 }
 #undef CString
 #undef ReadOnlyCString

@@ -766,8 +766,10 @@ func isEqual(const std::string& l, const std::string& r,
 			 const unsigned long startRight = 0,
 			 const unsigned long max = 0)
 {
-	if (max == 0 and l.size() - startLeft not_eq r.size() - startRight) return false;
-	var total { std::max(l.size() - startLeft, r.size() - startRight) };
+	const var sizeLeft 	{ l.size() - startLeft };
+	const var sizeRIght { r.size() - startRight };
+	if (max == 0 and sizeLeft not_eq sizeRIght) return false;
+	var total { std::max(sizeLeft, sizeRIght) };
 	for (var i { 0 }; i<(max > 0 ? std::min(max, total) : total); ++i)
 		switch (ic) {
 			case IgnoreCase::Both:
@@ -4499,7 +4501,7 @@ struct Output {
 				content.suffix = "' \\\n";
 				break; }
 			case Section::Footer:
-				file << ")\n\n#for file in $playlist; do\n#\topen \"${file}\n#done\n";
+				file << ")\n\n#for file in $playlist; do\n#\topen \"${file}\"\n#done\n";
 				break;
 			default:
 				;
@@ -4597,6 +4599,53 @@ struct Output {
 				break;
 			case Section::Footer:
 				file << "\t]\n}";
+				break;
+			default:
+				;
+			}
+		}
+		else if (extension == ".csv") {
+			switch (section) {
+			case Section::Header:
+				file << "file\n";
+				break;
+			case Section::Content:
+				content.prefix = "\"";
+				content.suffix = "\"\n";
+				break;
+			case Section::Footer:
+				break;
+			default:
+				;
+			}
+		}
+		else if (extension == ".pl") {
+			switch (section) {
+			case Section::Header:
+				file << "@playlist = (\n";
+				break;
+			case Section::Content:
+				content.prefix = "\t\"";
+				content.suffix = "\",\n";
+				break;
+			case Section::Footer:
+				file << ");\n";
+				break;
+			default:
+				;
+			}
+		}
+		else if (extension == ".java") {
+			switch (section) {
+			case Section::Header:
+				file << "String[] playlist = {\n";
+				break;
+			case Section::Content:
+				content.prefix = "\t\"";
+				content.suffix = "\",\n";
+				break;
+			case Section::Footer:
+				file << "};\n";
 				break;
 			default:
 				;
@@ -6052,7 +6101,7 @@ SIZE_NEEDED:	std::cout << "⚠️  Expecting operator '<' or '>' followed"\
 
 	if (const var dirOut { in::inputDirs.size() == 1
 			? transformWhiteSpace(fs::path(opt::valueOf[OPT_OUTDIR]).filename().string())
-			: std::to_string(in::inputDirs.size())};
+			: std::to_string(in::inputDirs.size()) };
 		opt::valueOf[OPT_OUTFILENAME].empty())
 	{
 		#ifdef LIBCPP_FORMAT

@@ -6258,7 +6258,8 @@ SIZE_NEEDED:	std::cout << "⚠️  Expecting operator '<' or '>' followed"\
 	}
 
 	#ifndef DEBUG
-	if (opt::valueOf[OPT_BENCHMARK] == "true" or opt::valueOf[OPT_DEBUG] == "true")
+	if (const var isDebugTrue { opt::valueOf[OPT_DEBUG] == "true" };
+		opt::valueOf[OPT_BENCHMARK] == "true" or isDebugTrue)
 	#endif
 	{
 		if (in::inputDirs.size() > 0)
@@ -6268,23 +6269,21 @@ SIZE_NEEDED:	std::cout << "⚠️  Expecting operator '<' or '>' followed"\
 					  + (in::selectFiles.size() > 0
 						 ? " and " + groupNumber(std::to_string(in::selectFiles.size()))
 						 + " input files " : " " ) + "took ");
+		#ifndef DEBUG
+		if (isDebugTrue)
+		#endif
+		for (var i { 0 }; i<maxDirSize; ++i)
+			for (var& select : {1, 2}) {
+				if ((select == 1 and i >= in::regularDirs.size())
+					or (select == 2 and i >= in::seasonDirs.size()))
+					continue;
+				std::cout
+					<< (i == 0 and select == 1 ? "BEGIN valid dirs-----\n" : "")
+					<< (select == 1 ? 'R' : 'S') << ':'
+					<< (select == 1 ? in::regularDirs[i] : in::seasonDirs[i])
+					<< (i + 1 == maxDirSize ? "\nEND valid dirs-----\n\n" : "\n");
+			}
 	}
-
-
-	#ifndef DEBUG
-	if (opt::valueOf[OPT_DEBUG] == "true")
-	#endif
-	for (var i { 0 }; i<maxDirSize; ++i)
-		for (var& select : {1, 2}) {
-			if ((select == 1 and i >= in::regularDirs.size())
-				or (select == 2 and i >= in::seasonDirs.size()))
-				continue;
-			std::cout
-				<< (i == 0 and select == 1 ? "BEGIN valid dirs-----\n" : "")
-				<< (select == 1 ? 'R' : 'S') << ':'
-				<< (select == 1 ? in::regularDirs[i] : in::seasonDirs[i])
-				<< (i + 1 == maxDirSize ? "\nEND valid dirs-----\n\n" : "\n");
-		}
 	
 	
 	var records { MapStringPListPath() };

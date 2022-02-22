@@ -180,6 +180,7 @@ let OPEN_WITH="\
 let LIST="\
 --list\n\
         Display list of options state, then exit.\n\
+        To list playlist contents, use --verbose\n\
         See also: --debug=args or --display-config\n\
 ";
 let SHOW="\

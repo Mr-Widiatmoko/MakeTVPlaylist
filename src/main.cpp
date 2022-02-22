@@ -4269,8 +4269,6 @@ struct Output {
 				  ReadOnlyCString title = nullptr,
 				  Type type = Type::None)
 	{
-		assert(section == Section::Content and content);
-		
 		if (extension == ".pls") {
 			switch (section) {
 			case Section::Header:

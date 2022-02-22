@@ -4265,22 +4265,12 @@ struct Output {
 	}
 	
 	func generate(Section section,
-				  const fs::path* const path = nullptr,
+				  Content* const content = nullptr,
 				  ReadOnlyCString title = nullptr,
 				  Type type = Type::None)
 	{
-		var content { Content() };
-
-		if (section == Section::Content) {
-			if (not path)
-				return;
-			
-			playlistCount++;
-			
-			deduceFilename(path, &content);
-		}
+		assert(section == Section::Content and content);
 		
-
 		if (extension == ".pls") {
 			switch (section) {
 			case Section::Header:
@@ -4288,9 +4278,9 @@ struct Output {
 				break;
 			case Section::Content: {
 				const var indexString { std::to_string(playlistCount) };
-				content.prefix = "File" + indexString + '=';
-				content.suffix = "\nTitle" + indexString + '=';
-				content.suffix += title;
+				content->prefix = "File" + indexString + '=';
+				content->suffix = "\nTitle" + indexString + '=';
+				content->suffix += title;
 				break; }
 			case Section::Footer:
 				file << "\nNumberOfEntries="
@@ -4320,11 +4310,11 @@ struct Output {
 						"\t<trackList>\n";
 				break;
 			case Section::Content: {
-				content.prefix = "\t\t<track>\n\t\t\t<title>";
-				content.prefix += title;
-				content.prefix += "</title>\n"\
+				content->prefix = "\t\t<track>\n\t\t\t<title>";
+				content->prefix += title;
+				content->prefix += "</title>\n"\
 					   "\t\t\t<location>file://";
-				content.suffix = "</location>\n\t\t</track>";
+				content->suffix = "</location>\n\t\t</track>";
 				break;
 			}
 			case Section::Footer:
@@ -4351,12 +4341,12 @@ struct Output {
 					break;
 			case Section::Content: {
 				const var key { std::to_string(1000 - playlistCount) };
-				content.prefix = "\t\t<key>" + key + "</key>\n"\
+				content->prefix = "\t\t<key>" + key + "</key>\n"\
 				   "\t\t<dict>\n"\
 				   "\t\t\t<key>Track ID</key><integer>" + key + "</integer>\n"\
 				   "\t\t\t<key>Name</key><string>" + filenameWithoutExtension() + "</string>\n"\
 				   "\t\t\t<key>Location</key><string>file://";
-				content.suffix = "</string>\n\t\t</dict>";
+				content->suffix = "</string>\n\t\t</dict>";
 				break; }
 			case Section::Footer:
 				file << "\t</dict>\n</dict>\n</plist>\n";
@@ -4378,8 +4368,8 @@ struct Output {
 					"\t\t<seq>\n";
 				break;
 			case Section::Content: {
-				content.prefix = "\t\t\t<media src=\"";
-				content.suffix = "\"/>";
+				content->prefix = "\t\t\t<media src=\"";
+				content->suffix = "\"/>";
 				break; }
 			case Section::Footer:
 				file << "\t\t</seq>\n\t</body>\n</smil>\n";
@@ -4397,8 +4387,8 @@ struct Output {
 						"\t\t<seq>\n";
 				break;
 			case Section::Content: {
-				content.prefix = "\t\t\t<audio src=\"";
-				content.suffix = "\"/>";
+				content->prefix = "\t\t\t<audio src=\"";
+				content->suffix = "\"/>";
 				break; }
 			case Section::Footer:
 				file << "\t\t</seq>\n\t</body>\n</smil>\n";
@@ -4415,8 +4405,8 @@ struct Output {
 						"\t<playlist>\n";
 				break;
 			case Section::Content: {
-				content.prefix = "\t\t<entry Playstring=\"file:";
-				content.suffix = "\">\n\t\t\t<Name>"
+				content->prefix = "\t\t<entry Playstring=\"file:";
+				content->suffix = "\">\n\t\t\t<Name>"
 					   + filenameWithoutExtension()
 					   + "</Name>\n\t\t</entry>";
 				break; }
@@ -4434,10 +4424,10 @@ struct Output {
 					"\t\t<title>" << name.filename().string() << "</title>\n";
 				break;
 			case Section::Content: {
-				content.prefix = "\t<entry>\n\t\t<title>"
+				content->prefix = "\t<entry>\n\t\t<title>"
 					   + filenameWithoutExtension()
 					   + "</title>\t\t<ref href=\"";
-				content.suffix = "\"/>\n\t</entry>";
+				content->suffix = "\"/>\n\t</entry>";
 				break; }
 			case Section::Footer:
 				file << "</asx>\n";
@@ -4486,11 +4476,11 @@ struct Output {
 						classDef.second = "width=\"100%\"";
 				}
 				
-				content.prefix = "\t\t<tr class=\"row_" + typeName + "\">\n"\
+				content->prefix = "\t\t<tr class=\"row_" + typeName + "\">\n"\
 					   "\t\t\t<td " + classDef.first + ">"
 					   + std::to_string(playlistCount) + ".</td>\n"\
 					   "\t\t\t<td " + classDef.second + "><a href=\"";
-				content.suffix = "\">" + name.filename().string() + "</a></td>\n"\
+				content->suffix = "\">" + name.filename().string() + "</a></td>\n"\
 					   "\t\t</tr>\n";
 				break; }
 			case Section::Footer:
@@ -4506,8 +4496,8 @@ struct Output {
 				file << "declare -a playlist=(\\\n";
 				break;
 			case Section::Content: {
-				content.prefix = "\t'";
-				content.suffix = "' \\\n";
+				content->prefix = "\t'";
+				content->suffix = "' \\\n";
 				break; }
 			case Section::Footer:
 				file << ")\n\n#for file in $playlist; do\n#\topen \"${file}\"\n#done\n";
@@ -4522,8 +4512,8 @@ struct Output {
 			if (section == Section::Footer)
 				file << "};\n";
 			else if (section == Section::Content) {
-				content.prefix = "\t\"";
-				content.suffix = "\",\n";
+				content->prefix = "\t\"";
+				content->suffix = "\",\n";
 			}
 			
 			if (isEqual(extension.c_str(), {".h", ".hpp"})) {
@@ -4555,8 +4545,8 @@ struct Output {
 				file << "playlist = [\n";
 				break;
 			case Section::Content:
-				content.prefix = "\t\"";
-				content.suffix = "\",\n";
+				content->prefix = "\t\"";
+				content->suffix = "\",\n";
 				break;
 			case Section::Footer:
 				file << "]\n\n#for file in playlist do\n#\tputs file\n#end\n";
@@ -4571,8 +4561,8 @@ struct Output {
 				file << "playlist = [\n";
 				break;
 			case Section::Content:
-				content.prefix = "\t'";
-				content.suffix = "',\n";
+				content->prefix = "\t'";
+				content->suffix = "',\n";
 				break;
 			case Section::Footer:
 				file << "\t]\n\n#for file in playlist:\n#\tprint(file)\n";
@@ -4587,8 +4577,8 @@ struct Output {
 				file << "var playlist = [\n";
 				break;
 			case Section::Content:
-				content.prefix = "\t\"";
-				content.suffix = "\",\n";
+				content->prefix = "\t\"";
+				content->suffix = "\",\n";
 				break;
 			case Section::Footer:
 				file << "]\n";
@@ -4603,8 +4593,8 @@ struct Output {
 				file << "{\n\t\"playlist\": [\n";
 				break;
 			case Section::Content:
-				content.prefix = "\t\t{\n\t\t\t\"file\": \"";
-				content.suffix = "\"\n\t\t},\n";
+				content->prefix = "\t\t{\n\t\t\t\"file\": \"";
+				content->suffix = "\"\n\t\t},\n";
 				break;
 			case Section::Footer:
 				file << "\t]\n}";
@@ -4619,8 +4609,8 @@ struct Output {
 				file << "file\n";
 				break;
 			case Section::Content:
-				content.prefix = "\"";
-				content.suffix = "\"\n";
+				content->prefix = "\"";
+				content->suffix = "\"\n";
 				break;
 			case Section::Footer:
 				break;
@@ -4634,8 +4624,8 @@ struct Output {
 				file << "@playlist = (\n";
 				break;
 			case Section::Content:
-				content.prefix = "\t\"";
-				content.suffix = "\",\n";
+				content->prefix = "\t\"";
+				content->suffix = "\",\n";
 				break;
 			case Section::Footer:
 				file << ");\n";
@@ -4650,8 +4640,8 @@ struct Output {
 				file << "String[] playlist = {\n";
 				break;
 			case Section::Content:
-				content.prefix = "\t\"";
-				content.suffix = "\",\n";
+				content->prefix = "\t\"";
+				content->suffix = "\",\n";
 				break;
 			case Section::Footer:
 				file << "};\n";
@@ -4666,8 +4656,8 @@ struct Output {
 				file << "var playlist = [\n";
 				break;
 			case Section::Content:
-				content.prefix = "\t\"";
-				content.suffix = "\",\n";
+				content->prefix = "\t\"";
+				content->suffix = "\",\n";
 				break;
 			case Section::Footer:
 				file << "]\n\n#for file in playlist {\n#print(file)\n#}\n";
@@ -4713,7 +4703,7 @@ struct Output {
 		#endif
 		
 		if (section == Section::Content) {
-			file << content.prefix << content.fullPath << content.suffix << '\n';
+			file << content->prefix << content->fullPath << content->suffix << '\n';
 		}
 		else if (section == Section::Footer) {
 			file.flush();
@@ -6415,74 +6405,7 @@ SIZE_NEEDED:	std::cout << "⚠️  Expecting operator '<' or '>' followed"\
 	unsigned long adsCount[2] {0, 0};
 
 
-	func putIntoPlaylist{ [&](const fs::path& file)
-	{
-		func putIt{ [&](const fs::path& file,
-						ReadOnlyCString title = nullptr,
-						Output::Type type = Output::Type::None)
-		{
-			if (not isDontWrite)
-				output.generate(Output::Section::Content, &file, title, type);
-			
-			else {
-				output.playlistCount++;
-				var content { Output::Content() };
-				output.deduceFilename(&file, &content);
-				
-				#if MAKE_LIB
-				if (outc)
-					*outc += 1;
-				if (maxLength) {
-					if (const var sz { content.fullPath.size() + 1 };
-						*maxLength < sz)
-						*maxLength = sz;
-				}
-				if (outs)
-					std::strcpy(outs[output.playlistCount - 1],
-								content.fullPath.c_str());
-				#endif
-			}
-			
-			#ifndef DEBUG
-			if (output.isVerbose)
-			#endif
-				std::cout << file.string()
-							<< '\n';
-		}};
-		
-		#if defined(_WIN32) || defined(_WIN64)
-		#define OS_NAME	"Windows"
-		#elif defined(__APPLE__)
-		#define OS_NAME	"macOS"
-		#else
-		#define OS_NAME	"Linux"
-		#endif
-
-		putIt(file,
-			  OS_NAME " Path",
-			  Output::Type::Regular);
-		   
-
-		if (opt::valueOf[OPT_SKIPSUBTITLE] not_eq "true") {
-			var subtitleFiles { ListPath() };
-			findSubtitleFileInto(file, &subtitleFiles);
-			for (var& sf : subtitleFiles)
-				putIt(std::move(sf),
-					  "Subtitle Path on " OS_NAME,
-					  Output::Type::Subtitle);
-		}
-		   
-		if (not in::listAdsDir.empty())
-		   for (var i { 0 }; i<(adsCount[1] == 0
-							  ? adsCount[0]
-							  : distribCount(mersenneTwisterEngine));
-			   ++i, ++output.playlistCount)
-			   putIt(fs::absolute(
-						   in::listAdsDir[distrib(mersenneTwisterEngine)]).string(),
-					 "Ads path on " OS_NAME,
-					 Output::Type::Advertise);
-		#undef OS_NAME
-	}};
+	
 					   
 	///Check if records has listAdsDir and equal
 	if (var equal { true };
@@ -6528,7 +6451,77 @@ SIZE_NEEDED:	std::cout << "⚠️  Expecting operator '<' or '>' followed"\
 			}
 		}
 	}
+	
 					   
+	func putIntoPlaylist{ [&](const fs::path&& file)
+	{
+		func putIt{ [&](const fs::path& file,
+						ReadOnlyCString title = nullptr,
+						Output::Type type = Output::Type::None)
+			{
+				output.playlistCount++;
+				var content { Output::Content() };
+				output.deduceFilename(&file, &content);
+				
+				if (not isDontWrite)
+					output.generate(Output::Section::Content, &content, title, type);
+				
+				else {
+					#if MAKE_LIB
+					if (outc)
+						*outc += 1;
+					if (maxLength) {
+						if (const var sz { content.fullPath.size() + 1 };
+							*maxLength < sz)
+							*maxLength = sz;
+					}
+					if (outs)
+						std::strcpy(outs[output.playlistCount - 1],
+									content.fullPath.c_str());
+					#endif
+				}
+				
+				#ifndef DEBUG
+				if (output.isVerbose)
+				#endif
+					std::cout << content.fullPath
+					<< '\n';
+			}};
+		
+		#if defined(_WIN32) || defined(_WIN64)
+		#define OS_NAME	"Windows"
+		#elif defined(__APPLE__)
+		#define OS_NAME	"macOS"
+		#else
+		#define OS_NAME	"Linux"
+		#endif
+		
+		putIt(file,
+			  OS_NAME " Path",
+			  Output::Type::Regular);
+		
+		
+		if (opt::valueOf[OPT_SKIPSUBTITLE] not_eq "true") {
+			var subtitleFiles { ListPath() };
+			findSubtitleFileInto(file, &subtitleFiles);
+			for (var& sf : subtitleFiles)
+				putIt(std::move(sf),
+					  "Subtitle Path on " OS_NAME,
+					  Output::Type::Subtitle);
+		}
+		
+		if (not in::listAdsDir.empty())
+			for (var i { 0 }; i<(adsCount[1] == 0
+								 ? adsCount[0]
+								 : distribCount(mersenneTwisterEngine));
+				 ++i, ++output.playlistCount)
+				putIt(fs::absolute(
+								   in::listAdsDir[distrib(mersenneTwisterEngine)]).string(),
+					  "Ads path on " OS_NAME,
+					  Output::Type::Advertise);
+		#undef OS_NAME
+	}};
+
 	if (const var mode { opt::valueOf[OPT_ARRANGEMENT] };
 			mode == MODE_ARRANGEMENT_DEFAULT
 		 or mode == MODE_ARRANGEMENT_UNORDERED

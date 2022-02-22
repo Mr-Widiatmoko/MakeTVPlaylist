@@ -191,7 +191,7 @@ let SHOW="\
 --print-defaults\n\
 --print-config\n\
         Display options summary and configuration file contents, then quit.\n\
-        See also --verbose or --verbose=info or --debug=args or --benchmark.\n\
+        See also --list or --verbose=info or --debug=args or --benchmark.\n\
         Example: --print-defaults\n\
 ";
 let WRITE="\
@@ -324,10 +324,10 @@ let EXCLUDE_HIDDEN="\
 [[deprecated("Recognized in --find or --exlude-find.")]] [[maybe_unused]]
 let CASEINSENSITIVE="\
 -N, --make-case-insensitive\n\
-     --case-insensitive\n\
-     --caseinsensitive\n\
-     --ignore-case\n\
-     --ignorecase\n\
+    --case-insensitive\n\
+    --caseinsensitive\n\
+    --ignore-case\n\
+    --ignorecase\n\
         Make --find and --exclude-find case-insensitive.\n\
         To make case-sensitive again, pass --ignorecase=false.\n\
 ";

@@ -6533,14 +6533,14 @@ SIZE_NEEDED:	std::cout << "⚠️  Expecting operator '<' or '>' followed"\
 		while (true) {
 			var finish { true };
 			for (var i { 0 }; i < maxDirSize; ++i)
-				for (var& indexPass : {1, 2})
+				for (const var& indexPass : {1, 2})
 				{
-					if ((indexPass == 1 and i >= in::regularDirs.size())
-						or (indexPass == 2 and i >= in::seasonDirs.size()))
+					if (	(indexPass == 1 and i >= in::regularDirs.size())
+						or 	(indexPass == 2 and i >= in::seasonDirs.size()))
 						continue;
 					
-					if (const var dir { indexPass == 1 ? in::regularDirs[i]
-						: in::seasonDirs[i] };
+					if (const var dir { indexPass == 1 	? in::regularDirs[i]
+														: in::seasonDirs[i] };
 						dir.empty())
 						continue;
 
@@ -6556,10 +6556,12 @@ SIZE_NEEDED:	std::cout << "⚠️  Expecting operator '<' or '>' followed"\
 						
 						if (indexFile == 0) {
 							if (mode == MODE_ARRANGEMENT_SHUFFLE_DEFAULT)
-								std::shuffle(found->begin(), found->end(), mersenneTwisterEngine);
+								std::shuffle(found->begin(), found->end(),
+											 mersenneTwisterEngine);
 							
 							else if (mode == MODE_ARRANGEMENT_DESCENDING_DEFAULT)
-								std::sort(found->begin(), found->end(), descending);
+								std::sort(found->begin(), found->end(),
+										  descending);
 						}
 							
 						for (var c { 0 }; c < in::fileCountPerTurn; ++c)

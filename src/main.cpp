@@ -2468,35 +2468,36 @@ func isValidFile(const fs::path& path)
 
 		bool found[2]{ false, false };
 		for (var& z : { 0, 1 })
-		for (var& i : { 0, 1, 2, 3 })
-		{
-			if (opt::valueOf[*opt::date::SINGLE_DATE[z][i]] not_eq "") {
-				for (var& r : *opt::date::RANGE_DATE[z][i])
-					if (ft[z][i] >= r.first and ft[z][i] <= r.second ) {
-						found[z] = true;
-						break;
-					}
-				for (var& t : *opt::date::OPERATOR_DATE[z][i])
-					if (t.first == '=') {
-						if (ft[z][i] == t.second) {
+			for (var& i : { 0, 1, 2, 3 })
+			{
+				if (opt::valueOf[*opt::date::SINGLE_DATE[z][i]] not_eq "")
+				{
+					for (var& r : *opt::date::RANGE_DATE[z][i])
+						if (ft[z][i] >= r.first and ft[z][i] <= r.second ) {
 							found[z] = true;
 							break;
 						}
-					}
-					else if (t.first == '<') {
-						if (ft[z][i] < t.second) {
-							found[z] = true;
-							break;
+					for (var& t : *opt::date::OPERATOR_DATE[z][i])
+						if (t.first == '=') {
+							if (ft[z][i] == t.second) {
+								found[z] = true;
+								break;
+							}
 						}
-					}
-					else if (t.first == '>') {
-						if (ft[z][i] > t.second) {
-							found[z] = true;
-							break;
+						else if (t.first == '<') {
+							if (ft[z][i] < t.second) {
+								found[z] = true;
+								break;
+							}
 						}
-					}
-			} // end st[] -> valueOf[OPT_D?????]
-		}
+						else if (t.first == '>') {
+							if (ft[z][i] > t.second) {
+								found[z] = true;
+								break;
+							}
+						}
+				} // end st[] -> valueOf[OPT_D?????]
+			}
 		
 		if (not found[0] or found[1])
 			return false;
@@ -4184,7 +4185,7 @@ struct Output {
 	}
 	
 	property unsigned long  playlistCount;
-	
+	property bool			isVerbose;
 
 	func filenameWithoutExtension() {
 		if (nameWithoutExt.empty())
@@ -4197,16 +4198,78 @@ struct Output {
 	enum class Section { None, Header, Content, Footer };
 	enum class Type { None, Regular, Subtitle, Advertise };
 	
+	struct Content {
+		property std::string 	fullPath,
+								prefix,
+								suffix;
+	};
+	
+	func deduceFilename(const fs::path* const path, Content* const content)
+	{
+		content->fullPath = path->string();
+		
+		var needAbsolute = true;
+		var isNetworkTransport = isNetworkTransportFile(path->string());
+		
+		if (isNetworkTransport or isEqual(extension.c_str(),
+										  {".htm", ".html", ".xhtml"}))
+		{
+			replace_all(content->fullPath, " ", "%20");
+			replace_all(content->fullPath, "=", "%3D");
+			replace_all(content->fullPath, "+", "%2B");
+			replace_all(content->fullPath, "-", "%2D");
+			replace_all(content->fullPath, "?", "%3F");
+			replace_all(content->fullPath, ";", "%3B");
+			//replace_all(content->fullPath, "%", "%25");
+			replace_all(content->fullPath, "@" ,"%4F");
+			replace_all(content->fullPath, "!" ,"%21");
+			replace_all(content->fullPath, "\"","%22");
+			replace_all(content->fullPath, "'" ,"%27");
+			replace_all(content->fullPath, "," ,"%2C");
+			//replace_all(content->fullPath, "/" ,"%2F");
+			replace_all(content->fullPath, "\\","%5C");
+			replace_all(content->fullPath, "$" ,"%24");
+			replace_all(content->fullPath, "&" ,"%26");
+			replace_all(content->fullPath, "#" ,"%23");
+			replace_all(content->fullPath, "<" ,"%3C");
+			replace_all(content->fullPath, ">" ,"%3E");
+
+			if (not isNetworkTransport)
+				content->fullPath.insert(0, "file://");
+			needAbsolute = false;
+		}
+		
+		if (needAbsolute)
+			content->fullPath = fs::absolute(*path).string();
+		
+		if (isEqual(extension.c_str(),
+					{".wpl", ".b4s", ".smil", ".asx", ".wax", ".wvx"}))
+		{
+			for (var w { 0 }; w<ARRAYLEN(def::XML_CHARS_ALIAS); ++w)
+				if (isContains(content->fullPath, def::XML_CHARS_NORMAL[w],
+							   IgnoreCase::Left) not_eq std::string::npos)
+				{
+					replace_all(content->fullPath, def::XML_CHARS_NORMAL[w],
+								def::XML_CHARS_ALIAS[w]);
+					break;
+				}
+
+			if (not isEqual(extension.c_str(), {".wpl", ".smil"}))
+			{
+				const var tmp { fs::path(content->fullPath).filename() };
+				name = tmp.string().substr(0,
+										   tmp.string().size() - tmp.extension().string().size());
+			}
+		}
+
+	}
+	
 	func generate(Section section,
 				  const fs::path* const path = nullptr,
 				  ReadOnlyCString title = nullptr,
 				  Type type = Type::None)
 	{
-		struct Content {
-			property std::string 	fullPath,
-									prefix,
-									suffix;
-		} content;
+		var content { Content() };
 
 		if (section == Section::Content) {
 			if (not path)
@@ -4214,61 +4277,7 @@ struct Output {
 			
 			playlistCount++;
 			
-			content.fullPath = path->string();
-			
-			var needAbsolute = true;
-			var isNetworkTransport = isNetworkTransportFile(path->string());
-			
-			if (isNetworkTransport or isEqual(extension.c_str(),
-											  {".htm", ".html", ".xhtml"}))
-			{
-				replace_all(content.fullPath, " ", "%20");
-				replace_all(content.fullPath, "=", "%3D");
-				replace_all(content.fullPath, "+", "%2B");
-				replace_all(content.fullPath, "-", "%2D");
-				replace_all(content.fullPath, "?", "%3F");
-				replace_all(content.fullPath, ";", "%3B");
-				//replace_all(content.fullPath, "%", "%25");
-				replace_all(content.fullPath, "@" ,"%4F");
-				replace_all(content.fullPath, "!" ,"%21");
-				replace_all(content.fullPath, "\"","%22");
-				replace_all(content.fullPath, "'" ,"%27");
-				replace_all(content.fullPath, "," ,"%2C");
-				//replace_all(content.fullPath, "/" ,"%2F");
-				replace_all(content.fullPath, "\\","%5C");
-				replace_all(content.fullPath, "$" ,"%24");
-				replace_all(content.fullPath, "&" ,"%26");
-				replace_all(content.fullPath, "#" ,"%23");
-				replace_all(content.fullPath, "<" ,"%3C");
-				replace_all(content.fullPath, ">" ,"%3E");
-
-				if (not isNetworkTransport)
-					content.fullPath.insert(0, "file://");
-				needAbsolute = false;
-			}
-			
-			if (needAbsolute)
-				content.fullPath = fs::absolute(*path).string();
-			
-			if (isEqual(extension.c_str(),
-						{".wpl", ".b4s", ".smil", ".asx", ".wax", ".wvx"}))
-			{
-				for (var w { 0 }; w<ARRAYLEN(def::XML_CHARS_ALIAS); ++w)
-					if (isContains(content.fullPath, def::XML_CHARS_NORMAL[w],
-								   IgnoreCase::Left) not_eq std::string::npos)
-					{
-						replace_all(content.fullPath, def::XML_CHARS_NORMAL[w],
-									def::XML_CHARS_ALIAS[w]);
-						break;
-					}
-
-				if (not isEqual(extension.c_str(), {".wpl", ".smil"}))
-				{
-					const var tmp { fs::path(content.fullPath).filename() };
-					name = tmp.string().substr(0,
-											   tmp.string().size() - tmp.extension().string().size());
-				}
-			}
+			deduceFilename(path, &content);
 		}
 		
 
@@ -4705,11 +4714,6 @@ struct Output {
 		
 		if (section == Section::Content) {
 			file << content.prefix << content.fullPath << content.suffix << '\n';
-			#ifndef DEBUG
-			if (isVerbose)
-			#endif
-				std::cout << content.fullPath
-							<< '\n';
 		}
 		else if (section == Section::Footer) {
 			file.flush();
@@ -4745,7 +4749,6 @@ struct Output {
 	
 private:
 	property std::string nameWithoutExt;
-	property bool			isVerbose;
 	
 };
 
@@ -6423,19 +6426,28 @@ SIZE_NEEDED:	std::cout << "⚠️  Expecting operator '<' or '>' followed"\
 			
 			else {
 				output.playlistCount++;
+				var content { Output::Content() };
+				output.deduceFilename(&file, &content);
+				
 				#if MAKE_LIB
 				if (outc)
 					*outc += 1;
 				if (maxLength) {
-					if (const var sz { fs::absolute(file).string().size() + 1 };
+					if (const var sz { content.fullPath.size() + 1 };
 						*maxLength < sz)
 						*maxLength = sz;
 				}
 				if (outs)
 					std::strcpy(outs[output.playlistCount - 1],
-								fs::absolute(file).string().c_str());
+								content.fullPath.c_str());
 				#endif
 			}
+			
+			#ifndef DEBUG
+			if (output.isVerbose)
+			#endif
+				std::cout << file.string()
+							<< '\n';
 		}};
 		
 		#if defined(_WIN32) || defined(_WIN64)

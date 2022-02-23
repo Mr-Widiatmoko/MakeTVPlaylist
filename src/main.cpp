@@ -81,7 +81,7 @@ let OPT_EXECUTION					{"execution"};				// c
 	let MODE_EXECUTION_THREAD					{"thread"};
 	let MODE_EXECUTION_ASYNC					{"async"};
 let OPT_EXCLHIDDEN					{"exclude-hidden"};			// n
-let OPT_REGEXSYNTAX					{"regex-syntax"};		// X
+let OPT_REGEXSYNTAX					{"regex-syntax"};			// X
 let OPT_REGEXSYNTAX_ARGS 			= {	"ecma",
 										"basic",
 										"extended",
@@ -529,7 +529,7 @@ typedef std::vector<int> 								ListInt;
 typedef std::vector<unsigned short> 					ListUShort;
 typedef std::vector<short> 								ListShort;
 typedef std::vector<unsigned> 							ListUInt;
-typedef std::vector<std::pair<uintmax_t, uintmax_t>> 	ListPaitUIntMax;
+typedef std::vector<std::pair<uintmax_t, uintmax_t>> 	ListPairUIntMax;
 typedef std::vector<std::pair<float, std::string>> 		ListPairFloatString;
 struct 	Date;
 typedef std::vector<std::pair<char, Date>> 				ListPairCharDate;
@@ -861,7 +861,9 @@ func printHelp(ReadOnlyCString arg = nullptr)
 			OPT_DEXCLMODIFIED, OPT_DACCESSED, OPT_DEXCLACCESSED}))
 			std::cout << HELP_DATE_REST;
 	}};
-	if (var i { 0 }; arg) {
+	if (var i { 0 };
+		arg)
+	{
 		for (var& opt : OPTS) {
 			if (isEqual(arg, *opt)) {
 				if (isEqual(arg, OPT_HELP))
@@ -1304,7 +1306,7 @@ public:
 											std::chrono::system_clock::now()) };
 			const var t { std::chrono::system_clock::to_time_t(now) };
 			set(&t);
-			if (isEqual(s, "today")) {
+			if (isEqual(s, "today", IgnoreCase::Left)) {
 				hour = 0;
 				minute = 0;
 				second = 0;
@@ -1357,7 +1359,8 @@ public:
 						const var get { s.substr(k, i - k) };
 						const var isNumber { isDigit(get) };
 						if (std::isalpha(last)) {
-							if (const var pm { isPM(get) }; pm)
+							if (const var pm { isPM(get) };
+								pm)
 								time.emplace_back(pm);
 							else if (not get.empty())
 								others.emplace_back(get);
@@ -1374,7 +1377,8 @@ public:
 				} else {
 					if (i == s.size() - 1) {
 						const var get { s.substr(k) };
-						if (const var pm { isPM(get) }; pm)
+						if (const var pm { isPM(get) };
+							pm)
 							time.emplace_back(pm);
 						else if (not get.empty())
 							others.emplace_back(get);
@@ -1518,7 +1522,7 @@ public:
 	func isValid() const -> bool
 	{
 		return not (year == 0 and month == 0 and day == 0 and hour == 0 and minute == 0 and second == 0 and weekday == 0)
-		and (weekday <= 7 or year >= 10 or month <= 12 or day <= 33 or hour <= 24 or minute <= 60 or second <= 60);
+		and (weekday <= 7 or year >= 10 or month <= 12 or day <= 32 or hour <= 24 or minute <= 60 or second <= 60);
 	}
 
 };
@@ -2249,7 +2253,8 @@ public:
 				
 				if (size == 1) {
 					var result { buffer[0] };
-					if (var genreIndex { 0 }; isGenre)
+					if (var genreIndex { 0 };
+						isGenre)
 						for (var& g : GENRES) {
 							if (result == genreIndex)
 								return g;
@@ -2321,7 +2326,7 @@ namespace opt {
 	ListString 	listFind, 	listExclFind,
 				listFindDir,listExclFindDir;
 
-	ListPaitUIntMax listSize, listExclSize;
+	ListPairUIntMax listSize, listExclSize;
 
 	ListPairCharDate
 		listDCreated, 	  listDModified, 	 listDAccessed, 	listDChanged,
@@ -2433,18 +2438,16 @@ func isValidFile(const fs::path& path)
 	}
 	
 	const var fileExt { tolower(tmp.extension().string()) };
-	if (opt::valueOf[OPT_EXT] not_eq "*"
-		and opt::DEFAULT_EXT.find(fileExt)
-		== opt::DEFAULT_EXT.end())
+	if (	opt::valueOf[OPT_EXT] not_eq "*"
+		and opt::DEFAULT_EXT.find(fileExt) == opt::DEFAULT_EXT.end())
 		return false;
 	
-	if (opt::valueOf[OPT_EXCLEXT] not_eq "*"
+	if (	opt::valueOf[OPT_EXCLEXT] not_eq "*"
 		and not opt::valueOf[OPT_EXCLEXT].empty())
-		if (opt::EXCLUDE_EXT.find(fileExt)
-			not_eq opt::EXCLUDE_EXT.end())
+		if (opt::EXCLUDE_EXT.find(fileExt) not_eq opt::EXCLUDE_EXT.end())
 			return false;
 	
-	if (opt::valueOf[OPT_DCREATED] 		not_eq ""
+	if (   opt::valueOf[OPT_DCREATED] 	not_eq ""
 		or opt::valueOf[OPT_DACCESSED] 	not_eq ""
 		or opt::valueOf[OPT_DMODIFIED] 	not_eq ""
 		or opt::valueOf[OPT_DCHANGED] 	not_eq ""
@@ -2457,10 +2460,10 @@ func isValidFile(const fs::path& path)
 		struct stat filestat;
 		stat(tmp.string().c_str(), &filestat);
 		
-		const Date _ft[4] = { 			Date(&filestat.st_birthtime),
-										Date(&filestat.st_atime),
-										Date(&filestat.st_mtime),
-										Date(&filestat.st_ctime) };
+		const Date _ft[4] = { 	Date(&filestat.st_birthtime),
+								Date(&filestat.st_atime),
+								Date(&filestat.st_mtime),
+								Date(&filestat.st_ctime) };
 		const Date ft[2][4] = {
 			{ _ft[0], _ft[1], _ft[2], _ft[3]},
 			{ _ft[0], _ft[1], _ft[2], _ft[3]}
@@ -2505,7 +2508,9 @@ func isValidFile(const fs::path& path)
 	}
 	
 	
-	if (var found { false }; not opt::valueOf[OPT_REGEX].empty()) {
+	if (var found { false };
+		not opt::valueOf[OPT_REGEX].empty())
+	{
 		for (var filename { excludeExtension(tmp.filename()) };
 			 var& regex : opt::listRegex)
 			if (std::regex_search(filename, regex)) {
@@ -2532,7 +2537,8 @@ func isValidFile(const fs::path& path)
 		if (ismp3)
 			id3 = ID3(tmp.string().c_str(), isCaseInsensitive);
 	
-		if (var found { false }; not opt::listFind.empty())
+		if (var found { false };
+			not opt::listFind.empty())
 		{
 			for (var& keyword : opt::listFind)
 			{
@@ -2555,7 +2561,9 @@ func isValidFile(const fs::path& path)
 		for (var& keyword : opt::listExclFind)
 		{
 			var handled { keyword[0] == char(1) };
-			if (var found { false }; not handled and ismp3 and (handled = true)) {
+			if (var found { false };
+				not handled and ismp3 and (handled = true))
+			{
 				found = id3 % keyword;
 				if (handled and found)
 					return false;
@@ -2908,7 +2916,9 @@ namespace def {
 func findSubtitleFileInto(const fs::path& original,
 						  ListPath* const result)
 {
-	if (const var parentPath { original.parent_path() }; not parentPath.empty()) {
+	if (const var parentPath { original.parent_path() };
+		not parentPath.empty())
+	{
 		const var noext { excludeExtension(original.filename()) };
 		for (var& f : directory_iterator(parentPath, DT_REG))
 			if (isValid(f)
@@ -3325,7 +3335,8 @@ func parseKeyValue(std::string* const s, const bool isExclude)
 			}
 		}
 		else if (const var havePrefix { value[0] == '<' or value[0] == '>'};
-				 havePrefix) {
+				 havePrefix)
+		{
 			if (const var number { getBytes(value.substr(havePrefix ? 1 : 0)) };
 				number < 0)
 				isKeyValue = false;
@@ -3531,7 +3542,8 @@ func getLinesInto(std::basic_istream<T>* const inputStream,
 		else if (buff.empty() and c == std::isspace(c))
 			continue;
 		else if (const var peek { inputStream->peek() };
-				 c == '/' and (peek == '/' or peek == '*')) {
+				 c == '/' and (peek == '/' or peek == '*'))
+		{
 			if (peek == '*')
 				commentCount++;
 			push();
@@ -5145,8 +5157,7 @@ func main(const int argc, CString const argv[]) -> int
 			installMan(true);
 			return RETURN_VALUE
 		}
-		else if (isMatch(OPT_HELP, 'h') or isMatch(OPT_VERSION, 'v'))
-		{
+		else if (isMatch(OPT_HELP, 'h') or isMatch(OPT_VERSION, 'v')) {
 			printHelp(i + 1 < in::args.size()
 					  ? (in::args[i + 1][0] == '-' and in::args[i + 1][1] == '-'
 						 ? tolower(in::args[++i].substr(2)).c_str()
@@ -5382,9 +5393,9 @@ func main(const int argc, CString const argv[]) -> int
 			{
 				i++;
 				var value { in::args[i] };
-				if (in::args[i].starts_with(MODE_ARRANGEMENT_DEFAULT)
-					or in::args[i].starts_with(MODE_ARRANGEMENT_DEFAULT)
-					or in::args[i].starts_with(MODE_ARRANGEMENT_DESCENDING_DEFAULT))
+				if (	in::args[i].starts_with(MODE_ARRANGEMENT_DEFAULT)
+					or 	in::args[i].starts_with(MODE_ARRANGEMENT_SHUFFLE_DEFAULT)
+					or 	in::args[i].starts_with(MODE_ARRANGEMENT_DESCENDING_DEFAULT))
 				{
 					const var pos { in::args[i].find('=') };
 					value = in::args[i].substr(0, pos - 1);
@@ -5618,14 +5629,14 @@ func main(const int argc, CString const argv[]) -> int
 						opt::valueOf[OPT_DEXCLACCESSED] = "1";
 						opt::valueOf[OPT_DEXCLCHANGED]  = "1";
 					} else {
-					(opt == OPT_DCREATED ? opt::listDCreated
-					 : opt == OPT_DCHANGED ? opt::listDChanged
+					(  opt == OPT_DCREATED  ? opt::listDCreated
+					 : opt == OPT_DCHANGED  ? opt::listDChanged
 					 : opt == OPT_DMODIFIED ? opt::listDModified
 					 : opt == OPT_DACCESSED ? opt::listDAccessed
-					 : opt == OPT_DEXCLCREATED ? opt::listDExclCreated
-					 : opt == OPT_DEXCLCHANGED ? opt::listDExclChanged
+					 : opt == OPT_DEXCLCREATED  ? opt::listDExclCreated
+					 : opt == OPT_DEXCLCHANGED  ? opt::listDExclChanged
 					 : opt == OPT_DEXCLMODIFIED ? opt::listDExclModified
-					 : opt::listDExclAccessed
+					 : 							  opt::listDExclAccessed
 					 ).emplace_back(std::make_pair(opGt, date));
 
 						opt::valueOf[opt] = "1";
@@ -5682,14 +5693,14 @@ func main(const int argc, CString const argv[]) -> int
 						opt::valueOf[OPT_DEXCLACCESSED] = "1";
 						opt::valueOf[OPT_DEXCLCHANGED]  = "1";
 					} else {
-					(opt == OPT_DCREATED ? opt::listDCreatedR
-					 : opt == OPT_DCHANGED ? opt::listDChangedR
+					(  opt == OPT_DCREATED 	? opt::listDCreatedR
+					 : opt == OPT_DCHANGED 	? opt::listDChangedR
 					 : opt == OPT_DMODIFIED ? opt::listDModifiedR
 					 : opt == OPT_DACCESSED ? opt::listDAccessedR
-					 : opt == OPT_DEXCLCREATED ? opt::listDExclCreatedR
-					 : opt == OPT_DEXCLCHANGED ? opt::listDExclChangedR
+					 : opt == OPT_DEXCLCREATED 	? opt::listDExclCreatedR
+					 : opt == OPT_DEXCLCHANGED 	? opt::listDExclChangedR
 					 : opt == OPT_DEXCLMODIFIED ? opt::listDExclModifiedR
-					 : opt::listDExclAccessedR
+					 : 							  opt::listDExclAccessedR
 					 ).emplace_back(std::make_pair(lower, upper));
 						opt::valueOf[opt] = "1";
 					}

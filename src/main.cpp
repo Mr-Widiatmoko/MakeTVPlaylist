@@ -45,10 +45,10 @@ let OPT_SHOWCONFIG_ALTERNATIVE 		= {	"show-defaults",
 										"print-config",
 										"print-defaults",
 };
-let OPT_WRITEDEFAULTS				{"write-defaults"};	// W
-let OPT_WRITEDEFAULTS_ALTERNATIVE 	= {	"write-config"
+let OPT_WRITECONFIG					{"write-defaults"};	// W
+let OPT_WRITECONFIG_ALTERNATIVE 	= {	"write-config"
 };
-let OPT_WRITEDEFAULTS_ARGS 			= { "new",
+let OPT_WRITECONFIG_ARGS 			= { "new",
 										"edit",
 										"remove",
 										"reset",
@@ -546,7 +546,7 @@ typedef std::unordered_map<std::string, std::shared_ptr<ListPath>>
 constexpr ReadOnlyCString* OPTS[] = { &OPT_VERSION, &OPT_HELP, &OPT_ARRANGEMENT,
 	&OPT_SEARCH, &OPT_VERBOSE, &OPT_BENCHMARK, & OPT_OVERWRITE,
 	&OPT_SKIPSUBTITLE, &OPT_OUTDIR, &OPT_CURRENTDIR, &OPT_ADSDIR, &OPT_ADSCOUNT,
-	&OPT_EXECUTION, &OPT_LOADCONFIG, &OPT_WRITEDEFAULTS, &OPT_SHOWCONFIG,
+	&OPT_EXECUTION, &OPT_LOADCONFIG, &OPT_WRITECONFIG, &OPT_SHOWCONFIG,
 	&OPT_LIST, &OPT_OUTFILENAME, &OPT_NOOUTPUTFILE, &OPT_OPEN, &OPT_OPENWITH,
 	&OPT_SIZE, &OPT_EXCLSIZE, &OPT_EXT, &OPT_EXCLEXT,
 	&OPT_FIND, &OPT_EXCLFIND, &OPT_REGEX, &OPT_EXCLREGEX, &OPT_EXCLHIDDEN,
@@ -3600,12 +3600,12 @@ func writeConfig(const ListString* const args,
 				offset = 1;
 			if (isOpt) {
 				if ((offset == 2 and isEqual(s.c_str() + offset,
-											 {OPT_WRITEDEFAULTS, OPT_DEBUG}))
+											 {OPT_WRITECONFIG, OPT_DEBUG}))
 					or (offset == 1 and (s[1] == 'W')))
 				{
 					if (const var next { i + 1 < args->size() ? (*args)[i + 1] : "" };
-						(s == OPT_WRITEDEFAULTS
-						 and not isEqual(next.c_str(), OPT_WRITEDEFAULTS_ARGS,
+						(s == OPT_WRITECONFIG
+						 and not isEqual(next.c_str(), OPT_WRITECONFIG_ARGS,
 										IgnoreCase::Left))
 						or
 						(s == OPT_DEBUG
@@ -4277,6 +4277,34 @@ struct Output {
 
 	}
 	
+	func open()
+	{
+		if (playlistCount == 0)
+			return;
+		
+		const var outputFullpath { fs::absolute(name).string() };
+		std::cout << outputFullpath
+		<< '\n';
+		
+		if (const var app { opt::valueOf[OPT_OPENWITH] };
+			opt::valueOf[OPT_OPEN] == "true" or not app.empty())
+		{
+			#if defined(_WIN32) || defined(_WIN64)
+			if (app.empty())
+				std::cout << "📢 Open in Windows is Under construction.\n";
+			else
+				std::system(std::string(
+										"\"" + app + "\" \"" + outputFullpath + "\"").c_str());
+			#else
+			std::system(std::string((not app.empty() ? "\"" + app + "\"" : "open")
+									+ " \""
+									+ outputFullpath
+									+ "\"").c_str());
+			#endif
+		}
+	}
+	
+	
 	func generate(Section section,
 				  Content* const content = nullptr,
 				  ReadOnlyCString title = nullptr,
@@ -4723,28 +4751,8 @@ struct Output {
 
 			if (playlistCount == 0)
 				fs::remove(name);
-			else {
-				const var outputFullpath { fs::absolute(name).string() };
-				std::cout << outputFullpath
-							<< '\n';
-
-				if (const var app { opt::valueOf[OPT_OPENWITH] };
-					opt::valueOf[OPT_OPEN] == "true" or not app.empty())
-				{
-					#if defined(_WIN32) || defined(_WIN64)
-					if (app.empty())
-						std::cout << "📢 Open in Windows is Under construction.\n";
-					else
-						std::system(std::string(
-												"\"" + app + "\" \"" + outputFullpath + "\"").c_str());
-					#else
-					std::system(std::string((not app.empty() ? "\"" + app + "\"" : "open")
-											+ " \""
-											+ outputFullpath
-											+ "\"").c_str());
-					#endif
-				}
-			}
+			else
+				open();
 		}
 	}
 	
@@ -5268,19 +5276,19 @@ func main(const int argc, CString const argv[]) -> int
 							<< '\n';
 		}
 		else if (isMatch(OPT_SHOWCONFIG, '\0', true, OPT_SHOWCONFIG_ALTERNATIVE));
-		else if (isMatch(OPT_WRITEDEFAULTS, 'W', true, OPT_WRITEDEFAULTS_ALTERNATIVE)) {
+		else if (isMatch(OPT_WRITECONFIG, 'W', true, OPT_WRITECONFIG_ALTERNATIVE)) {
 			if (i + 1 < in::args.size()) {
 				if (isEqual(in::args[i + 1], "reset", IgnoreCase::Left)) {
 					fs::remove(CONFIG_PATH);
-					opt::valueOf[OPT_WRITEDEFAULTS].clear();
+					opt::valueOf[OPT_WRITECONFIG].clear();
 					i++;
 				}
 				else if (isEqual(in::args[i + 1].c_str(),
-								 OPT_WRITEDEFAULTS_ARGS, IgnoreCase::Left)) {
+								 OPT_WRITECONFIG_ARGS, IgnoreCase::Left)) {
 					i++;
-					opt::valueOf[OPT_WRITEDEFAULTS] = in::args[i];
+					opt::valueOf[OPT_WRITECONFIG] = in::args[i];
 				}
-			} else opt::valueOf[OPT_WRITEDEFAULTS] = "new";
+			} else opt::valueOf[OPT_WRITECONFIG] = "new";
 		}
 		else if (isMatch(OPT_LOADCONFIG, 'L')) {
 			if (i + 1 < in::args.size() and fs::exists(in::args[i + 1])) {
@@ -6008,17 +6016,19 @@ SIZE_NEEDED:	std::cout << "⚠️  Expecting operator '<' or '>' followed"\
 		else if (fs::is_directory(in::args[i]))
 			insertInto(&in::inputDirs, fs::path(in::args[i]));
 		else if (const var path { fs::path(in::args[i]) };
-				 fs::is_regular_file(path)
-				 and isValid(path) and isValidFile(path))
+				 fs::is_regular_file(path))
 		{
-			var list { ListPath() };
-			loadPlaylistInto(path, &list);
-			if (list.empty())
-				insertInto(&in::selectFiles, fs::absolute(path));
-			else
-				for (var& f : list)
-					if (isValid(f) and isValidFile(f))
-						insertInto(&in::selectFiles, f);
+			if (isValid(path) and isValidFile(path))
+			{
+				var list { ListPath() };
+				loadPlaylistInto(path, &list);
+				if (list.empty())
+					insertInto(&in::selectFiles, fs::absolute(path));
+				else
+					for (var& f : list)
+						if (isValid(f) and isValidFile(f))
+							insertInto(&in::selectFiles, f);
+			}
 		}
 		else
 			in::invalidArgs.emplace(in::args[i]);
@@ -6133,7 +6143,7 @@ SIZE_NEEDED:	std::cout << "⚠️  Expecting operator '<' or '>' followed"\
 		return RETURN_VALUE
 					   
 					   
-	if (const var mode { opt::valueOf[OPT_WRITEDEFAULTS] };
+	if (const var mode { opt::valueOf[OPT_WRITECONFIG] };
 		not mode.empty())
 		writeConfig(&in::args,
 					  mode == "edit" 	? WriteConfigMode::Edit
@@ -6165,7 +6175,7 @@ SIZE_NEEDED:	std::cout << "⚠️  Expecting operator '<' or '>' followed"\
 					   
     if (		opt::valueOf[OPT_LIST] == "true"
 		or	not opt::valueOf[OPT_SHOWCONFIG].empty()
-		or 	not opt::valueOf[OPT_WRITEDEFAULTS].empty())
+		or 	not opt::valueOf[OPT_WRITECONFIG].empty())
         return RETURN_VALUE
 
 	{///Clean up <key=val> dir=??? in listFind and listExclFind

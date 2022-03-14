@@ -5280,7 +5280,6 @@ func main(const int argc, CString const argv[]) -> int
 			if (i + 1 < in::args.size()) {
 				if (isEqual(in::args[i + 1], "reset", IgnoreCase::Left)) {
 					fs::remove(CONFIG_PATH);
-					opt::valueOf[OPT_WRITECONFIG].clear();
 					i++;
 				}
 				else if (isEqual(in::args[i + 1].c_str(),
@@ -5288,14 +5287,21 @@ func main(const int argc, CString const argv[]) -> int
 					i++;
 					opt::valueOf[OPT_WRITECONFIG] = in::args[i];
 				}
-			} else opt::valueOf[OPT_WRITECONFIG] = "new";
+			} else
+				opt::valueOf[OPT_WRITECONFIG] = "new";
 		}
 		else if (isMatch(OPT_LOADCONFIG, 'L')) {
-			if (i + 1 < in::args.size() and fs::exists(in::args[i + 1])) {
+			if (i + 1 < in::args.size()) {
 				i++;
-				opt::valueOf[OPT_LOADCONFIG] = in::args[i];
-				loadConfigInto(&in::args);
-				continue;
+				if (fs::exists(in::args[i])) {
+					opt::valueOf[OPT_LOADCONFIG] = in::args[i];
+					loadConfigInto(&in::args);
+					continue;
+				}
+				else
+					std::cout << "⚠️  No such file: \""
+								<< in::args[i]
+								<< "\"\n";
 			}
 			
 			std::cout << "⚠️  Expecting config file path. Please see --help "
@@ -5303,14 +5309,20 @@ func main(const int argc, CString const argv[]) -> int
 						<< '\n';
 		}
 		else if (isMatch(OPT_ADSDIR, 'D')) {
-			if (i + 1 < in::args.size() and fs::exists(in::args[i + 1])) {
+			if (i + 1 < in::args.size()) {
 				i++;
-				in::listAdsDir.emplace_back(fs::path(in::args[i]));
-				continue;
+				
+				if (fs::exists(in::args[i])) {
+					in::listAdsDir.emplace_back(fs::path(in::args[i]));
+					continue;
+				} else
+					std::cout << "⚠️  No such directory: \""
+								<< in::args[i]
+								<< "\"\n";
 			}
 			
 			std::cout << "⚠️  Expecting directory path. Please see --help "
-						<< in::args[i].substr(2)
+						<< OPT_ADSDIR
 						<< '\n';
 		}
 		else if (isMatch(OPT_ADSCOUNT, 'C')) {

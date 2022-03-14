@@ -11,7 +11,7 @@ This is a utility to create playlist file with extension .m3u8 (by default) that
 	Then "mpv" (by default, if you have one) or your default video player will be automatically used to play the playlist file.
 	
 	This workflow implemented using zsh script, so the performace to create playlist is very, very, very ... slugish. To upgrade performace for more than 1000% and have bunch of bells and whistles you need to download [tvplaylist](https://github.com/Mr-Widiatmoko/MakeTVPlaylist/Release/tvplaylist)(for macOS Intel!) or For others platform, you need to compile by your self, see Installation).
-		
+	
 2. By using Terminal.app and type "tvplaylist" press SPACE then drag folders or files from Finder to Terminal, then press ENTER. the program will display full path of playlist file.
 
 ![tvplaylist on Terminal](https://raw.githubusercontent.com/Mr-Widiatmoko/MakeTVPlaylist/master/README/ScreenShot3.png "Screen shot of tvplayliston Terminal.app")
@@ -36,7 +36,9 @@ But, if you need more features and blasting super speed for processing, you may 
 
 Or pass argument "install" to automatically install into "/usr/local/bin". For the example: 
 
-	tvplaylist --install
+```bash
+tvplaylist --install
+```
 
 Thats it, and "Make TV Playlist" will automatically use "tvplaylist" for processing.
 
@@ -44,34 +46,42 @@ To build "tvplaylist" on macOS Apple Silicon, Windows, Linux, or another platfor
 
 To build using cmake, inside "MakeTVPlaylist" folder (or folder containing CMakeLists.txt) copy below and paste on the Terminal:
 
-	mkdir Release
-	cd Release
-	cmake ../
-	make
-	make install
-	make clean
-	
+```bash
+mkdir Release
+cd Release
+cmake ../
+make
+make install
+make clean
+```
+
 Don't forget to [Press ENTER]. Thats it, you will get "tvplaylist" on "/usr/local/bin" directory.
 
 If you don't have cmake installed then, from 'src' directory on Terminal, paste following:
 
-    c++ main.cpp -std=c++2b -o /usr/local/bin/tvplaylist
+```bash
+c++ main.cpp -std=c++2b -o /usr/local/bin/tvplaylist
+```
 
 Don't forget to [Press ENTER]. Thats it, you will get "tvplaylist" on "/usr/local/bin/" directory.
 
 If you already have "tvplaylist", then you can use "install" or "uninstall" or "update" argument to do automation, for the example, to update to the newest version: 
 
-	tvplaylist --update
+```bash
+tvplaylist --update
+```
 
 If you need to build this as library file, then copy below and paste on the Terminal:
 
-	mkdir WHATEVER
-	cd WHATEVER
-	cmake ../ -DMAKE_LIB=1
-	make
-	make install
-	make clean
- 
+```bash
+mkdir WHATEVER
+cd WHATEVER
+cmake ../ -DMAKE_LIB=1
+make
+make install
+make clean
+```
+
 Don't forget to [Press ENTER]. Thats it, you will get "libtvplaylist.dylib" on "/usr/local/lib" directory and "libtvplaylist.h" on "/usr/local/include" directory. 
 
 ## Usage fo Dummies:

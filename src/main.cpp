@@ -13,20 +13,34 @@
 #include <iostream>
 #include <string>
 #include <charconv>
-#include <vector>
-#include <unordered_set>
-#include <unordered_map>
 #include <filesystem>
 #include <thread>
 #include <future>
-#include <cstdarg>
 #include <algorithm>
 #include <regex>
-#include <clocale>
-#include <sys/stat.h> // TODO: I dont know in Windows, should change to use FileAttribute?
 #include <fstream>
 #include <random>
+#include <vector>
+#include <unordered_set>
+#include <unordered_map>
+#include <cstdarg>
+#include <clocale>
+
+/// USE_DIRENT if true then readdir() is used instead of std::filesystem::directory_iterator()
+#define USE_DIRENT 0
+
+#if defined(_WIN32) || defined(_WIN64)
+#define USE_DIRENT 0
+#endif
+
+#if USE_DIRENT
 #include <dirent.h>
+#else
+#define DT_DIR	4
+#define DT_REG	8
+#endif
+
+#include <sys/stat.h> // TODO: I dont know in Windows, should change to use FileAttribute?
 #define let static constexpr auto
 let TRUE_FALSE						= {	"true",
 										"false"
@@ -2362,7 +2376,7 @@ namespace opt {
 func directory_iterator(const fs::path& path, const unsigned char type)
 {
 	var result { ListEntry() };
-		
+	#if USE_DIRENT
 	if(const var folder { opendir(path.string().c_str()) }; folder) {
 		const var parentPath { path.string() + fs::path::preferred_separator };
 		struct dirent* entry;
@@ -2408,6 +2422,42 @@ func directory_iterator(const fs::path& path, const unsigned char type)
 		}
 		closedir(folder);
 	}
+	#else
+	if (fs::is_directory(path)) {
+		for (var && entry : fs::directory_iterator(path)) {
+			if (	(entry.is_directory() and (type & DT_DIR) == DT_DIR)
+				or 	(entry.is_regular_file() and (type & DT_REG) == DT_REG))
+			{
+				if (entry.is_regular_file()
+					and entry.path().filename().string() == ".DS_Store")
+					;
+				else {
+					if (((entry.status().permissions() & ( fs::perms::owner_read
+														  | fs::perms::group_read
+														  | fs::perms::others_read))
+						 == fs::perms::none)
+						or (opt::valueOf[OPT_EXCLHIDDEN] == "true"
+							and entry.path().string()[0] == '.'))
+						continue;
+					
+					if (entry.is_symlink()) {
+						const var ori { fs::directory_entry(
+															std::move(fs::read_symlink(entry.path()))) };
+						if ((ori.path().empty() or not ori.exists())
+							and
+							(((type & DT_DIR) == DT_DIR and not ori.is_directory())
+							 or
+							 ((type & DT_REG) == DT_REG and not ori.is_regular_file()))
+							)
+							continue;
+					}
+					
+					result.emplace_back(entry);
+				}
+			}
+		}
+	}
+	#endif
 	return result;
 }
 

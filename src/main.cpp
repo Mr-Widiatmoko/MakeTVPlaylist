@@ -27,10 +27,12 @@
 #include <clocale>
 
 /// USE_DIRENT if true then readdir() is used instead of std::filesystem::directory_iterator()
-#define USE_DIRENT 0
-
 #if defined(_WIN32) || defined(_WIN64)
 #define USE_DIRENT 0
+#else
+#ifndef USE_DIRENT
+#define USE_DIRENT 0
+#endif
 #endif
 
 #if USE_DIRENT

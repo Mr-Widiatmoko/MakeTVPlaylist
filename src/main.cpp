@@ -1756,7 +1756,7 @@ struct ID3
 	}
 	
 private:
-	std::unordered_multimap<std::string_view, std::string> tags;
+	MapString tags;
 	const CString path;
 	bool isCaseInsensitive;
 	
